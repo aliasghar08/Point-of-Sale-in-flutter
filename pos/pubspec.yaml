@@ -37,10 +37,6 @@ dependencies:
 
   # Barcode & QR Scanner
   mobile_scanner: ^7.2.1
-  qr_code_scanner: ^1.0.1
-
-  # Voice Input
-  text_to_speech: ^0.2.3
 
   # State Management
   provider: ^6.1.5+1
