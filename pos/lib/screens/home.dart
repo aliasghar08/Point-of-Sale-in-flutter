@@ -1,6 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:pos/screens/inventory_screen.dart';
+import 'package:pos/screens/user_management_screen.dart';
 import 'package:pos/widgets/barcode_scanner.dart';
+import 'package:pos/widgets/drawer.dart';
 import 'package:pos/widgets/qr_scanner.dart';
 import 'package:pos/widgets/voice_input.dart';
 import 'package:provider/provider.dart';
@@ -21,7 +24,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final FirebaseService _firebaseService = FirebaseService();
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
-  
+
   List<Product> _cartItems = [];
   double _totalAmount = 0.0;
   double _totalProfit = 0.0;
@@ -29,7 +32,12 @@ class _HomeScreenState extends State<HomeScreen> {
   String _selectedPaymentMethod = 'Cash';
   bool _isSearching = false;
 
-  final List<String> _paymentMethods = ['Cash', 'Card', 'Mobile Payment', 'Credit'];
+  final List<String> _paymentMethods = [
+    'Cash',
+    'Card',
+    'Mobile Payment',
+    'Credit',
+  ];
 
   @override
   void dispose() {
@@ -45,6 +53,44 @@ class _HomeScreenState extends State<HomeScreen> {
     final showProfit = settingsProvider.showProfitInPOS;
 
     return Scaffold(
+      // home.dart
+      drawer: AppDrawer(
+        currentIndex: 0,
+        onItemSelected: (index) {
+          // Close the drawer first
+          Navigator.pop(context);
+
+          // Navigate based on the selected index
+          switch (index) {
+            case 0:
+              // Already on Home (POS) - do nothing
+              break;
+
+            case 1:
+              // Navigate to Inventory
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const InventoryScreen(),
+                ),
+              );
+              break;
+
+            case 2:
+              // Navigate to User Management
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const UserManagementScreen(),
+                ),
+              );
+              break;
+
+            default:
+              break;
+          }
+        },
+      ),
       appBar: AppBar(
         title: const Text('Point of Sale'),
         backgroundColor: Colors.blue.shade700,
@@ -73,16 +119,16 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           // Search and Input Section
           _buildSearchSection(),
-          
+
           // Cart Items
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : _cartItems.isEmpty
-                    ? _buildEmptyCart()
-                    : _buildCartList(currencySymbol),
+                ? _buildEmptyCart()
+                : _buildCartList(currencySymbol),
           ),
-          
+
           // Summary and Checkout
           _buildCheckoutSection(currencySymbol, showProfit),
         ],
@@ -207,7 +253,7 @@ class _HomeScreenState extends State<HomeScreen> {
       itemBuilder: (context, index) {
         final product = _cartItems[index];
         final itemTotal = product.price * product.stock;
-        
+
         return Dismissible(
           key: Key(product.id),
           direction: DismissDirection.endToStart,
@@ -263,9 +309,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               subtitle: Text(
                 '$currencySymbol${product.price.toStringAsFixed(2)} × ${product.stock}',
-                style: TextStyle(
-                  color: Colors.grey.shade600,
-                ),
+                style: TextStyle(color: Colors.grey.shade600),
               ),
               trailing: Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
@@ -343,10 +387,7 @@ class _HomeScreenState extends State<HomeScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Text(
                 'Add products using barcode, QR, voice, or search',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey.shade500,
-                ),
+                style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
                 textAlign: TextAlign.center,
               ),
             ),
@@ -360,7 +401,10 @@ class _HomeScreenState extends State<HomeScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blue.shade700,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -393,10 +437,7 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               const Text(
                 'Total:',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               Text(
                 '$currencySymbol${_totalAmount.toStringAsFixed(2)}',
@@ -415,10 +456,7 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 const Text(
                   'Total Profit:',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
                 ),
                 Text(
                   '$currencySymbol${_totalProfit.toStringAsFixed(2)}',
@@ -450,10 +488,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         : Colors.grey.shade800,
                   ),
                   items: _paymentMethods.map((method) {
-                    return DropdownMenuItem(
-                      value: method,
-                      child: Text(method),
-                    );
+                    return DropdownMenuItem(value: method, child: Text(method));
                   }).toList(),
                   onChanged: (value) {
                     setState(() {
@@ -510,25 +545,27 @@ class _HomeScreenState extends State<HomeScreen> {
       _showSnackBar('Please enter a search term');
       return;
     }
-    
+
     setState(() {
       _isLoading = true;
       _isSearching = true;
     });
-    
+
     try {
       // Search by barcode or QR code first
-      QuerySnapshot barcodeResult = await _firebaseService
-          .getProductByBarcode(query);
-      
+      QuerySnapshot barcodeResult = await _firebaseService.getProductByBarcode(
+        query,
+      );
+
       if (barcodeResult.docs.isNotEmpty) {
         _addProductToCart(barcodeResult.docs.first);
         _searchController.clear();
         _searchFocusNode.unfocus();
       } else {
-        QuerySnapshot qrResult = await _firebaseService
-            .getProductByQRCode(query);
-        
+        QuerySnapshot qrResult = await _firebaseService.getProductByQRCode(
+          query,
+        );
+
         if (qrResult.docs.isNotEmpty) {
           _addProductToCart(qrResult.docs.first);
           _searchController.clear();
@@ -540,7 +577,7 @@ class _HomeScreenState extends State<HomeScreen> {
               .where('name', isLessThanOrEqualTo: query + '\uf8ff')
               .limit(20)
               .get();
-          
+
           if (nameResult.docs.isNotEmpty) {
             _showProductSelection(nameResult);
           } else {
@@ -563,12 +600,12 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       var data = doc.data() as Map<String, dynamic>;
       Product product = Product.fromMap(data, doc.id);
-      
+
       // Check if product already in cart
       var existingIndex = _cartItems.indexWhere(
         (item) => item.id == product.id,
       );
-      
+
       setState(() {
         if (existingIndex != -1) {
           // Update quantity
@@ -582,7 +619,7 @@ class _HomeScreenState extends State<HomeScreen> {
         }
         _updateTotals();
       });
-      
+
       _showSnackBar('${product.name} added to cart');
     } catch (e) {
       _showSnackBar('Error adding product: $e');
@@ -612,7 +649,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void _updateTotals() {
     _totalAmount = 0;
     _totalProfit = 0;
-    
+
     for (var item in _cartItems) {
       _totalAmount += item.price * item.stock;
       _totalProfit += (item.price - item.costPrice) * item.stock;
@@ -621,19 +658,21 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _processCheckout() async {
     if (_cartItems.isEmpty) return;
-    
+
     // Check stock availability
     for (var item in _cartItems) {
       try {
         // Check current stock from database
-        DocumentSnapshot doc = await _firebaseService.products.doc(item.id).get();
+        DocumentSnapshot doc = await _firebaseService.products
+            .doc(item.id)
+            .get();
         if (doc.exists) {
           var data = doc.data() as Map<String, dynamic>;
           int availableStock = (data['stock'] ?? 0).toInt();
-          
+
           if (availableStock < item.stock) {
             _showSnackBar(
-              'Insufficient stock for ${item.name}. Available: $availableStock'
+              'Insufficient stock for ${item.name}. Available: $availableStock',
             );
             return;
           }
@@ -643,16 +682,18 @@ class _HomeScreenState extends State<HomeScreen> {
         return;
       }
     }
-    
+
     bool confirm = await _showConfirmationDialog();
     if (!confirm) return;
-    
+
     setState(() => _isLoading = true);
-    
+
     try {
       String receiptNumber = 'RCP-${DateTime.now().millisecondsSinceEpoch}';
-      String receiptDate = DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now());
-      
+      String receiptDate = DateFormat(
+        'yyyy-MM-dd HH:mm:ss',
+      ).format(DateTime.now());
+
       for (var item in _cartItems) {
         Sale sale = Sale(
           id: '',
@@ -667,19 +708,18 @@ class _HomeScreenState extends State<HomeScreen> {
           paymentMethod: _selectedPaymentMethod,
           receiptNumber: receiptNumber,
         );
-        
+
         await _firebaseService.addSale(sale.toMap());
       }
-      
+
       // Clear cart
       setState(() {
         _cartItems.clear();
         _updateTotals();
       });
-      
+
       _showSnackBar('✅ Sale completed! Receipt #$receiptNumber');
       _showReceiptDialog(receiptNumber: receiptNumber);
-      
     } catch (e) {
       _showSnackBar('❌ Checkout failed: $e');
       print('Checkout error: $e');
@@ -689,7 +729,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _showProductSelection(QuerySnapshot snapshot) {
-    final settingsProvider = Provider.of<SettingsProvider>(context, listen: false);
+    final settingsProvider = Provider.of<SettingsProvider>(
+      context,
+      listen: false,
+    );
     final currencySymbol = settingsProvider.currencySymbol;
 
     showDialog(
@@ -786,7 +829,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _showReceiptDialog({String? receiptNumber}) {
-    final settingsProvider = Provider.of<SettingsProvider>(context, listen: false);
+    final settingsProvider = Provider.of<SettingsProvider>(
+      context,
+      listen: false,
+    );
     final currencySymbol = settingsProvider.currencySymbol;
     final showProfit = settingsProvider.showProfitInPOS;
 
@@ -814,37 +860,36 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const Divider(),
             const SizedBox(height: 8),
-            ..._cartItems.map((item) => Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Text(
-                      '${item.name} × ${item.stock}',
-                      style: const TextStyle(fontSize: 14),
+            ..._cartItems.map(
+              (item) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '${item.name} × ${item.stock}',
+                        style: const TextStyle(fontSize: 14),
+                      ),
                     ),
-                  ),
-                  Text(
-                    '$currencySymbol${(item.price * item.stock).toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w500,
-                      fontSize: 14,
+                    Text(
+                      '$currencySymbol${(item.price * item.stock).toStringAsFixed(2)}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w500,
+                        fontSize: 14,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            )),
+            ),
             const Divider(),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text(
                   'Total:',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
                 Text(
                   '$currencySymbol${_totalAmount.toStringAsFixed(2)}',
@@ -863,10 +908,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   Text(
                     'Profit:',
-                    style: TextStyle(
-                      color: Colors.grey.shade600,
-                      fontSize: 14,
-                    ),
+                    style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
                   ),
                   Text(
                     '$currencySymbol${_totalProfit.toStringAsFixed(2)}',
@@ -886,17 +928,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   Text(
                     'Payment:',
-                    style: TextStyle(
-                      color: Colors.grey.shade600,
-                      fontSize: 14,
-                    ),
+                    style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
                   ),
                   Text(
                     _selectedPaymentMethod,
-                    style: TextStyle(
-                      color: Colors.grey.shade600,
-                      fontSize: 14,
-                    ),
+                    style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
                   ),
                 ],
               ),
@@ -926,7 +962,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _showSalesHistory() {
-    final settingsProvider = Provider.of<SettingsProvider>(context, listen: false);
+    final settingsProvider = Provider.of<SettingsProvider>(
+      context,
+      listen: false,
+    );
     final currencySymbol = settingsProvider.currencySymbol;
 
     showModalBottomSheet(
@@ -942,10 +981,7 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             const Text(
               'Sales History',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             const Divider(),
             Expanded(
@@ -958,22 +994,21 @@ class _HomeScreenState extends State<HomeScreen> {
                   if (snapshot.hasError) {
                     return Center(child: Text('Error: ${snapshot.error}'));
                   }
-                  
+
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());
                   }
-                  
+
                   if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                    return const Center(
-                      child: Text('No sales yet'),
-                    );
+                    return const Center(child: Text('No sales yet'));
                   }
-                  
+
                   return ListView.builder(
                     itemCount: snapshot.data!.docs.length,
                     itemBuilder: (context, index) {
-                      var data = snapshot.data!.docs[index].data()
-                          as Map<String, dynamic>;
+                      var data =
+                          snapshot.data!.docs[index].data()
+                              as Map<String, dynamic>;
                       return Card(
                         child: ListTile(
                           leading: CircleAvatar(
@@ -1027,65 +1062,67 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<bool> _showConfirmationDialog() async {
-    final settingsProvider = Provider.of<SettingsProvider>(context, listen: false);
+    final settingsProvider = Provider.of<SettingsProvider>(
+      context,
+      listen: false,
+    );
     final currencySymbol = settingsProvider.currencySymbol;
     final showProfit = settingsProvider.showProfitInPOS;
 
     return await showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Confirm Checkout'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Total items: ${_cartItems.length}',
-              style: const TextStyle(fontWeight: FontWeight.w500),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Total amount: $currencySymbol${_totalAmount.toStringAsFixed(2)}',
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.green,
-              ),
-            ),
-            if (showProfit) ...[
-              const SizedBox(height: 4),
-              Text(
-                'Total profit: $currencySymbol${_totalProfit.toStringAsFixed(2)}',
-                style: TextStyle(
-                  color: Colors.blue.shade700,
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Confirm Checkout'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Total items: ${_cartItems.length}',
+                  style: const TextStyle(fontWeight: FontWeight.w500),
                 ),
+                const SizedBox(height: 8),
+                Text(
+                  'Total amount: $currencySymbol${_totalAmount.toStringAsFixed(2)}',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green,
+                  ),
+                ),
+                if (showProfit) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'Total profit: $currencySymbol${_totalProfit.toStringAsFixed(2)}',
+                    style: TextStyle(color: Colors.blue.shade700),
+                  ),
+                ],
+                const SizedBox(height: 8),
+                const Divider(),
+                const SizedBox(height: 8),
+                const Text(
+                  'Proceed with checkout?',
+                  style: TextStyle(fontWeight: FontWeight.w500),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green.shade700,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Confirm'),
               ),
             ],
-            const SizedBox(height: 8),
-            const Divider(),
-            const SizedBox(height: 8),
-            const Text(
-              'Proceed with checkout?',
-              style: TextStyle(fontWeight: FontWeight.w500),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
           ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green.shade700,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Confirm'),
-          ),
-        ],
-      ),
-    ) ?? false;
+        ) ??
+        false;
   }
 
   void _showSnackBar(String message) {
@@ -1094,9 +1131,7 @@ class _HomeScreenState extends State<HomeScreen> {
         content: Text(message),
         duration: const Duration(seconds: 2),
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );
   }

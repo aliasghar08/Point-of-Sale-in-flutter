@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:pos/models/user.dart';
 import 'package:pos/providers/auth_provider.dart';
 import 'package:pos/providers/settings_provider.dart';
-import 'package:pos/providers/settings_screen.dart';
+import 'package:pos/screens/settings_screen.dart';
 import 'package:pos/screens/home.dart';
 import 'package:pos/screens/inventory_screen.dart';
 import 'package:pos/screens/login_screen.dart';

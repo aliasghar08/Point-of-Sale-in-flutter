@@ -10,22 +10,19 @@ class SettingsProvider extends ChangeNotifier {
   AppSettings get settings => _settings;
   bool get isLoading => _isLoading;
 
-  // Theme related getters
-  ThemeMode get themeMode {
-    switch (_settings.themeMode) {
-      case 'light':
-        return ThemeMode.light;
-      case 'dark':
-        return ThemeMode.dark;
-      default:
-        return ThemeMode.system;
-    }
-  }
-
+  // Currency related getters (Theme removed)
   String get currencySymbol => _settings.currencySymbol;
   String get currencyCode => _settings.currencyCode;
   bool get showProfitInPOS => _settings.showProfitInPOS;
   int get lowStockThreshold => _settings.lowStockThreshold;
+  bool get enableNotifications => _settings.enableNotifications;
+  bool get enableSound => _settings.enableSound;
+  bool get enableVibration => _settings.enableVibration;
+  bool get autoPrintReceipt => _settings.autoPrintReceipt;
+  bool get enableOfflineMode => _settings.enableOfflineMode;
+  bool get autoSyncData => _settings.autoSyncData;
+  String get dateFormat => _settings.dateFormat;
+  String get timeFormat => _settings.timeFormat;
 
   SettingsProvider() {
     loadSettings();
@@ -69,13 +66,7 @@ class SettingsProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Update individual settings
-  Future<void> updateThemeMode(String themeMode) async {
-    _settings = _settings.copyWith(themeMode: themeMode);
-    await _saveSettings();
-    notifyListeners();
-  }
-
+  // Currency Methods
   Future<void> updateCurrency(String symbol, String code) async {
     _settings = _settings.copyWith(
       currencySymbol: symbol,
@@ -85,18 +76,27 @@ class SettingsProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Inventory Methods
   Future<void> updateLowStockThreshold(int threshold) async {
     _settings = _settings.copyWith(lowStockThreshold: threshold);
     await _saveSettings();
     notifyListeners();
   }
 
+  // POS Toggles
   Future<void> toggleShowProfit() async {
     _settings = _settings.copyWith(showProfitInPOS: !_settings.showProfitInPOS);
     await _saveSettings();
     notifyListeners();
   }
 
+  Future<void> toggleAutoPrint() async {
+    _settings = _settings.copyWith(autoPrintReceipt: !_settings.autoPrintReceipt);
+    await _saveSettings();
+    notifyListeners();
+  }
+
+  // Notification Toggles
   Future<void> toggleNotifications() async {
     _settings = _settings.copyWith(enableNotifications: !_settings.enableNotifications);
     await _saveSettings();
@@ -115,12 +115,7 @@ class SettingsProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> toggleAutoPrint() async {
-    _settings = _settings.copyWith(autoPrintReceipt: !_settings.autoPrintReceipt);
-    await _saveSettings();
-    notifyListeners();
-  }
-
+  // Data & Sync Toggles
   Future<void> toggleOfflineMode() async {
     _settings = _settings.copyWith(enableOfflineMode: !_settings.enableOfflineMode);
     await _saveSettings();
@@ -132,6 +127,35 @@ class SettingsProvider extends ChangeNotifier {
     await _saveSettings();
     notifyListeners();
   }
+
+/// Initialize settings with location-based currency
+Future<void> initSettingsWithLocation() async {
+  _isLoading = true;
+  notifyListeners();
+
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final String? settingsJson = prefs.getString('app_settings');
+    
+    if (settingsJson != null) {
+      // Settings exist, load them
+      final Map<String, dynamic> data = json.decode(settingsJson);
+      _settings = AppSettings.fromMap(data);
+    } else {
+      // No settings found, create with location-based currency
+      _settings = await AppSettings.createWithLocationBasedCurrency();
+      await _saveSettings();
+      print('✅ Settings initialized with location-based currency');
+    }
+  } catch (e) {
+    print('Error loading settings: $e');
+    // Fallback to default
+    _settings = AppSettings();
+  } finally {
+    _isLoading = false;
+    notifyListeners();
+  }
+}
 
   // Reset to default settings
   Future<void> resetToDefault() async {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import '../models/user.dart';
 import '../providers/auth_provider.dart';
 import '../providers/settings_provider.dart';
@@ -28,11 +29,122 @@ class _UserManagementContent extends StatefulWidget {
 
 class _UserManagementContentState extends State<_UserManagementContent> {
   final AuthService _authService = AuthService();
+  bool _isLoading = true;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkUserPermissions();
+  }
+
+  // ========== DEBUG: Check User Permissions ==========
+  Future<void> _checkUserPermissions() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final currentUser = firebase_auth.FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        setState(() {
+          _errorMessage = 'No user logged in';
+          _isLoading = false;
+        });
+        return;
+      }
+
+      print('🔍 Checking user: ${currentUser.uid}');
+      print('📧 Email: ${currentUser.email}');
+
+      // Check if user document exists
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(currentUser.uid)
+          .get();
+
+      if (doc.exists) {
+        final data = doc.data();
+        print('✅ User document exists');
+        print('📝 Role: ${data?['role']}');
+        print('📝 Name: ${data?['name']}');
+        print('📝 Is Active: ${data?['isActive']}');
+
+        if (data?['role'] == 'owner') {
+          print('✅ User is OWNER - Has full access');
+          setState(() {
+            _errorMessage = null;
+            _isLoading = false;
+          });
+        } else {
+          print('⚠️ User is NOT owner. Role: ${data?['role']}');
+          setState(() {
+            _errorMessage = 'You are not an owner. Role: ${data?['role']}';
+            _isLoading = false;
+          });
+        }
+      } else {
+        print('❌ User document does NOT exist!');
+        print('⚠️ This is the cause of permission issues');
+        
+        // Try to create the document
+        await _createUserDocument(currentUser);
+      }
+    } catch (e) {
+      print('❌ Error: $e');
+      setState(() {
+        _errorMessage = e.toString();
+        _isLoading = false;
+      });
+    }
+  }
+
+  // ========== CREATE USER DOCUMENT IF MISSING ==========
+  Future<void> _createUserDocument(firebase_auth.User user) async {
+    try {
+      print('📝 Creating user document...');
+      
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .set({
+        'id': user.uid,
+        'email': user.email ?? '',
+        'name': user.displayName ?? 'User',
+        'role': 'owner',  // Make first user owner
+        'phone': '',
+        'storeName': 'My Store',
+        'createdAt': FieldValue.serverTimestamp(),
+        'isActive': true,
+      });
+      
+      print('✅ User document created with role: owner');
+      
+      setState(() {
+        _errorMessage = null;
+        _isLoading = false;
+      });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('✅ User document created successfully!'),
+          backgroundColor: Colors.green,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      print('❌ Error creating user document: $e');
+      setState(() {
+        _errorMessage = 'Failed to create user document: $e';
+        _isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final settingsProvider = Provider.of<SettingsProvider>(context);
-    final currencySymbol = settingsProvider.currencySymbol;
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
@@ -52,22 +164,108 @@ class _UserManagementContentState extends State<_UserManagementContent> {
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () {
+              _checkUserPermissions();
               setState(() {});
             },
             tooltip: 'Refresh',
           ),
+          // Debug button
+          IconButton(
+            icon: const Icon(Icons.bug_report),
+            onPressed: () {
+              _checkUserPermissions();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('🔍 Checking permissions...'),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            },
+            tooltip: 'Debug Permissions',
+          ),
         ],
       ),
-      body: _buildUserList(isDarkMode),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _errorMessage != null
+              ? _buildErrorScreen(isDarkMode)
+              : _buildUserList(isDarkMode),
     );
   }
 
+  // ========== ERROR SCREEN ==========
+  Widget _buildErrorScreen(bool isDarkMode) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.error_outline,
+              size: 60,
+              color: Colors.red.shade300,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Permission Error',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: isDarkMode ? Colors.white : Colors.black,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _errorMessage!,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Try refreshing or contact support.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12,
+                color: isDarkMode ? Colors.grey.shade500 : Colors.grey.shade400,
+              ),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: _checkUserPermissions,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue.shade700,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ========== USER LIST ==========
   Widget _buildUserList(bool isDarkMode) {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('users')
           .orderBy('createdAt', descending: true)
-          .snapshots(),
+          .snapshots()
+          .handleError((error) {
+            print('❌ Stream error: $error');
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Error: $error'),
+                backgroundColor: Colors.red,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           return Center(
@@ -88,16 +286,21 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                Text(
-                  snapshot.error.toString(),
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade500,
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Text(
+                    snapshot.error.toString(),
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade500,
+                    ),
+                    textAlign: TextAlign.center,
                   ),
                 ),
                 const SizedBox(height: 16),
                 ElevatedButton(
                   onPressed: () {
+                    _checkUserPermissions();
                     setState(() {});
                   },
                   child: const Text('Retry'),
@@ -173,6 +376,7 @@ class _UserManagementContentState extends State<_UserManagementContent> {
     );
   }
 
+  // ========== USER CARD ==========
   Widget _buildUserCard(BuildContext context, AppUser user, bool isDarkMode) {
     final authProvider = Provider.of<AuthProvider>(context);
     final isCurrentUser = authProvider.currentUser?.id == user.id;
@@ -369,6 +573,7 @@ class _UserManagementContentState extends State<_UserManagementContent> {
     }
   }
 
+  // ========== ADD USER DIALOG ==========
   void _showAddUserDialog(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final _formKey = GlobalKey<FormState>();
@@ -512,7 +717,7 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                     name: _nameController.text.trim(),
                     role: _selectedRole,
                     phone: _phoneController.text.trim(),
-                    storeName: '',
+                    storeName: '', // Owner can set this or leave empty
                   );
                   
                   Navigator.pop(context);
@@ -545,6 +750,7 @@ class _UserManagementContentState extends State<_UserManagementContent> {
     );
   }
 
+  // ========== EDIT USER ROLE DIALOG ==========
   void _showEditUserDialog(BuildContext context, AppUser user) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final roles = ['owner', 'manager', 'worker'];
@@ -633,6 +839,7 @@ class _UserManagementContentState extends State<_UserManagementContent> {
     );
   }
 
+  // ========== TOGGLE USER ACTIVE ==========
   void _toggleUserActive(BuildContext context, AppUser user) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
@@ -698,6 +905,7 @@ class _UserManagementContentState extends State<_UserManagementContent> {
     );
   }
 
+  // ========== DELETE USER ==========
   void _deleteUser(BuildContext context, AppUser user) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 

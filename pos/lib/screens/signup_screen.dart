@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:pos/providers/settings_provider.dart';
+import 'package:pos/screens/login_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:email_validator/email_validator.dart';
-import '../providers/auth_provider.dart';
-import '../providers/settings_provider.dart';
-import '../screens/login_screen.dart';
+import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:pos/providers/auth_provider.dart';
+import 'package:pos/services/permission_service.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -20,10 +24,489 @@ class _SignupScreenState extends State<SignupScreen> {
   final _confirmPasswordController = TextEditingController();
   final _phoneController = TextEditingController();
   final _storeNameController = TextEditingController();
-  
+
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   String _selectedRole = 'owner';
+  bool _isDetectingCountry = false;
+  bool _locationPermissionDenied = false;
+
+  // Country code related - Default to Pakistan
+  String _selectedCountryCode = '+92';
+  String _countryFlag = '🇵🇰';
+  String _countryName = 'Pakistan';
+
+  // List of countries with codes - Including Pakistan
+  final List<Map<String, String>> _countries = [
+    {'code': '+93', 'flag': '🇦🇫', 'name': 'Afghanistan'},
+    {'code': '+355', 'flag': '🇦🇱', 'name': 'Albania'},
+    {'code': '+213', 'flag': '🇩🇿', 'name': 'Algeria'},
+    {'code': '+376', 'flag': '🇦🇩', 'name': 'Andorra'},
+    {'code': '+244', 'flag': '🇦🇴', 'name': 'Angola'},
+    {'code': '+54', 'flag': '🇦🇷', 'name': 'Argentina'},
+    {'code': '+61', 'flag': '🇦🇺', 'name': 'Australia'},
+    {'code': '+43', 'flag': '🇦🇹', 'name': 'Austria'},
+    {'code': '+994', 'flag': '🇦🇿', 'name': 'Azerbaijan'},
+    {'code': '+1242', 'flag': '🇧🇸', 'name': 'Bahamas'},
+    {'code': '+973', 'flag': '🇧🇭', 'name': 'Bahrain'},
+    {'code': '+880', 'flag': '🇧🇩', 'name': 'Bangladesh'},
+    {'code': '+375', 'flag': '🇧🇾', 'name': 'Belarus'},
+    {'code': '+32', 'flag': '🇧🇪', 'name': 'Belgium'},
+    {'code': '+501', 'flag': '🇧🇿', 'name': 'Belize'},
+    {'code': '+229', 'flag': '🇧🇯', 'name': 'Benin'},
+    {'code': '+975', 'flag': '🇧🇹', 'name': 'Bhutan'},
+    {'code': '+591', 'flag': '🇧🇴', 'name': 'Bolivia'},
+    {'code': '+387', 'flag': '🇧🇦', 'name': 'Bosnia'},
+    {'code': '+267', 'flag': '🇧🇼', 'name': 'Botswana'},
+    {'code': '+55', 'flag': '🇧🇷', 'name': 'Brazil'},
+    {'code': '+673', 'flag': '🇧🇳', 'name': 'Brunei'},
+    {'code': '+359', 'flag': '🇧🇬', 'name': 'Bulgaria'},
+    {'code': '+226', 'flag': '🇧🇫', 'name': 'Burkina Faso'},
+    {'code': '+95', 'flag': '🇲🇲', 'name': 'Myanmar'},
+    {'code': '+257', 'flag': '🇧🇮', 'name': 'Burundi'},
+    {'code': '+855', 'flag': '🇰🇭', 'name': 'Cambodia'},
+    {'code': '+237', 'flag': '🇨🇲', 'name': 'Cameroon'},
+    {'code': '+1', 'flag': '🇨🇦', 'name': 'Canada'},
+    {'code': '+238', 'flag': '🇨🇻', 'name': 'Cape Verde'},
+    {'code': '+236', 'flag': '🇨🇫', 'name': 'Central African Republic'},
+    {'code': '+235', 'flag': '🇹🇩', 'name': 'Chad'},
+    {'code': '+56', 'flag': '🇨🇱', 'name': 'Chile'},
+    {'code': '+86', 'flag': '🇨🇳', 'name': 'China'},
+    {'code': '+57', 'flag': '🇨🇴', 'name': 'Colombia'},
+    {'code': '+269', 'flag': '🇰🇲', 'name': 'Comoros'},
+    {'code': '+242', 'flag': '🇨🇬', 'name': 'Congo'},
+    {'code': '+506', 'flag': '🇨🇷', 'name': 'Costa Rica'},
+    {'code': '+385', 'flag': '🇭🇷', 'name': 'Croatia'},
+    {'code': '+53', 'flag': '🇨🇺', 'name': 'Cuba'},
+    {'code': '+357', 'flag': '🇨🇾', 'name': 'Cyprus'},
+    {'code': '+420', 'flag': '🇨🇿', 'name': 'Czech Republic'},
+    {'code': '+45', 'flag': '🇩🇰', 'name': 'Denmark'},
+    {'code': '+253', 'flag': '🇩🇯', 'name': 'Djibouti'},
+    {'code': '+1809', 'flag': '🇩🇴', 'name': 'Dominican Republic'},
+    {'code': '+593', 'flag': '🇪🇨', 'name': 'Ecuador'},
+    {'code': '+20', 'flag': '🇪🇬', 'name': 'Egypt'},
+    {'code': '+503', 'flag': '🇸🇻', 'name': 'El Salvador'},
+    {'code': '+240', 'flag': '🇬🇶', 'name': 'Equatorial Guinea'},
+    {'code': '+291', 'flag': '🇪🇷', 'name': 'Eritrea'},
+    {'code': '+372', 'flag': '🇪🇪', 'name': 'Estonia'},
+    {'code': '+251', 'flag': '🇪🇹', 'name': 'Ethiopia'},
+    {'code': '+679', 'flag': '🇫🇯', 'name': 'Fiji'},
+    {'code': '+358', 'flag': '🇫🇮', 'name': 'Finland'},
+    {'code': '+33', 'flag': '🇫🇷', 'name': 'France'},
+    {'code': '+241', 'flag': '🇬🇦', 'name': 'Gabon'},
+    {'code': '+220', 'flag': '🇬🇲', 'name': 'Gambia'},
+    {'code': '+995', 'flag': '🇬🇪', 'name': 'Georgia'},
+    {'code': '+49', 'flag': '🇩🇪', 'name': 'Germany'},
+    {'code': '+233', 'flag': '🇬🇭', 'name': 'Ghana'},
+    {'code': '+30', 'flag': '🇬🇷', 'name': 'Greece'},
+    {'code': '+502', 'flag': '🇬🇹', 'name': 'Guatemala'},
+    {'code': '+224', 'flag': '🇬🇳', 'name': 'Guinea'},
+    {'code': '+592', 'flag': '🇬🇾', 'name': 'Guyana'},
+    {'code': '+509', 'flag': '🇭🇹', 'name': 'Haiti'},
+    {'code': '+504', 'flag': '🇭🇳', 'name': 'Honduras'},
+    {'code': '+36', 'flag': '🇭🇺', 'name': 'Hungary'},
+    {'code': '+354', 'flag': '🇮🇸', 'name': 'Iceland'},
+    {'code': '+91', 'flag': '🇮🇳', 'name': 'India'},
+    {'code': '+62', 'flag': '🇮🇩', 'name': 'Indonesia'},
+    {'code': '+98', 'flag': '🇮🇷', 'name': 'Iran'},
+    {'code': '+964', 'flag': '🇮🇶', 'name': 'Iraq'},
+    {'code': '+353', 'flag': '🇮🇪', 'name': 'Ireland'},
+    {'code': '+972', 'flag': '🇮🇱', 'name': 'Israel'},
+    {'code': '+39', 'flag': '🇮🇹', 'name': 'Italy'},
+    {'code': '+225', 'flag': '🇨🇮', 'name': 'Ivory Coast'},
+    {'code': '+81', 'flag': '🇯🇵', 'name': 'Japan'},
+    {'code': '+962', 'flag': '🇯🇴', 'name': 'Jordan'},
+    {'code': '+7', 'flag': '🇰🇿', 'name': 'Kazakhstan'},
+    {'code': '+254', 'flag': '🇰🇪', 'name': 'Kenya'},
+    {'code': '+686', 'flag': '🇰🇮', 'name': 'Kiribati'},
+    {'code': '+965', 'flag': '🇰🇼', 'name': 'Kuwait'},
+    {'code': '+996', 'flag': '🇰🇬', 'name': 'Kyrgyzstan'},
+    {'code': '+856', 'flag': '🇱🇦', 'name': 'Laos'},
+    {'code': '+371', 'flag': '🇱🇻', 'name': 'Latvia'},
+    {'code': '+961', 'flag': '🇱🇧', 'name': 'Lebanon'},
+    {'code': '+266', 'flag': '🇱🇸', 'name': 'Lesotho'},
+    {'code': '+231', 'flag': '🇱🇷', 'name': 'Liberia'},
+    {'code': '+218', 'flag': '🇱🇾', 'name': 'Libya'},
+    {'code': '+423', 'flag': '🇱🇮', 'name': 'Liechtenstein'},
+    {'code': '+370', 'flag': '🇱🇹', 'name': 'Lithuania'},
+    {'code': '+352', 'flag': '🇱🇺', 'name': 'Luxembourg'},
+    {'code': '+261', 'flag': '🇲🇬', 'name': 'Madagascar'},
+    {'code': '+265', 'flag': '🇲🇼', 'name': 'Malawi'},
+    {'code': '+60', 'flag': '🇲🇾', 'name': 'Malaysia'},
+    {'code': '+960', 'flag': '🇲🇻', 'name': 'Maldives'},
+    {'code': '+223', 'flag': '🇲🇱', 'name': 'Mali'},
+    {'code': '+356', 'flag': '🇲🇹', 'name': 'Malta'},
+    {'code': '+692', 'flag': '🇲🇭', 'name': 'Marshall Islands'},
+    {'code': '+222', 'flag': '🇲🇷', 'name': 'Mauritania'},
+    {'code': '+230', 'flag': '🇲🇺', 'name': 'Mauritius'},
+    {'code': '+52', 'flag': '🇲🇽', 'name': 'Mexico'},
+    {'code': '+691', 'flag': '🇫🇲', 'name': 'Micronesia'},
+    {'code': '+373', 'flag': '🇲🇩', 'name': 'Moldova'},
+    {'code': '+377', 'flag': '🇲🇨', 'name': 'Monaco'},
+    {'code': '+976', 'flag': '🇲🇳', 'name': 'Mongolia'},
+    {'code': '+382', 'flag': '🇲🇪', 'name': 'Montenegro'},
+    {'code': '+212', 'flag': '🇲🇦', 'name': 'Morocco'},
+    {'code': '+258', 'flag': '🇲🇿', 'name': 'Mozambique'},
+    {'code': '+264', 'flag': '🇳🇦', 'name': 'Namibia'},
+    {'code': '+674', 'flag': '🇳🇷', 'name': 'Nauru'},
+    {'code': '+977', 'flag': '🇳🇵', 'name': 'Nepal'},
+    {'code': '+31', 'flag': '🇳🇱', 'name': 'Netherlands'},
+    {'code': '+64', 'flag': '🇳🇿', 'name': 'New Zealand'},
+    {'code': '+505', 'flag': '🇳🇮', 'name': 'Nicaragua'},
+    {'code': '+227', 'flag': '🇳🇪', 'name': 'Niger'},
+    {'code': '+234', 'flag': '🇳🇬', 'name': 'Nigeria'},
+    {'code': '+47', 'flag': '🇳🇴', 'name': 'Norway'},
+    {'code': '+968', 'flag': '🇴🇲', 'name': 'Oman'},
+    {'code': '+92', 'flag': '🇵🇰', 'name': 'Pakistan'},
+    {'code': '+680', 'flag': '🇵🇼', 'name': 'Palau'},
+    {'code': '+507', 'flag': '🇵🇦', 'name': 'Panama'},
+    {'code': '+675', 'flag': '🇵🇬', 'name': 'Papua New Guinea'},
+    {'code': '+595', 'flag': '🇵🇾', 'name': 'Paraguay'},
+    {'code': '+51', 'flag': '🇵🇪', 'name': 'Peru'},
+    {'code': '+63', 'flag': '🇵🇭', 'name': 'Philippines'},
+    {'code': '+48', 'flag': '🇵🇱', 'name': 'Poland'},
+    {'code': '+351', 'flag': '🇵🇹', 'name': 'Portugal'},
+    {'code': '+974', 'flag': '🇶🇦', 'name': 'Qatar'},
+    {'code': '+40', 'flag': '🇷🇴', 'name': 'Romania'},
+    {'code': '+7', 'flag': '🇷🇺', 'name': 'Russia'},
+    {'code': '+250', 'flag': '🇷🇼', 'name': 'Rwanda'},
+    {'code': '+685', 'flag': '🇼🇸', 'name': 'Samoa'},
+    {'code': '+378', 'flag': '🇸🇲', 'name': 'San Marino'},
+    {'code': '+966', 'flag': '🇸🇦', 'name': 'Saudi Arabia'},
+    {'code': '+221', 'flag': '🇸🇳', 'name': 'Senegal'},
+    {'code': '+381', 'flag': '🇷🇸', 'name': 'Serbia'},
+    {'code': '+248', 'flag': '🇸🇨', 'name': 'Seychelles'},
+    {'code': '+232', 'flag': '🇸🇱', 'name': 'Sierra Leone'},
+    {'code': '+65', 'flag': '🇸🇬', 'name': 'Singapore'},
+    {'code': '+421', 'flag': '🇸🇰', 'name': 'Slovakia'},
+    {'code': '+386', 'flag': '🇸🇮', 'name': 'Slovenia'},
+    {'code': '+677', 'flag': '🇸🇧', 'name': 'Solomon Islands'},
+    {'code': '+252', 'flag': '🇸🇴', 'name': 'Somalia'},
+    {'code': '+27', 'flag': '🇿🇦', 'name': 'South Africa'},
+    {'code': '+82', 'flag': '🇰🇷', 'name': 'South Korea'},
+    {'code': '+34', 'flag': '🇪🇸', 'name': 'Spain'},
+    {'code': '+94', 'flag': '🇱🇰', 'name': 'Sri Lanka'},
+    {'code': '+249', 'flag': '🇸🇩', 'name': 'Sudan'},
+    {'code': '+597', 'flag': '🇸🇷', 'name': 'Suriname'},
+    {'code': '+268', 'flag': '🇸🇿', 'name': 'Eswatini'},
+    {'code': '+46', 'flag': '🇸🇪', 'name': 'Sweden'},
+    {'code': '+41', 'flag': '🇨🇭', 'name': 'Switzerland'},
+    {'code': '+963', 'flag': '🇸🇾', 'name': 'Syria'},
+    {'code': '+886', 'flag': '🇹🇼', 'name': 'Taiwan'},
+    {'code': '+992', 'flag': '🇹🇯', 'name': 'Tajikistan'},
+    {'code': '+255', 'flag': '🇹🇿', 'name': 'Tanzania'},
+    {'code': '+66', 'flag': '🇹🇭', 'name': 'Thailand'},
+    {'code': '+228', 'flag': '🇹🇬', 'name': 'Togo'},
+    {'code': '+676', 'flag': '🇹🇴', 'name': 'Tonga'},
+    {'code': '+1868', 'flag': '🇹🇹', 'name': 'Trinidad'},
+    {'code': '+216', 'flag': '🇹🇳', 'name': 'Tunisia'},
+    {'code': '+90', 'flag': '🇹🇷', 'name': 'Turkey'},
+    {'code': '+993', 'flag': '🇹🇲', 'name': 'Turkmenistan'},
+    {'code': '+688', 'flag': '🇹🇻', 'name': 'Tuvalu'},
+    {'code': '+256', 'flag': '🇺🇬', 'name': 'Uganda'},
+    {'code': '+380', 'flag': '🇺🇦', 'name': 'Ukraine'},
+    {'code': '+971', 'flag': '🇦🇪', 'name': 'UAE'},
+    {'code': '+44', 'flag': '🇬🇧', 'name': 'United Kingdom'},
+    {'code': '+1', 'flag': '🇺🇸', 'name': 'USA'},
+    {'code': '+598', 'flag': '🇺🇾', 'name': 'Uruguay'},
+    {'code': '+998', 'flag': '🇺🇿', 'name': 'Uzbekistan'},
+    {'code': '+678', 'flag': '🇻🇺', 'name': 'Vanuatu'},
+    {'code': '+58', 'flag': '🇻🇪', 'name': 'Venezuela'},
+    {'code': '+84', 'flag': '🇻🇳', 'name': 'Vietnam'},
+    {'code': '+967', 'flag': '🇾🇪', 'name': 'Yemen'},
+    {'code': '+260', 'flag': '🇿🇲', 'name': 'Zambia'},
+    {'code': '+263', 'flag': '🇿🇼', 'name': 'Zimbabwe'},
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _detectCountry();
+  }
+
+  Future<void> _detectCountry() async {
+    setState(() {
+      _isDetectingCountry = true;
+      _locationPermissionDenied = false;
+    });
+
+    try {
+      String? detectedCountryCode;
+
+      // ===== METHOD 1: Try Location Permission (GPS) =====
+      try {
+        bool hasPermission =
+            await PermissionService.isLocationPermissionGranted();
+
+        if (!hasPermission) {
+          bool granted = await PermissionService.requestLocationPermission();
+          if (!granted) {
+            _locationPermissionDenied = true;
+            await PermissionService.showLocationPermissionDialog(context);
+          }
+        }
+
+        if (await PermissionService.isLocationPermissionGranted()) {
+          try {
+            print('📍 Location permission granted, using IP detection fallback');
+          } catch (e) {
+            print('Location detection failed: $e');
+          }
+        }
+      } catch (e) {
+        print('Location permission check failed: $e');
+      }
+
+      // ===== METHOD 2: Try IP Geolocation =====
+      try {
+        final response = await http
+            .get(Uri.parse('https://ip-api.com/json/'))
+            .timeout(const Duration(seconds: 5));
+
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+          if (data['status'] == 'success') {
+            detectedCountryCode = data['countryCode']?.toString().toUpperCase();
+            print('📍 Country detected via IP: $detectedCountryCode');
+          }
+        }
+      } catch (e) {
+        print('IP Geolocation failed: $e');
+      }
+
+      // ===== METHOD 3: Try Device Locale =====
+      if (detectedCountryCode == null ||
+          detectedCountryCode.isEmpty ||
+          detectedCountryCode == 'US') {
+        try {
+          final locale = WidgetsBinding.instance.platformDispatcher.locale;
+          detectedCountryCode = locale.countryCode?.toUpperCase() ?? '';
+          print('📍 Country detected via Locale: $detectedCountryCode');
+        } catch (e) {
+          print('Locale detection failed: $e');
+        }
+      }
+
+      // ===== SET FINAL COUNTRY =====
+      if (detectedCountryCode != null &&
+          detectedCountryCode.isNotEmpty &&
+          detectedCountryCode != 'US') {
+        final countryName = _getCountryNameFromCode(detectedCountryCode);
+        final matchingCountry = _countries.firstWhere(
+          (country) => country['name'] == countryName,
+          orElse: () => {'code': '+92', 'flag': '🇵🇰', 'name': 'Pakistan'},
+        );
+
+        setState(() {
+          _selectedCountryCode = matchingCountry['code']!;
+          _countryFlag = matchingCountry['flag']!;
+          _countryName = matchingCountry['name']!;
+          _isDetectingCountry = false;
+        });
+        print('✅ Country set to: $_countryName ($_selectedCountryCode)');
+      } else {
+        setState(() {
+          _selectedCountryCode = '+92';
+          _countryFlag = '🇵🇰';
+          _countryName = 'Pakistan';
+          _isDetectingCountry = false;
+        });
+        print('⚠️ Using default country: Pakistan (+92)');
+      }
+    } catch (e) {
+      print('❌ Country detection error: $e');
+      setState(() {
+        _selectedCountryCode = '+92';
+        _countryFlag = '🇵🇰';
+        _countryName = 'Pakistan';
+        _isDetectingCountry = false;
+      });
+    }
+  }
+
+  String _getCountryNameFromCode(String code) {
+    final countryNames = {
+      'AF': 'Afghanistan',
+      'AL': 'Albania',
+      'DZ': 'Algeria',
+      'AD': 'Andorra',
+      'AO': 'Angola',
+      'AR': 'Argentina',
+      'AM': 'Armenia',
+      'AU': 'Australia',
+      'AT': 'Austria',
+      'AZ': 'Azerbaijan',
+      'BS': 'Bahamas',
+      'BH': 'Bahrain',
+      'BD': 'Bangladesh',
+      'BY': 'Belarus',
+      'BE': 'Belgium',
+      'BZ': 'Belize',
+      'BJ': 'Benin',
+      'BT': 'Bhutan',
+      'BO': 'Bolivia',
+      'BA': 'Bosnia',
+      'BW': 'Botswana',
+      'BR': 'Brazil',
+      'BN': 'Brunei',
+      'BG': 'Bulgaria',
+      'BF': 'Burkina',
+      'BI': 'Burundi',
+      'KH': 'Cambodia',
+      'CM': 'Cameroon',
+      'CA': 'Canada',
+      'CV': 'Cape Verde',
+      'CF': 'CAR',
+      'TD': 'Chad',
+      'CL': 'Chile',
+      'CN': 'China',
+      'CO': 'Colombia',
+      'KM': 'Comoros',
+      'CG': 'Congo',
+      'CR': 'Costa Rica',
+      'HR': 'Croatia',
+      'CU': 'Cuba',
+      'CY': 'Cyprus',
+      'CZ': 'Czech',
+      'DK': 'Denmark',
+      'DJ': 'Djibouti',
+      'DO': 'Dominican',
+      'EC': 'Ecuador',
+      'EG': 'Egypt',
+      'SV': 'El Salvador',
+      'GQ': 'Equatorial Guinea',
+      'ER': 'Eritrea',
+      'EE': 'Estonia',
+      'ET': 'Ethiopia',
+      'FJ': 'Fiji',
+      'FI': 'Finland',
+      'FR': 'France',
+      'GA': 'Gabon',
+      'GM': 'Gambia',
+      'GE': 'Georgia',
+      'DE': 'Germany',
+      'GH': 'Ghana',
+      'GR': 'Greece',
+      'GT': 'Guatemala',
+      'GN': 'Guinea',
+      'GY': 'Guyana',
+      'HT': 'Haiti',
+      'HN': 'Honduras',
+      'HU': 'Hungary',
+      'IS': 'Iceland',
+      'IN': 'India',
+      'ID': 'Indonesia',
+      'IR': 'Iran',
+      'IQ': 'Iraq',
+      'IE': 'Ireland',
+      'IL': 'Israel',
+      'IT': 'Italy',
+      'CI': 'Ivory Coast',
+      'JP': 'Japan',
+      'JO': 'Jordan',
+      'KZ': 'Kazakhstan',
+      'KE': 'Kenya',
+      'KI': 'Kiribati',
+      'KW': 'Kuwait',
+      'KG': 'Kyrgyzstan',
+      'LA': 'Laos',
+      'LV': 'Latvia',
+      'LB': 'Lebanon',
+      'LS': 'Lesotho',
+      'LR': 'Liberia',
+      'LY': 'Libya',
+      'LI': 'Liechtenstein',
+      'LT': 'Lithuania',
+      'LU': 'Luxembourg',
+      'MG': 'Madagascar',
+      'MW': 'Malawi',
+      'MY': 'Malaysia',
+      'MV': 'Maldives',
+      'ML': 'Mali',
+      'MT': 'Malta',
+      'MH': 'Marshall Islands',
+      'MR': 'Mauritania',
+      'MU': 'Mauritius',
+      'MX': 'Mexico',
+      'FM': 'Micronesia',
+      'MD': 'Moldova',
+      'MC': 'Monaco',
+      'MN': 'Mongolia',
+      'ME': 'Montenegro',
+      'MA': 'Morocco',
+      'MZ': 'Mozambique',
+      'MM': 'Myanmar',
+      'NA': 'Namibia',
+      'NR': 'Nauru',
+      'NP': 'Nepal',
+      'NL': 'Netherlands',
+      'NZ': 'New Zealand',
+      'NI': 'Nicaragua',
+      'NE': 'Niger',
+      'NG': 'Nigeria',
+      'NO': 'Norway',
+      'OM': 'Oman',
+      'PK': 'Pakistan',
+      'PW': 'Palau',
+      'PA': 'Panama',
+      'PG': 'Papua New Guinea',
+      'PY': 'Paraguay',
+      'PE': 'Peru',
+      'PH': 'Philippines',
+      'PL': 'Poland',
+      'PT': 'Portugal',
+      'QA': 'Qatar',
+      'RO': 'Romania',
+      'RU': 'Russia',
+      'RW': 'Rwanda',
+      'WS': 'Samoa',
+      'SM': 'San Marino',
+      'SA': 'Saudi Arabia',
+      'SN': 'Senegal',
+      'RS': 'Serbia',
+      'SC': 'Seychelles',
+      'SL': 'Sierra Leone',
+      'SG': 'Singapore',
+      'SK': 'Slovakia',
+      'SI': 'Slovenia',
+      'SB': 'Solomon Islands',
+      'SO': 'Somalia',
+      'ZA': 'South Africa',
+      'KR': 'South Korea',
+      'ES': 'Spain',
+      'LK': 'Sri Lanka',
+      'SD': 'Sudan',
+      'SR': 'Suriname',
+      'SE': 'Sweden',
+      'CH': 'Switzerland',
+      'SY': 'Syria',
+      'TW': 'Taiwan',
+      'TJ': 'Tajikistan',
+      'TZ': 'Tanzania',
+      'TH': 'Thailand',
+      'TG': 'Togo',
+      'TO': 'Tonga',
+      'TT': 'Trinidad',
+      'TN': 'Tunisia',
+      'TR': 'Turkey',
+      'TM': 'Turkmenistan',
+      'TV': 'Tuvalu',
+      'UG': 'Uganda',
+      'UA': 'Ukraine',
+      'AE': 'UAE',
+      'GB': 'United Kingdom',
+      'US': 'USA',
+      'UY': 'Uruguay',
+      'UZ': 'Uzbekistan',
+      'VU': 'Vanuatu',
+      'VE': 'Venezuela',
+      'VN': 'Vietnam',
+      'YE': 'Yemen',
+      'ZM': 'Zambia',
+      'ZW': 'Zimbabwe',
+    };
+    return countryNames[code] ?? 'Pakistan';
+  }
 
   @override
   void dispose() {
@@ -81,10 +564,7 @@ class _SignupScreenState extends State<SignupScreen> {
             const SizedBox(height: 8),
             Text(
               'Fill in the details to get started',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey.shade600,
-              ),
+              style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
             ),
             const SizedBox(height: 8),
             // Currency display
@@ -115,6 +595,79 @@ class _SignupScreenState extends State<SignupScreen> {
               ),
             ),
             const SizedBox(height: 24),
+            // Show detection status
+            if (_isDetectingCountry)
+              Container(
+                padding: const EdgeInsets.all(8),
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Detecting your country...',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.blue.shade700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            // Show location permission status
+            if (_locationPermissionDenied)
+              Container(
+                padding: const EdgeInsets.all(8),
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.location_off,
+                      size: 16,
+                      color: Colors.orange.shade700,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Location permission denied. Using default country.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.orange.shade700,
+                        ),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        PermissionService.openAppSettings();
+                      },
+                      child: Text(
+                        'Settings',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.blue.shade700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             // Form
             Form(
               key: _formKey,
@@ -130,7 +683,9 @@ class _SignupScreenState extends State<SignupScreen> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       filled: true,
-                      fillColor: isDarkMode ? Colors.grey.shade800 : Colors.grey.shade50,
+                      fillColor: isDarkMode
+                          ? Colors.grey.shade800
+                          : Colors.grey.shade50,
                     ),
                     style: TextStyle(
                       color: isDarkMode ? Colors.white : Colors.black,
@@ -156,7 +711,9 @@ class _SignupScreenState extends State<SignupScreen> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       filled: true,
-                      fillColor: isDarkMode ? Colors.grey.shade800 : Colors.grey.shade50,
+                      fillColor: isDarkMode
+                          ? Colors.grey.shade800
+                          : Colors.grey.shade50,
                     ),
                     keyboardType: TextInputType.emailAddress,
                     style: TextStyle(
@@ -197,7 +754,9 @@ class _SignupScreenState extends State<SignupScreen> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       filled: true,
-                      fillColor: isDarkMode ? Colors.grey.shade800 : Colors.grey.shade50,
+                      fillColor: isDarkMode
+                          ? Colors.grey.shade800
+                          : Colors.grey.shade50,
                     ),
                     style: TextStyle(
                       color: isDarkMode ? Colors.white : Colors.black,
@@ -237,7 +796,9 @@ class _SignupScreenState extends State<SignupScreen> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       filled: true,
-                      fillColor: isDarkMode ? Colors.grey.shade800 : Colors.grey.shade50,
+                      fillColor: isDarkMode
+                          ? Colors.grey.shade800
+                          : Colors.grey.shade50,
                     ),
                     style: TextStyle(
                       color: isDarkMode ? Colors.white : Colors.black,
@@ -253,32 +814,163 @@ class _SignupScreenState extends State<SignupScreen> {
                     },
                   ),
                   const SizedBox(height: 16),
-                  TextFormField(
-                    controller: _phoneController,
-                    decoration: InputDecoration(
-                      labelText: 'Phone Number',
-                      hintText: 'Enter your phone number',
-                      prefixIcon: const Icon(Icons.phone),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
+                  // ===== IMPROVED PHONE NUMBER WITH COUNTRY CODE =====
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Country Code Dropdown
+                      Container(
+                        width: 180,
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey.shade300),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: _selectedCountryCode,
+                            isExpanded: true,
+                            dropdownColor: isDarkMode
+                                ? Colors.grey.shade800
+                                : Colors.white,
+                            style: TextStyle(
+                              color: isDarkMode ? Colors.white : Colors.black,
+                              fontSize: 13,
+                            ),
+                            items: _countries.map((country) {
+                              return DropdownMenuItem(
+                                value: country['code'],
+                                child: Row(
+                                  children: [
+                                    Text(country['flag']!),
+                                    const SizedBox(width: 4),
+                                    Expanded(
+                                      child: Text(
+                                        country['name']!,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      country['code']!,
+                                      style: TextStyle(
+                                        color: Colors.grey.shade500,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (value) {
+                              if (value != null) {
+                                final selected = _countries.firstWhere(
+                                  (c) => c['code'] == value,
+                                );
+                                setState(() {
+                                  _selectedCountryCode = value;
+                                  _countryFlag = selected['flag']!;
+                                  _countryName = selected['name']!;
+                                });
+                              }
+                            },
+                          ),
+                        ),
                       ),
-                      filled: true,
-                      fillColor: isDarkMode ? Colors.grey.shade800 : Colors.grey.shade50,
-                    ),
-                    keyboardType: TextInputType.phone,
-                    style: TextStyle(
-                      color: isDarkMode ? Colors.white : Colors.black,
-                    ),
-                    validator: (value) {
-                      if (value != null && value.isNotEmpty) {
-                        if (value.length < 10) {
-                          return 'Please enter a valid phone number';
-                        }
-                      }
-                      return null;
-                    },
+                      const SizedBox(width: 12),
+                      // Phone Number Input with better placeholder
+                      Expanded(
+                        child: TextFormField(
+                          controller: _phoneController,
+                          decoration: InputDecoration(
+                            labelText: 'Phone Number *',
+                            hintText: '3XX XXX XXXX',  // Better placeholder
+                            prefixIcon: const Icon(Icons.phone),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            filled: true,
+                            fillColor: isDarkMode
+                                ? Colors.grey.shade800
+                                : Colors.grey.shade50,
+                          ),
+                          keyboardType: TextInputType.phone,
+                          style: TextStyle(
+                            color: isDarkMode ? Colors.white : Colors.black,
+                          ),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                            // Optional: Add custom formatter for phone number
+                          ],
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please enter your phone number';
+                            }
+                            if (value.length < 7) {
+                              return 'Please enter a valid phone number';
+                            }
+                            return null;
+                          },
+                        ),
+                      ),
+                    ],
                   ),
+                  // Show formatted preview
+                  if (_phoneController.text.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4, left: 12),
+                      child: Row(
+                        children: [
+                          Text(
+                            'Full Number: ',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                          Text(
+                            '$_selectedCountryCode ${_formatPhoneNumber(_phoneController.text)}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.green.shade700,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  if (!_isDetectingCountry)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2, left: 12),
+                      child: Row(
+                        children: [
+                          Text(
+                            'Default country: ',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                          Text(
+                            '$_countryFlag $_countryName',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.green.shade700,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '($_selectedCountryCode)',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.grey.shade400,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   const SizedBox(height: 16),
+                  // ===== REST OF THE FORM =====
                   TextFormField(
                     controller: _storeNameController,
                     decoration: InputDecoration(
@@ -289,7 +981,9 @@ class _SignupScreenState extends State<SignupScreen> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       filled: true,
-                      fillColor: isDarkMode ? Colors.grey.shade800 : Colors.grey.shade50,
+                      fillColor: isDarkMode
+                          ? Colors.grey.shade800
+                          : Colors.grey.shade50,
                     ),
                     style: TextStyle(
                       color: isDarkMode ? Colors.white : Colors.black,
@@ -316,7 +1010,9 @@ class _SignupScreenState extends State<SignupScreen> {
                         border: InputBorder.none,
                         prefixIcon: Icon(Icons.admin_panel_settings),
                       ),
-                      dropdownColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
+                      dropdownColor: isDarkMode
+                          ? Colors.grey.shade800
+                          : Colors.white,
                       style: TextStyle(
                         color: isDarkMode ? Colors.white : Colors.black,
                       ),
@@ -349,7 +1045,10 @@ class _SignupScreenState extends State<SignupScreen> {
                   ),
                   const SizedBox(height: 8),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.orange.shade50,
                       borderRadius: BorderRadius.circular(8),
@@ -386,10 +1085,7 @@ class _SignupScreenState extends State<SignupScreen> {
                       ),
                       child: Row(
                         children: [
-                          Icon(
-                            Icons.error_outline,
-                            color: Colors.red.shade700,
-                          ),
+                          Icon(Icons.error_outline, color: Colors.red.shade700),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
@@ -418,7 +1114,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     width: double.infinity,
                     height: 50,
                     child: ElevatedButton(
-                      onPressed: authProvider.isLoading
+                      onPressed: authProvider.isLoading || _isDetectingCountry
                           ? null
                           : () async {
                               if (_formKey.currentState?.validate() ?? false) {
@@ -427,7 +1123,9 @@ class _SignupScreenState extends State<SignupScreen> {
                                   password: _passwordController.text,
                                   name: _nameController.text.trim(),
                                   role: _selectedRole,
-                                  phone: _phoneController.text.trim(),
+                                  phone:
+                                      _selectedCountryCode +
+                                      _phoneController.text.trim(),
                                   storeName: _storeNameController.text.trim(),
                                 );
 
@@ -446,7 +1144,7 @@ class _SignupScreenState extends State<SignupScreen> {
                                       ),
                                     ),
                                   );
-                                  
+
                                   Navigator.pushReplacement(
                                     context,
                                     MaterialPageRoute(
@@ -492,9 +1190,7 @@ class _SignupScreenState extends State<SignupScreen> {
               children: [
                 Text(
                   'Already have an account?',
-                  style: TextStyle(
-                    color: Colors.grey.shade600,
-                  ),
+                  style: TextStyle(color: Colors.grey.shade600),
                 ),
                 TextButton(
                   onPressed: () {
@@ -519,14 +1215,27 @@ class _SignupScreenState extends State<SignupScreen> {
             // Version info
             Text(
               'Version 1.0.0',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey.shade400,
-              ),
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade400),
             ),
           ],
         ),
       ),
     );
+  }
+
+  // ===== HELPER METHOD TO FORMAT PHONE NUMBER =====
+  String _formatPhoneNumber(String phone) {
+    // Remove any non-digit characters
+    String cleaned = phone.replaceAll(RegExp(r'\D'), '');
+    
+    if (cleaned.length <= 3) {
+      return cleaned;
+    } else if (cleaned.length <= 6) {
+      return '${cleaned.substring(0, 3)} ${cleaned.substring(3)}';
+    } else if (cleaned.length <= 10) {
+      return '${cleaned.substring(0, 3)} ${cleaned.substring(3, 6)} ${cleaned.substring(6)}';
+    } else {
+      return '${cleaned.substring(0, 3)} ${cleaned.substring(3, 6)} ${cleaned.substring(6, 10)}';
+    }
   }
 }
