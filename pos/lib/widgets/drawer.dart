@@ -22,16 +22,28 @@ class AppDrawer extends StatelessWidget {
     final settingsProvider = Provider.of<SettingsProvider>(context);
     final user = authProvider.currentUser;
     final currencySymbol = settingsProvider.currencySymbol;
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     if (user == null) {
-      return const Drawer(child: Center(child: Text('No user logged in')));
+      return Drawer(
+        backgroundColor: isDarkMode ? Colors.grey.shade900 : Colors.white,
+        child: Center(
+          child: Text(
+            'No user logged in',
+            style: TextStyle(
+              color: isDarkMode ? Colors.white : Colors.black,
+            ),
+          ),
+        ),
+      );
     }
 
     return Drawer(
+      backgroundColor: isDarkMode ? Colors.grey.shade900 : Colors.white,
       child: Column(
         children: [
           // User Header
-          _buildUserHeader(context, user, currencySymbol),
+          _buildUserHeader(context, user, currencySymbol, isDarkMode),
 
           // Navigation Items
           Expanded(
@@ -44,6 +56,7 @@ class AppDrawer extends StatelessWidget {
                   title: 'Dashboard',
                   index: 0,
                   isSelected: currentIndex == 0,
+                  isDarkMode: isDarkMode,
                   onTap: () => _navigateTo(context, 0),
                 ),
                 _buildDrawerItem(
@@ -52,6 +65,7 @@ class AppDrawer extends StatelessWidget {
                   title: 'POS',
                   index: 0,
                   isSelected: currentIndex == 0,
+                  isDarkMode: isDarkMode,
                   onTap: () => _navigateTo(context, 0),
                 ),
                 if (user.canManageInventory)
@@ -61,6 +75,7 @@ class AppDrawer extends StatelessWidget {
                     title: 'Inventory',
                     index: 1,
                     isSelected: currentIndex == 1,
+                    isDarkMode: isDarkMode,
                     onTap: () => _navigateTo(context, 1),
                   ),
                 if (user.canManageUsers)
@@ -70,54 +85,66 @@ class AppDrawer extends StatelessWidget {
                     title: 'User Management',
                     index: 2,
                     isSelected: currentIndex == 2,
+                    isDarkMode: isDarkMode,
                     onTap: () => _navigateTo(context, 2),
                   ),
-                const Divider(),
+                Divider(
+                  color: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade300,
+                ),
                 _buildDrawerItem(
                   context,
                   icon: Icons.history,
                   title: 'Sales History',
+                  isDarkMode: isDarkMode,
                   onTap: () {
                     Navigator.pop(context);
-                    _showSalesHistory(context);
+                    _showSalesHistory(context, isDarkMode);
                   },
                 ),
                 _buildDrawerItem(
                   context,
                   icon: Icons.bar_chart,
                   title: 'Reports',
+                  isDarkMode: isDarkMode,
                   onTap: () {
                     Navigator.pop(context);
-                    _showReports(context);
+                    _showReports(context, isDarkMode);
                   },
                 ),
-                const Divider(),
+                Divider(
+                  color: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade300,
+                ),
                 _buildDrawerItem(
                   context,
                   icon: Icons.settings,
                   title: 'Settings',
+                  isDarkMode: isDarkMode,
                   onTap: () {
                     Navigator.pop(context);
                     _navigateToSettings(context);
                   },
                 ),
-                const Divider(),
+                Divider(
+                  color: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade300,
+                ),
                 _buildDrawerItem(
                   context,
                   icon: Icons.help,
                   title: 'Help & Support',
+                  isDarkMode: isDarkMode,
                   onTap: () {
                     Navigator.pop(context);
-                    _showHelp(context);
+                    _showHelp(context, isDarkMode);
                   },
                 ),
                 _buildDrawerItem(
                   context,
                   icon: Icons.info,
                   title: 'About',
+                  isDarkMode: isDarkMode,
                   onTap: () {
                     Navigator.pop(context);
-                    _showAbout(context);
+                    _showAbout(context, isDarkMode);
                   },
                 ),
               ],
@@ -125,7 +152,7 @@ class AppDrawer extends StatelessWidget {
           ),
 
           // Logout Button at Bottom
-          _buildLogoutButton(context, authProvider),
+          _buildLogoutButton(context, authProvider, isDarkMode),
 
           const SizedBox(height: 16),
         ],
@@ -139,11 +166,12 @@ class AppDrawer extends StatelessWidget {
     BuildContext context,
     AppUser user,
     String currencySymbol,
+    bool isDarkMode,
   ) {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.blue.shade700,
+        color: isDarkMode ? Colors.blue.shade900 : Colors.blue.shade700,
         borderRadius: const BorderRadius.only(
           bottomLeft: Radius.circular(20),
           bottomRight: Radius.circular(20),
@@ -159,7 +187,7 @@ class AppDrawer extends StatelessWidget {
               user.name.substring(0, 1).toUpperCase(),
               style: TextStyle(
                 fontSize: 30,
-                color: Colors.blue.shade700,
+                color: isDarkMode ? Colors.blue.shade700 : Colors.blue.shade700,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -236,16 +264,21 @@ class AppDrawer extends StatelessWidget {
     int? index,
     bool isSelected = false,
     required VoidCallback onTap,
+    required bool isDarkMode,
   }) {
     return ListTile(
       leading: Icon(
         icon,
-        color: isSelected ? Colors.blue.shade700 : Colors.grey.shade600,
+        color: isSelected
+            ? (isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700)
+            : (isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600),
       ),
       title: Text(
         title,
         style: TextStyle(
-          color: isSelected ? Colors.blue.shade700 : Colors.grey.shade800,
+          color: isSelected
+              ? (isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700)
+              : (isDarkMode ? Colors.white : Colors.grey.shade800),
           fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
         ),
       ),
@@ -254,7 +287,7 @@ class AppDrawer extends StatelessWidget {
               width: 4,
               height: 24,
               decoration: BoxDecoration(
-                color: Colors.blue.shade700,
+                color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
                 borderRadius: BorderRadius.circular(2),
               ),
             )
@@ -263,26 +296,39 @@ class AppDrawer extends StatelessWidget {
     );
   }
 
-  Widget _buildLogoutButton(BuildContext context, AuthProvider authProvider) {
+  Widget _buildLogoutButton(
+    BuildContext context,
+    AuthProvider authProvider,
+    bool isDarkMode,
+  ) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: SizedBox(
         width: double.infinity,
         child: ElevatedButton.icon(
-          onPressed: () => _showLogoutDialog(context, authProvider),
+          onPressed: () => _showLogoutDialog(context, authProvider, isDarkMode),
           style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.red.shade50,
-            foregroundColor: Colors.red.shade700,
+            backgroundColor: isDarkMode
+                ? Colors.red.shade900.withOpacity(0.5)
+                : Colors.red.shade50,
+            foregroundColor: isDarkMode ? Colors.red.shade400 : Colors.red.shade700,
             elevation: 0,
             padding: const EdgeInsets.symmetric(vertical: 12),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
           ),
-          icon: const Icon(Icons.logout),
-          label: const Text(
+          icon: Icon(
+            Icons.logout,
+            color: isDarkMode ? Colors.red.shade400 : Colors.red.shade700,
+          ),
+          label: Text(
             'Logout',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: isDarkMode ? Colors.red.shade400 : Colors.red.shade700,
+            ),
           ),
         ),
       ),
@@ -305,16 +351,36 @@ class AppDrawer extends StatelessWidget {
 
   // ==================== DIALOG METHODS ====================
 
-  void _showLogoutDialog(BuildContext context, AuthProvider authProvider) {
+  void _showLogoutDialog(
+    BuildContext context,
+    AuthProvider authProvider,
+    bool isDarkMode,
+  ) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Logout'),
-        content: const Text('Are you sure you want to logout?'),
+        title: Text(
+          'Logout',
+          style: TextStyle(
+            color: isDarkMode ? Colors.white : Colors.black,
+          ),
+        ),
+        content: Text(
+          'Are you sure you want to logout?',
+          style: TextStyle(
+            color: isDarkMode ? Colors.white : Colors.black,
+          ),
+        ),
+        backgroundColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                color: isDarkMode ? Colors.white : Colors.black,
+              ),
+            ),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -328,7 +394,7 @@ class AppDrawer extends StatelessWidget {
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red.shade700,
+              backgroundColor: isDarkMode ? Colors.red.shade400 : Colors.red.shade700,
               foregroundColor: Colors.white,
             ),
             child: const Text('Logout'),
@@ -338,101 +404,173 @@ class AppDrawer extends StatelessWidget {
     );
   }
 
-  void _showSalesHistory(BuildContext context) {
-    // You can either show a bottom sheet or navigate to sales history screen
+  void _showSalesHistory(BuildContext context, bool isDarkMode) {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Sales History coming soon!'),
+      SnackBar(
+        content: Text(
+          'Sales History coming soon!',
+          style: TextStyle(
+            color: isDarkMode ? Colors.white : Colors.black,
+          ),
+        ),
         behavior: SnackBarBehavior.floating,
+        backgroundColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
       ),
     );
   }
 
-  void _showReports(BuildContext context) {
+  void _showReports(BuildContext context, bool isDarkMode) {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Reports coming soon!'),
+      SnackBar(
+        content: Text(
+          'Reports coming soon!',
+          style: TextStyle(
+            color: isDarkMode ? Colors.white : Colors.black,
+          ),
+        ),
         behavior: SnackBarBehavior.floating,
+        backgroundColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
       ),
     );
   }
 
-  void _showHelp(BuildContext context) {
+  void _showHelp(BuildContext context, bool isDarkMode) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Help & Support'),
-        content: const Column(
+        title: Text(
+          'Help & Support',
+          style: TextStyle(
+            color: isDarkMode ? Colors.white : Colors.black,
+          ),
+        ),
+        backgroundColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
+        content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('📧 Email: support@posapp.com'),
-            SizedBox(height: 8),
-            Text('📞 Phone: +92 300 1234567'),
-            SizedBox(height: 8),
-            Text('🌐 Website: www.posapp.com'),
-            SizedBox(height: 16),
+            Text(
+              '📧 Email: support@posapp.com',
+              style: TextStyle(
+                color: isDarkMode ? Colors.white : Colors.black,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '📞 Phone: +92 300 1234567',
+              style: TextStyle(
+                color: isDarkMode ? Colors.white : Colors.black,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '🌐 Website: www.posapp.com',
+              style: TextStyle(
+                color: isDarkMode ? Colors.white : Colors.black,
+              ),
+            ),
+            const SizedBox(height: 16),
             Text(
               'For any issues, please contact our support team.',
-              style: TextStyle(fontSize: 14),
+              style: TextStyle(
+                fontSize: 14,
+                color: isDarkMode ? Colors.white : Colors.black,
+              ),
             ),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
+            child: Text(
+              'Close',
+              style: TextStyle(
+                color: isDarkMode ? Colors.white : Colors.black,
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 
-  void _showAbout(BuildContext context) {
+  void _showAbout(BuildContext context, bool isDarkMode) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.storefront, color: Colors.blue),
-            SizedBox(width: 8),
-            Text('About POS System'),
+            Icon(
+              Icons.storefront,
+              color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'About POS System',
+              style: TextStyle(
+                color: isDarkMode ? Colors.white : Colors.black,
+              ),
+            ),
           ],
         ),
+        backgroundColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.shopping_cart, size: 64, color: Colors.blue),
+            Icon(
+              Icons.shopping_cart,
+              size: 64,
+              color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+            ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Point of Sale System',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: isDarkMode ? Colors.white : Colors.black,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
               'Version 1.0.0',
-              style: TextStyle(color: Colors.grey.shade600),
+              style: TextStyle(
+                color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+              ),
             ),
             const SizedBox(height: 16),
-            const Divider(),
+            Divider(
+              color: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade300,
+            ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'A complete POS solution with inventory management,\n'
               'barcode scanning, and real-time reporting.',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 14, color: Colors.grey),
+              style: TextStyle(
+                fontSize: 14,
+                color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
               '© ${DateTime.now().year} POS System',
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade400),
+              style: TextStyle(
+                fontSize: 12,
+                color: isDarkMode ? Colors.grey.shade500 : Colors.grey.shade400,
+              ),
             ),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
+            child: Text(
+              'Close',
+              style: TextStyle(
+                color: isDarkMode ? Colors.white : Colors.black,
+              ),
+            ),
           ),
         ],
       ),

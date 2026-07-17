@@ -9,7 +9,6 @@ import 'package:pos/screens/login_screen.dart';
 import 'package:pos/screens/user_management_screen.dart';
 import 'package:provider/provider.dart';
 
-
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
 
@@ -40,27 +39,48 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return tabs;
   }
 
-  List<BottomNavigationBarItem> _getNavItems(AppUser user) {
+  List<BottomNavigationBarItem> _getNavItems(AppUser user, bool isDarkMode) {
     List<BottomNavigationBarItem> items = [];
     
     // POS
-    items.add(const BottomNavigationBarItem(
-      icon: Icon(Icons.shopping_cart),
+    items.add(BottomNavigationBarItem(
+      icon: Icon(
+        Icons.shopping_cart,
+        color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+      ),
+      activeIcon: Icon(
+        Icons.shopping_cart,
+        color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+      ),
       label: 'POS',
     ));
     
     // Inventory - Only owner and manager
     if (user.canManageInventory) {
-      items.add(const BottomNavigationBarItem(
-        icon: Icon(Icons.inventory_2),
+      items.add(BottomNavigationBarItem(
+        icon: Icon(
+          Icons.inventory_2,
+          color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+        ),
+        activeIcon: Icon(
+          Icons.inventory_2,
+          color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+        ),
         label: 'Inventory',
       ));
     }
     
     // User Management - Only owner
     if (user.canManageUsers) {
-      items.add(const BottomNavigationBarItem(
-        icon: Icon(Icons.people),
+      items.add(BottomNavigationBarItem(
+        icon: Icon(
+          Icons.people,
+          color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+        ),
+        activeIcon: Icon(
+          Icons.people,
+          color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+        ),
         label: 'Users',
       ));
     }
@@ -72,13 +92,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
     final user = authProvider.currentUser;
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     if (user == null) {
       return const LoginScreen();
     }
 
     List<Widget> tabs = _getTabs(user);
-    List<BottomNavigationBarItem> navItems = _getNavItems(user);
+    List<BottomNavigationBarItem> navItems = _getNavItems(user, isDarkMode);
 
     return Scaffold(
       body: tabs[_currentIndex],
@@ -89,27 +110,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
             _currentIndex = index;
           });
         },
-        selectedItemColor: Colors.blue.shade700,
-        unselectedItemColor: Colors.grey.shade600,
+        selectedItemColor: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+        unselectedItemColor: isDarkMode ? Colors.grey.shade500 : Colors.grey.shade600,
+        backgroundColor: isDarkMode ? Colors.grey.shade900 : Colors.white,
         type: BottomNavigationBarType.fixed,
+        elevation: 8,
         items: navItems,
       ),
-      drawer: _buildDrawer(context, user, authProvider),
+      drawer: _buildDrawer(context, user, authProvider, isDarkMode),
     );
   }
 
-  Widget _buildDrawer(BuildContext context, AppUser user, AuthProvider authProvider) {
+  Widget _buildDrawer(
+    BuildContext context, 
+    AppUser user, 
+    AuthProvider authProvider,
+    bool isDarkMode,
+  ) {
     final settingsProvider = Provider.of<SettingsProvider>(context);
     final currencySymbol = settingsProvider.currencySymbol;
 
     return Drawer(
+      backgroundColor: isDarkMode ? Colors.grey.shade900 : Colors.white,
       child: Column(
         children: [
           // User Header
           Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: Colors.blue.shade700,
+              color: isDarkMode ? Colors.blue.shade900 : Colors.blue.shade700,
               borderRadius: const BorderRadius.only(
                 bottomLeft: Radius.circular(20),
                 bottomRight: Radius.circular(20),
@@ -125,7 +154,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     user.name.substring(0, 1).toUpperCase(),
                     style: TextStyle(
                       fontSize: 30,
-                      color: Colors.blue.shade700,
+                      color: isDarkMode ? Colors.blue.shade700 : Colors.blue.shade700,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -202,15 +231,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const SizedBox(height: 8),
           // Navigation items
           ListTile(
-            leading: const Icon(Icons.dashboard),
-            title: const Text('Dashboard'),
+            leading: Icon(
+              Icons.dashboard,
+              color: isDarkMode ? Colors.grey.shade300 : Colors.grey.shade700,
+            ),
+            title: Text(
+              'Dashboard',
+              style: TextStyle(
+                color: isDarkMode ? Colors.white : Colors.black,
+              ),
+            ),
             onTap: () {
               Navigator.pop(context);
             },
           ),
           ListTile(
-            leading: const Icon(Icons.shopping_cart),
-            title: const Text('POS'),
+            leading: Icon(
+              Icons.shopping_cart,
+              color: isDarkMode ? Colors.grey.shade300 : Colors.grey.shade700,
+            ),
+            title: Text(
+              'POS',
+              style: TextStyle(
+                color: isDarkMode ? Colors.white : Colors.black,
+              ),
+            ),
             onTap: () {
               setState(() => _currentIndex = 0);
               Navigator.pop(context);
@@ -218,8 +263,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           if (user.canManageInventory)
             ListTile(
-              leading: const Icon(Icons.inventory_2),
-              title: const Text('Inventory'),
+              leading: Icon(
+                Icons.inventory_2,
+                color: isDarkMode ? Colors.grey.shade300 : Colors.grey.shade700,
+              ),
+              title: Text(
+                'Inventory',
+                style: TextStyle(
+                  color: isDarkMode ? Colors.white : Colors.black,
+                ),
+              ),
               onTap: () {
                 setState(() => _currentIndex = 1);
                 Navigator.pop(context);
@@ -227,51 +280,92 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           if (user.canManageUsers)
             ListTile(
-              leading: const Icon(Icons.people),
-              title: const Text('User Management'),
+              leading: Icon(
+                Icons.people,
+                color: isDarkMode ? Colors.grey.shade300 : Colors.grey.shade700,
+              ),
+              title: Text(
+                'User Management',
+                style: TextStyle(
+                  color: isDarkMode ? Colors.white : Colors.black,
+                ),
+              ),
               onTap: () {
                 setState(() => _currentIndex = 2);
                 Navigator.pop(context);
               },
             ),
           ListTile(
-            leading: const Icon(Icons.receipt_long),
-            title: const Text('Sales History'),
+            leading: Icon(
+              Icons.receipt_long,
+              color: isDarkMode ? Colors.grey.shade300 : Colors.grey.shade700,
+            ),
+            title: Text(
+              'Sales History',
+              style: TextStyle(
+                color: isDarkMode ? Colors.white : Colors.black,
+              ),
+            ),
             onTap: () {
-              // TODO: Navigate to sales history
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Sales History coming soon!'),
+                SnackBar(
+                  content: Text(
+                    'Sales History coming soon!',
+                    style: TextStyle(
+                      color: isDarkMode ? Colors.white : Colors.black,
+                    ),
+                  ),
                   behavior: SnackBarBehavior.floating,
+                  backgroundColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
                 ),
               );
               Navigator.pop(context);
             },
           ),
           ListTile(
-            leading: const Icon(Icons.bar_chart),
-            title: const Text('Reports'),
+            leading: Icon(
+              Icons.bar_chart,
+              color: isDarkMode ? Colors.grey.shade300 : Colors.grey.shade700,
+            ),
+            title: Text(
+              'Reports',
+              style: TextStyle(
+                color: isDarkMode ? Colors.white : Colors.black,
+              ),
+            ),
             onTap: () {
-              // TODO: Navigate to reports
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Reports coming soon!'),
+                SnackBar(
+                  content: Text(
+                    'Reports coming soon!',
+                    style: TextStyle(
+                      color: isDarkMode ? Colors.white : Colors.black,
+                    ),
+                  ),
                   behavior: SnackBarBehavior.floating,
+                  backgroundColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
                 ),
               );
               Navigator.pop(context);
             },
           ),
-          const Divider(),
+          const Divider(
+            color: Colors.grey,
+            thickness: 0.5,
+          ),
           ListTile(
             leading: Icon(
               Icons.settings,
-              color: Colors.blue.shade700,
+              color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
             ),
-            title: const Text('Settings'),
+            title: Text(
+              'Settings',
+              style: TextStyle(
+                color: isDarkMode ? Colors.white : Colors.black,
+              ),
+            ),
             onTap: () {
               Navigator.pop(context);
-              // Navigate to Settings Screen
               Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -282,26 +376,47 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           const Spacer(),
           ListTile(
-            leading: const Icon(Icons.logout, color: Colors.red),
-            title: const Text(
+            leading: const Icon(
+              Icons.logout,
+              color: Colors.red,
+            ),
+            title: Text(
               'Logout',
-              style: TextStyle(color: Colors.red),
+              style: TextStyle(
+                color: isDarkMode ? Colors.red.shade400 : Colors.red,
+              ),
             ),
             onTap: () async {
               bool confirm = await showDialog(
                 context: context,
                 builder: (context) => AlertDialog(
-                  title: const Text('Logout'),
-                  content: const Text('Are you sure you want to logout?'),
+                  title: Text(
+                    'Logout',
+                    style: TextStyle(
+                      color: isDarkMode ? Colors.white : Colors.black,
+                    ),
+                  ),
+                  content: Text(
+                    'Are you sure you want to logout?',
+                    style: TextStyle(
+                      color: isDarkMode ? Colors.white : Colors.black,
+                    ),
+                  ),
+                  backgroundColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.pop(context, false),
-                      child: const Text('Cancel'),
+                      child: Text(
+                        'Cancel',
+                        style: TextStyle(
+                          color: isDarkMode ? Colors.white : Colors.black,
+                        ),
+                      ),
                     ),
                     ElevatedButton(
                       onPressed: () => Navigator.pop(context, true),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red.shade700,
+                        backgroundColor: isDarkMode ? Colors.red.shade400 : Colors.red.shade700,
                         foregroundColor: Colors.white,
                       ),
                       child: const Text('Logout'),

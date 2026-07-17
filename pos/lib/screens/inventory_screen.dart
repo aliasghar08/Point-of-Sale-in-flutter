@@ -27,10 +27,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
   }
 
   void _setupRealtimeUpdates() {
-    // Listen to real-time updates from Firestore
     _productsStream = _firebaseService.products.snapshots();
-    
-    // Initial load
     _loadProducts();
   }
 
@@ -54,6 +51,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
   Widget build(BuildContext context) {
     final settingsProvider = Provider.of<SettingsProvider>(context);
     final currencySymbol = settingsProvider.currencySymbol;
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       appBar: AppBar(
@@ -63,17 +61,26 @@ class _InventoryScreenState extends State<InventoryScreen> {
         elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.add),
+            icon: Icon(
+              Icons.add,
+              color: isDarkMode ? Colors.white : Colors.white,
+            ),
             onPressed: _showAddProductDialog,
             tooltip: 'Add Product',
           ),
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: Icon(
+              Icons.refresh,
+              color: isDarkMode ? Colors.white : Colors.white,
+            ),
             onPressed: _loadProducts,
             tooltip: 'Refresh',
           ),
           IconButton(
-            icon: const Icon(Icons.filter_list),
+            icon: Icon(
+              Icons.filter_list,
+              color: isDarkMode ? Colors.white : Colors.white,
+            ),
             onPressed: _showFilterOptions,
             tooltip: 'Filter',
           ),
@@ -81,8 +88,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
       ),
       body: Column(
         children: [
-          _buildSearchBar(),
-          _buildStatsSummary(),
+          _buildSearchBar(isDarkMode),
+          _buildStatsSummary(isDarkMode),
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
@@ -90,38 +97,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     stream: _productsStream,
                     builder: (context, snapshot) {
                       if (snapshot.hasError) {
-                        return Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.error_outline,
-                                size: 60,
-                                color: Colors.red.shade300,
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'Error loading products',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  color: Colors.grey.shade600,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                snapshot.error.toString(),
-                                style: TextStyle(
-                                  color: Colors.grey.shade500,
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              ElevatedButton(
-                                onPressed: _loadProducts,
-                                child: const Text('Retry'),
-                              ),
-                            ],
-                          ),
-                        );
+                        return _buildErrorState(snapshot.error as Object, isDarkMode);
                       }
 
                       if (snapshot.connectionState == ConnectionState.waiting) {
@@ -131,10 +107,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       }
 
                       if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                        return _buildEmptyState();
+                        return _buildEmptyState(isDarkMode);
                       }
 
-                      // Convert to Product objects
                       List<Product> products = snapshot.data!.docs.map((doc) {
                         return Product.fromMap(
                           doc.data() as Map<String, dynamic>,
@@ -142,11 +117,10 @@ class _InventoryScreenState extends State<InventoryScreen> {
                         );
                       }).toList();
 
-                      // Filter products
                       List<Product> filteredProducts = _filterProducts(products);
 
                       if (filteredProducts.isEmpty) {
-                        return _buildNoResultsState();
+                        return _buildNoResultsState(isDarkMode);
                       }
 
                       return ListView.builder(
@@ -154,7 +128,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                         itemCount: filteredProducts.length,
                         itemBuilder: (context, index) {
                           final product = filteredProducts[index];
-                          return _buildProductCard(product, currencySymbol);
+                          return _buildProductCard(product, currencySymbol, isDarkMode);
                         },
                       );
                     },
@@ -164,20 +138,26 @@ class _InventoryScreenState extends State<InventoryScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _showAddProductDialog,
-        backgroundColor: Colors.blue.shade700,
-        child: const Icon(Icons.add),
+        backgroundColor: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+        child: Icon(
+          Icons.add,
+          color: isDarkMode ? Colors.white : Colors.white,
+        ),
       ),
     );
   }
 
-  Widget _buildSearchBar() {
+  // ==================== SEARCH BAR ====================
+  Widget _buildSearchBar(bool isDarkMode) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
+            color: isDarkMode
+                ? Colors.black.withOpacity(0.3)
+                : Colors.grey.withOpacity(0.1),
             spreadRadius: 1,
             blurRadius: 5,
             offset: const Offset(0, 2),
@@ -188,12 +168,24 @@ class _InventoryScreenState extends State<InventoryScreen> {
         children: [
           Expanded(
             child: TextField(
+              style: TextStyle(
+                color: isDarkMode ? Colors.white : Colors.black,
+              ),
               decoration: InputDecoration(
                 hintText: 'Search products...',
-                prefixIcon: const Icon(Icons.search),
+                hintStyle: TextStyle(
+                  color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                ),
+                prefixIcon: Icon(
+                  Icons.search,
+                  color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                ),
                 suffixIcon: _searchQuery.isNotEmpty
                     ? IconButton(
-                        icon: const Icon(Icons.clear),
+                        icon: Icon(
+                          Icons.clear,
+                          color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                        ),
                         onPressed: () {
                           setState(() => _searchQuery = '');
                         },
@@ -204,9 +196,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   borderSide: BorderSide.none,
                 ),
                 filled: true,
-                fillColor: Theme.of(context).brightness == Brightness.light
-                    ? Colors.grey.shade50
-                    : Colors.grey.shade800,
+                fillColor: isDarkMode
+                    ? Colors.grey.shade800
+                    : Colors.grey.shade50,
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 16,
                   vertical: 12,
@@ -222,16 +214,17 @@ class _InventoryScreenState extends State<InventoryScreen> {
           const SizedBox(width: 8),
           Container(
             decoration: BoxDecoration(
-              color: Colors.blue.shade50,
+              color: isDarkMode
+                  ? Colors.blue.shade900
+                  : Colors.blue.shade50,
               borderRadius: BorderRadius.circular(8),
             ),
             child: IconButton(
               icon: Icon(
                 Icons.qr_code_scanner,
-                color: Colors.blue.shade700,
+                color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
               ),
               onPressed: () {
-                // TODO: Implement QR scan for quick product lookup
                 _showSnackBar('QR Scanner coming soon!');
               },
             ),
@@ -241,7 +234,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
     );
   }
 
-  Widget _buildStatsSummary() {
+  // ==================== STATS SUMMARY ====================
+  Widget _buildStatsSummary(bool isDarkMode) {
     return StreamBuilder<QuerySnapshot>(
       stream: _productsStream,
       builder: (context, snapshot) {
@@ -265,9 +259,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          color: Theme.of(context).brightness == Brightness.light
-              ? Colors.grey.shade50
-              : Colors.grey.shade900,
+          color: isDarkMode
+              ? Colors.grey.shade900
+              : Colors.grey.shade50,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
@@ -275,19 +269,24 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 icon: Icons.inventory_2,
                 label: 'Products',
                 value: totalProducts.toString(),
-                color: Colors.blue,
+                color: isDarkMode ? Colors.blue.shade400 : Colors.blue,
+                isDarkMode: isDarkMode,
               ),
               _buildStatItem(
                 icon: Icons.shopping_bag,
                 label: 'Total Stock',
                 value: totalStock.toString(),
-                color: Colors.green,
+                color: isDarkMode ? Colors.green.shade400 : Colors.green,
+                isDarkMode: isDarkMode,
               ),
               _buildStatItem(
                 icon: Icons.warning_amber,
                 label: 'Low Stock',
                 value: lowStockCount.toString(),
-                color: lowStockCount > 0 ? Colors.red : Colors.grey,
+                color: lowStockCount > 0
+                    ? (isDarkMode ? Colors.red.shade400 : Colors.red)
+                    : (isDarkMode ? Colors.grey.shade400 : Colors.grey),
+                isDarkMode: isDarkMode,
               ),
             ],
           ),
@@ -301,6 +300,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
     required String label,
     required String value,
     required Color color,
+    required bool isDarkMode,
   }) {
     return Row(
       children: [
@@ -321,7 +321,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
               label,
               style: TextStyle(
                 fontSize: 11,
-                color: Colors.grey.shade600,
+                color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
               ),
             ),
           ],
@@ -330,38 +330,39 @@ class _InventoryScreenState extends State<InventoryScreen> {
     );
   }
 
-  Widget _buildProductCard(Product product, String currencySymbol) {
+  // ==================== PRODUCT CARD ====================
+  Widget _buildProductCard(Product product, String currencySymbol, bool isDarkMode) {
     bool isLowStock = product.stock <= product.minStock;
     bool isOutOfStock = product.stock <= 0;
 
     return Card(
       elevation: 2,
       margin: const EdgeInsets.only(bottom: 12),
+      color: isDarkMode ? Colors.grey.shade800 : Colors.white,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: isOutOfStock
-            ? BorderSide(color: Colors.red.shade300, width: 1)
+            ? BorderSide(color: isDarkMode ? Colors.red.shade400 : Colors.red.shade300, width: 1)
             : isLowStock
-                ? BorderSide(color: Colors.orange.shade300, width: 1)
+                ? BorderSide(color: isDarkMode ? Colors.orange.shade400 : Colors.orange.shade300, width: 1)
                 : BorderSide.none,
       ),
       child: InkWell(
-        onTap: () => _showProductDetails(product, currencySymbol),
+        onTap: () => _showProductDetails(product, currencySymbol, isDarkMode),
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Row(
             children: [
-              // Stock indicator
               Container(
                 width: 50,
                 height: 50,
                 decoration: BoxDecoration(
                   color: isOutOfStock
-                      ? Colors.red.shade100
+                      ? (isDarkMode ? Colors.red.shade900 : Colors.red.shade100)
                       : isLowStock
-                          ? Colors.orange.shade100
-                          : Colors.green.shade100,
+                          ? (isDarkMode ? Colors.orange.shade900 : Colors.orange.shade100)
+                          : (isDarkMode ? Colors.green.shade900 : Colors.green.shade100),
                   shape: BoxShape.circle,
                 ),
                 child: Center(
@@ -371,25 +372,25 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       fontWeight: FontWeight.bold,
                       fontSize: 18,
                       color: isOutOfStock
-                          ? Colors.red
+                          ? (isDarkMode ? Colors.red.shade400 : Colors.red)
                           : isLowStock
-                              ? Colors.orange
-                              : Colors.green,
+                              ? (isDarkMode ? Colors.orange.shade400 : Colors.orange)
+                              : (isDarkMode ? Colors.green.shade400 : Colors.green),
                     ),
                   ),
                 ),
               ),
               const SizedBox(width: 16),
-              // Product info
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       product.name,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
+                        color: isDarkMode ? Colors.white : Colors.black,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -401,7 +402,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                           '$currencySymbol${product.price.toStringAsFixed(2)}',
                           style: TextStyle(
                             fontWeight: FontWeight.w600,
-                            color: Colors.green.shade700,
+                            color: isDarkMode ? Colors.green.shade400 : Colors.green.shade700,
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -409,7 +410,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                           'Cost: $currencySymbol${product.costPrice.toStringAsFixed(2)}',
                           style: TextStyle(
                             fontSize: 12,
-                            color: Colors.grey.shade600,
+                            color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
                           ),
                         ),
                       ],
@@ -420,13 +421,12 @@ class _InventoryScreenState extends State<InventoryScreen> {
                         'Barcode: ${product.barcode}',
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.grey.shade500,
+                          color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade500,
                         ),
                       ),
                   ],
                 ),
               ),
-              // Status and actions
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
@@ -437,13 +437,13 @@ class _InventoryScreenState extends State<InventoryScreen> {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.red.shade100,
+                        color: isDarkMode ? Colors.red.shade900 : Colors.red.shade100,
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
                         'Out of Stock',
                         style: TextStyle(
-                          color: Colors.red.shade900,
+                          color: isDarkMode ? Colors.red.shade400 : Colors.red.shade900,
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
                         ),
@@ -456,13 +456,13 @@ class _InventoryScreenState extends State<InventoryScreen> {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.orange.shade100,
+                        color: isDarkMode ? Colors.orange.shade900 : Colors.orange.shade100,
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
                         'Low Stock',
                         style: TextStyle(
-                          color: Colors.orange.shade900,
+                          color: isDarkMode ? Colors.orange.shade400 : Colors.orange.shade900,
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
                         ),
@@ -473,14 +473,20 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
-                        icon: const Icon(Icons.edit, size: 20),
-                        color: Colors.blue.shade700,
+                        icon: Icon(
+                          Icons.edit,
+                          size: 20,
+                          color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+                        ),
                         onPressed: () => _showEditProductDialog(product),
                         tooltip: 'Edit Product',
                       ),
                       IconButton(
-                        icon: const Icon(Icons.delete_outline, size: 20),
-                        color: Colors.red.shade700,
+                        icon: Icon(
+                          Icons.delete_outline,
+                          size: 20,
+                          color: isDarkMode ? Colors.red.shade400 : Colors.red.shade700,
+                        ),
                         onPressed: () => _deleteProduct(product),
                         tooltip: 'Delete Product',
                       ),
@@ -495,7 +501,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
     );
   }
 
-  Widget _buildEmptyState() {
+  // ==================== EMPTY STATE ====================
+  Widget _buildEmptyState(bool isDarkMode) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -503,7 +510,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
           Icon(
             Icons.inventory_2_outlined,
             size: 100,
-            color: Colors.grey.shade300,
+            color: isDarkMode ? Colors.grey.shade600 : Colors.grey.shade300,
           ),
           const SizedBox(height: 16),
           Text(
@@ -511,7 +518,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
             style: TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.bold,
-              color: Colors.grey.shade600,
+              color: isDarkMode ? Colors.white : Colors.grey.shade600,
             ),
           ),
           const SizedBox(height: 8),
@@ -519,7 +526,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
             'Start by adding your first product',
             style: TextStyle(
               fontSize: 14,
-              color: Colors.grey.shade500,
+              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade500,
             ),
           ),
           const SizedBox(height: 24),
@@ -528,7 +535,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
             icon: const Icon(Icons.add),
             label: const Text('Add Product'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue.shade700,
+              backgroundColor: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               shape: RoundedRectangleBorder(
@@ -541,7 +548,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
     );
   }
 
-  Widget _buildNoResultsState() {
+  // ==================== NO RESULTS STATE ====================
+  Widget _buildNoResultsState(bool isDarkMode) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -549,7 +557,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
           Icon(
             Icons.search_off,
             size: 80,
-            color: Colors.grey.shade300,
+            color: isDarkMode ? Colors.grey.shade600 : Colors.grey.shade300,
           ),
           const SizedBox(height: 16),
           Text(
@@ -557,7 +565,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Colors.grey.shade600,
+              color: isDarkMode ? Colors.white : Colors.grey.shade600,
             ),
           ),
           const SizedBox(height: 8),
@@ -565,7 +573,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
             'Try adjusting your search query',
             style: TextStyle(
               fontSize: 14,
-              color: Colors.grey.shade500,
+              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade500,
             ),
           ),
           const SizedBox(height: 16),
@@ -573,13 +581,63 @@ class _InventoryScreenState extends State<InventoryScreen> {
             onPressed: () {
               setState(() => _searchQuery = '');
             },
-            child: const Text('Clear Search'),
+            child: Text(
+              'Clear Search',
+              style: TextStyle(
+                color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 
+  // ==================== ERROR STATE ====================
+  Widget _buildErrorState(Object error, bool isDarkMode) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.error_outline,
+            size: 60,
+            color: isDarkMode ? Colors.red.shade400 : Colors.red.shade300,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Error loading products',
+            style: TextStyle(
+              fontSize: 18,
+              color: isDarkMode ? Colors.white : Colors.grey.shade600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Text(
+              error.toString(),
+              style: TextStyle(
+                color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade500,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: _loadProducts,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Retry'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==================== FILTER PRODUCTS ====================
   List<Product> _filterProducts(List<Product> products) {
     if (_searchQuery.isEmpty) return products;
     
@@ -592,9 +650,13 @@ class _InventoryScreenState extends State<InventoryScreen> {
     }).toList();
   }
 
+  // ==================== FILTER OPTIONS ====================
   void _showFilterOptions() {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
     showModalBottomSheet(
       context: context,
+      backgroundColor: isDarkMode ? Colors.grey.shade900 : Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -604,37 +666,60 @@ class _InventoryScreenState extends State<InventoryScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Filter Products',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
+                color: isDarkMode ? Colors.white : Colors.black,
               ),
             ),
             const SizedBox(height: 16),
             ListTile(
-              leading: const Icon(Icons.inventory),
-              title: const Text('All Products'),
+              leading: Icon(
+                Icons.inventory,
+                color: isDarkMode ? Colors.white : Colors.black,
+              ),
+              title: Text(
+                'All Products',
+                style: TextStyle(
+                  color: isDarkMode ? Colors.white : Colors.black,
+                ),
+              ),
               onTap: () {
                 Navigator.pop(context);
                 setState(() => _searchQuery = '');
               },
             ),
             ListTile(
-              leading: const Icon(Icons.warning, color: Colors.orange),
-              title: const Text('Low Stock'),
+              leading: Icon(
+                Icons.warning,
+                color: isDarkMode ? Colors.orange.shade400 : Colors.orange,
+              ),
+              title: Text(
+                'Low Stock',
+                style: TextStyle(
+                  color: isDarkMode ? Colors.white : Colors.black,
+                ),
+              ),
               onTap: () {
                 Navigator.pop(context);
-                // TODO: Implement low stock filter
                 _showSnackBar('Low stock filter coming soon!');
               },
             ),
             ListTile(
-              leading: const Icon(Icons.error, color: Colors.red),
-              title: const Text('Out of Stock'),
+              leading: Icon(
+                Icons.error,
+                color: isDarkMode ? Colors.red.shade400 : Colors.red,
+              ),
+              title: Text(
+                'Out of Stock',
+                style: TextStyle(
+                  color: isDarkMode ? Colors.white : Colors.black,
+                ),
+              ),
               onTap: () {
                 Navigator.pop(context);
-                // TODO: Implement out of stock filter
                 _showSnackBar('Out of stock filter coming soon!');
               },
             ),
@@ -644,10 +729,12 @@ class _InventoryScreenState extends State<InventoryScreen> {
     );
   }
 
-  void _showProductDetails(Product product, String currencySymbol) {
+  // ==================== PRODUCT DETAILS ====================
+  void _showProductDetails(Product product, String currencySymbol, bool isDarkMode) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      backgroundColor: isDarkMode ? Colors.grey.shade900 : Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -662,7 +749,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 width: 60,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
+                  color: isDarkMode ? Colors.grey.shade600 : Colors.grey.shade300,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -672,13 +759,15 @@ class _InventoryScreenState extends State<InventoryScreen> {
               children: [
                 CircleAvatar(
                   radius: 30,
-                  backgroundColor: Colors.blue.shade100,
+                  backgroundColor: isDarkMode
+                      ? Colors.blue.shade900
+                      : Colors.blue.shade100,
                   child: Text(
                     product.stock.toString(),
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
-                      color: Colors.blue.shade700,
+                      color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
                     ),
                   ),
                 ),
@@ -689,15 +778,16 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     children: [
                       Text(
                         product.name,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
+                          color: isDarkMode ? Colors.white : Colors.black,
                         ),
                       ),
                       Text(
                         'Category: ${product.category}',
                         style: TextStyle(
-                          color: Colors.grey.shade600,
+                          color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
                         ),
                       ),
                     ],
@@ -707,13 +797,13 @@ class _InventoryScreenState extends State<InventoryScreen> {
             ),
             const Divider(),
             const SizedBox(height: 8),
-            _buildDetailRow('Price', '$currencySymbol${product.price.toStringAsFixed(2)}'),
-            _buildDetailRow('Cost Price', '$currencySymbol${product.costPrice.toStringAsFixed(2)}'),
-            _buildDetailRow('Profit', '$currencySymbol${(product.price - product.costPrice).toStringAsFixed(2)}'),
-            _buildDetailRow('Stock', product.stock.toString()),
-            _buildDetailRow('Minimum Stock', product.minStock.toString()),
-            _buildDetailRow('Barcode', product.barcode.isNotEmpty ? product.barcode : 'N/A'),
-            _buildDetailRow('QR Code', product.qrCode.isNotEmpty ? product.qrCode : 'N/A'),
+            _buildDetailRow('Price', '$currencySymbol${product.price.toStringAsFixed(2)}', isDarkMode),
+            _buildDetailRow('Cost Price', '$currencySymbol${product.costPrice.toStringAsFixed(2)}', isDarkMode),
+            _buildDetailRow('Profit', '$currencySymbol${(product.price - product.costPrice).toStringAsFixed(2)}', isDarkMode),
+            _buildDetailRow('Stock', product.stock.toString(), isDarkMode),
+            _buildDetailRow('Minimum Stock', product.minStock.toString(), isDarkMode),
+            _buildDetailRow('Barcode', product.barcode.isNotEmpty ? product.barcode : 'N/A', isDarkMode),
+            _buildDetailRow('QR Code', product.qrCode.isNotEmpty ? product.qrCode : 'N/A', isDarkMode),
             const SizedBox(height: 16),
             Row(
               children: [
@@ -726,7 +816,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     icon: const Icon(Icons.edit),
                     label: const Text('Edit'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue.shade700,
+                      backgroundColor: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
                       foregroundColor: Colors.white,
                     ),
                   ),
@@ -741,7 +831,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     icon: const Icon(Icons.delete),
                     label: const Text('Delete'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red.shade700,
+                      backgroundColor: isDarkMode ? Colors.red.shade400 : Colors.red.shade700,
                       foregroundColor: Colors.white,
                     ),
                   ),
@@ -755,7 +845,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
     );
   }
 
-  Widget _buildDetailRow(String label, String value) {
+  Widget _buildDetailRow(String label, String value, bool isDarkMode) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
@@ -764,15 +854,16 @@ class _InventoryScreenState extends State<InventoryScreen> {
           Text(
             label,
             style: TextStyle(
-              color: Colors.grey.shade600,
+              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
               fontSize: 14,
             ),
           ),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               fontWeight: FontWeight.w500,
               fontSize: 14,
+              color: isDarkMode ? Colors.white : Colors.black,
             ),
           ),
         ],
@@ -780,6 +871,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
     );
   }
 
+  // ==================== ADD/EDIT PRODUCT DIALOG ====================
   void _showAddProductDialog() {
     _showProductDialog(
       title: 'Add Product',
@@ -813,6 +905,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
   }) {
     final settingsProvider = Provider.of<SettingsProvider>(context, listen: false);
     final currencySymbol = settingsProvider.currencySymbol;
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     final nameController = TextEditingController(text: product.name);
     final priceController = TextEditingController(
@@ -841,12 +934,18 @@ class _InventoryScreenState extends State<InventoryScreen> {
           children: [
             Icon(
               isEdit ? Icons.edit : Icons.add,
-              color: Colors.blue.shade700,
+              color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
             ),
             const SizedBox(width: 8),
-            Text(title),
+            Text(
+              title,
+              style: TextStyle(
+                color: isDarkMode ? Colors.white : Colors.black,
+              ),
+            ),
           ],
         ),
+        backgroundColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
         content: SingleChildScrollView(
           child: Form(
             key: formKey,
@@ -855,10 +954,21 @@ class _InventoryScreenState extends State<InventoryScreen> {
               children: [
                 TextFormField(
                   controller: nameController,
-                  decoration: const InputDecoration(
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.white : Colors.black,
+                  ),
+                  decoration: InputDecoration(
                     labelText: 'Product Name *',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.production_quantity_limits),
+                    labelStyle: TextStyle(
+                      color: isDarkMode ? Colors.white : Colors.black,
+                    ),
+                    border: const OutlineInputBorder(),
+                    prefixIcon: Icon(
+                      Icons.production_quantity_limits,
+                      color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                    ),
+                    fillColor: isDarkMode ? Colors.grey.shade700 : Colors.white,
+                    filled: true,
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
@@ -873,11 +983,22 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     Expanded(
                       child: TextFormField(
                         controller: priceController,
+                        style: TextStyle(
+                          color: isDarkMode ? Colors.white : Colors.black,
+                        ),
                         decoration: InputDecoration(
                           labelText: 'Price *',
+                          labelStyle: TextStyle(
+                            color: isDarkMode ? Colors.white : Colors.black,
+                          ),
                           border: const OutlineInputBorder(),
                           prefixText: '$currencySymbol ',
-                          prefixIcon: const Icon(Icons.currency_exchange),
+                          prefixIcon: Icon(
+                            Icons.currency_exchange,
+                            color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                          ),
+                          fillColor: isDarkMode ? Colors.grey.shade700 : Colors.white,
+                          filled: true,
                         ),
                         keyboardType: TextInputType.number,
                         validator: (value) {
@@ -895,11 +1016,22 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     Expanded(
                       child: TextFormField(
                         controller: costController,
+                        style: TextStyle(
+                          color: isDarkMode ? Colors.white : Colors.black,
+                        ),
                         decoration: InputDecoration(
                           labelText: 'Cost Price *',
+                          labelStyle: TextStyle(
+                            color: isDarkMode ? Colors.white : Colors.black,
+                          ),
                           border: const OutlineInputBorder(),
                           prefixText: '$currencySymbol ',
-                          prefixIcon: const Icon(Icons.currency_exchange),
+                          prefixIcon: Icon(
+                            Icons.currency_exchange,
+                            color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                          ),
+                          fillColor: isDarkMode ? Colors.grey.shade700 : Colors.white,
+                          filled: true,
                         ),
                         keyboardType: TextInputType.number,
                         validator: (value) {
@@ -921,10 +1053,21 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     Expanded(
                       child: TextFormField(
                         controller: stockController,
-                        decoration: const InputDecoration(
+                        style: TextStyle(
+                          color: isDarkMode ? Colors.white : Colors.black,
+                        ),
+                        decoration: InputDecoration(
                           labelText: 'Stock *',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.inventory),
+                          labelStyle: TextStyle(
+                            color: isDarkMode ? Colors.white : Colors.black,
+                          ),
+                          border: const OutlineInputBorder(),
+                          prefixIcon: Icon(
+                            Icons.inventory,
+                            color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                          ),
+                          fillColor: isDarkMode ? Colors.grey.shade700 : Colors.white,
+                          filled: true,
                         ),
                         keyboardType: TextInputType.number,
                         validator: (value) {
@@ -942,10 +1085,21 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     Expanded(
                       child: TextFormField(
                         controller: minStockController,
-                        decoration: const InputDecoration(
+                        style: TextStyle(
+                          color: isDarkMode ? Colors.white : Colors.black,
+                        ),
+                        decoration: InputDecoration(
                           labelText: 'Min Stock *',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.warning),
+                          labelStyle: TextStyle(
+                            color: isDarkMode ? Colors.white : Colors.black,
+                          ),
+                          border: const OutlineInputBorder(),
+                          prefixIcon: Icon(
+                            Icons.warning,
+                            color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                          ),
+                          fillColor: isDarkMode ? Colors.grey.shade700 : Colors.white,
+                          filled: true,
                         ),
                         keyboardType: TextInputType.number,
                         validator: (value) {
@@ -964,28 +1118,61 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: barcodeController,
-                  decoration: const InputDecoration(
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.white : Colors.black,
+                  ),
+                  decoration: InputDecoration(
                     labelText: 'Barcode',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.barcode_reader),
+                    labelStyle: TextStyle(
+                      color: isDarkMode ? Colors.white : Colors.black,
+                    ),
+                    border: const OutlineInputBorder(),
+                    prefixIcon: Icon(
+                      Icons.barcode_reader,
+                      color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                    ),
+                    fillColor: isDarkMode ? Colors.grey.shade700 : Colors.white,
+                    filled: true,
                   ),
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: qrCodeController,
-                  decoration: const InputDecoration(
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.white : Colors.black,
+                  ),
+                  decoration: InputDecoration(
                     labelText: 'QR Code',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.qr_code),
+                    labelStyle: TextStyle(
+                      color: isDarkMode ? Colors.white : Colors.black,
+                    ),
+                    border: const OutlineInputBorder(),
+                    prefixIcon: Icon(
+                      Icons.qr_code,
+                      color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                    ),
+                    fillColor: isDarkMode ? Colors.grey.shade700 : Colors.white,
+                    filled: true,
                   ),
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: categoryController,
-                  decoration: const InputDecoration(
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.white : Colors.black,
+                  ),
+                  decoration: InputDecoration(
                     labelText: 'Category',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.category),
+                    labelStyle: TextStyle(
+                      color: isDarkMode ? Colors.white : Colors.black,
+                    ),
+                    border: const OutlineInputBorder(),
+                    prefixIcon: Icon(
+                      Icons.category,
+                      color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                    ),
+                    fillColor: isDarkMode ? Colors.grey.shade700 : Colors.white,
+                    filled: true,
                   ),
                 ),
               ],
@@ -995,7 +1182,12 @@ class _InventoryScreenState extends State<InventoryScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                color: isDarkMode ? Colors.white : Colors.black,
+              ),
+            ),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -1032,7 +1224,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue.shade700,
+              backgroundColor: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
               foregroundColor: Colors.white,
             ),
             child: Text(isEdit ? 'Update' : 'Add'),
@@ -1042,23 +1234,40 @@ class _InventoryScreenState extends State<InventoryScreen> {
     );
   }
 
+  // ==================== DELETE PRODUCT ====================
   void _deleteProduct(Product product) async {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
     bool confirm = await showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete Product'),
+        title: Text(
+          'Delete Product',
+          style: TextStyle(
+            color: isDarkMode ? Colors.white : Colors.black,
+          ),
+        ),
+        backgroundColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
         content: Text(
           'Are you sure you want to delete "${product.name}"?\n\n'
           'This action cannot be undone.',
+          style: TextStyle(
+            color: isDarkMode ? Colors.white : Colors.black,
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                color: isDarkMode ? Colors.white : Colors.black,
+              ),
+            ),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red.shade700,
+              backgroundColor: isDarkMode ? Colors.red.shade400 : Colors.red.shade700,
               foregroundColor: Colors.white,
             ),
             onPressed: () => Navigator.pop(context, true),
@@ -1078,11 +1287,21 @@ class _InventoryScreenState extends State<InventoryScreen> {
     }
   }
 
+  // ==================== SNACKBAR ====================
   void _showSnackBar(String message, {bool isError = false}) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
-        backgroundColor: isError ? Colors.red.shade700 : Colors.green.shade700,
+        content: Text(
+          message,
+          style: TextStyle(
+            color: isDarkMode ? Colors.white : Colors.black,
+          ),
+        ),
+        backgroundColor: isError
+            ? (isDarkMode ? Colors.red.shade400 : Colors.red.shade700)
+            : (isDarkMode ? Colors.green.shade400 : Colors.green.shade700),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8),

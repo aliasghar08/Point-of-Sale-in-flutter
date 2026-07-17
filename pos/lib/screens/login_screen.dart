@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:pos/screens/dashboard_screen.dart';
+import 'package:pos/screens/signup_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:email_validator/email_validator.dart';
-import '../providers/auth_provider.dart';
-import '../providers/settings_provider.dart';
-import '../screens/dashboard_screen.dart';
-import '../screens/signup_screen.dart';
+import 'package:pos/providers/auth_provider.dart';
+import 'package:pos/providers/settings_provider.dart';
+import 'package:pos/providers/theme_provider.dart';
+
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -31,9 +33,12 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
     final settingsProvider = Provider.of<SettingsProvider>(context);
+    final themeProvider = Provider.of<ThemeProvider>(context);
     final currencySymbol = settingsProvider.currencySymbol;
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
+      backgroundColor: isDarkMode ? Colors.grey.shade900 : Colors.white,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -46,11 +51,13 @@ class _LoginScreenState extends State<LoginScreen> {
                 width: 100,
                 height: 100,
                 decoration: BoxDecoration(
-                  color: Colors.blue.shade700,
+                  color: isDarkMode ? Colors.blue.shade800 : Colors.blue.shade700,
                   borderRadius: BorderRadius.circular(25),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.blue.shade200,
+                      color: isDarkMode
+                          ? Colors.blue.shade900.withOpacity(0.5)
+                          : Colors.blue.shade200,
                       blurRadius: 20,
                       spreadRadius: 5,
                     ),
@@ -68,7 +75,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 style: TextStyle(
                   fontSize: 32,
                   fontWeight: FontWeight.bold,
-                  color: Colors.blue.shade700,
+                  color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
                 ),
               ),
               const SizedBox(height: 8),
@@ -76,7 +83,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 'Sign in to continue',
                 style: TextStyle(
                   fontSize: 16,
-                  color: Colors.grey.shade600,
+                  color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
                 ),
               ),
               const SizedBox(height: 8),
@@ -84,24 +91,30 @@ class _LoginScreenState extends State<LoginScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
+                  color: isDarkMode
+                      ? Colors.blue.shade900.withOpacity(0.5)
+                      : Colors.blue.shade50,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.blue.shade200),
+                  border: Border.all(
+                    color: isDarkMode
+                        ? Colors.blue.shade700
+                        : Colors.blue.shade200,
+                  ),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.currency_exchange,
                       size: 16,
-                      color: Colors.blue,
+                      color: isDarkMode ? Colors.blue.shade400 : Colors.blue,
                     ),
                     const SizedBox(width: 4),
                     Text(
                       'Currency: $currencySymbol',
                       style: TextStyle(
                         fontSize: 12,
-                        color: Colors.blue.shade700,
+                        color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -116,25 +129,33 @@ class _LoginScreenState extends State<LoginScreen> {
                   children: [
                     TextFormField(
                       controller: _emailController,
+                      style: TextStyle(
+                        color: isDarkMode ? Colors.white : Colors.black,
+                      ),
                       decoration: InputDecoration(
                         labelText: 'Email',
+                        labelStyle: TextStyle(
+                          color: isDarkMode ? Colors.white : Colors.black,
+                        ),
                         hintText: 'Enter your email',
-                        prefixIcon: const Icon(Icons.email),
+                        hintStyle: TextStyle(
+                          color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                        ),
+                        prefixIcon: Icon(
+                          Icons.email,
+                          color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                        ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
                         ),
                         filled: true,
-                        fillColor: Theme.of(context).brightness == Brightness.light
-                            ? Colors.grey.shade50
-                            : Colors.grey.shade800,
+                        fillColor: isDarkMode
+                            ? Colors.grey.shade800
+                            : Colors.grey.shade50,
                       ),
                       keyboardType: TextInputType.emailAddress,
                       autovalidateMode: AutovalidateMode.onUserInteraction,
-                      style: TextStyle(
-                        color: Theme.of(context).brightness == Brightness.light
-                            ? Colors.black
-                            : Colors.white,
-                      ),
                       validator: (value) {
                         if (value == null || value.isEmpty) {
                           return 'Please enter your email';
@@ -149,15 +170,28 @@ class _LoginScreenState extends State<LoginScreen> {
                     TextFormField(
                       controller: _passwordController,
                       obscureText: _obscurePassword,
+                      style: TextStyle(
+                        color: isDarkMode ? Colors.white : Colors.black,
+                      ),
                       decoration: InputDecoration(
                         labelText: 'Password',
+                        labelStyle: TextStyle(
+                          color: isDarkMode ? Colors.white : Colors.black,
+                        ),
                         hintText: 'Enter your password',
-                        prefixIcon: const Icon(Icons.lock),
+                        hintStyle: TextStyle(
+                          color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                        ),
+                        prefixIcon: Icon(
+                          Icons.lock,
+                          color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                        ),
                         suffixIcon: IconButton(
                           icon: Icon(
                             _obscurePassword
                                 ? Icons.visibility_off
                                 : Icons.visibility,
+                            color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
                           ),
                           onPressed: () {
                             setState(() {
@@ -167,18 +201,14 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
                         ),
                         filled: true,
-                        fillColor: Theme.of(context).brightness == Brightness.light
-                            ? Colors.grey.shade50
-                            : Colors.grey.shade800,
+                        fillColor: isDarkMode
+                            ? Colors.grey.shade800
+                            : Colors.grey.shade50,
                       ),
                       autovalidateMode: AutovalidateMode.onUserInteraction,
-                      style: TextStyle(
-                        color: Theme.of(context).brightness == Brightness.light
-                            ? Colors.black
-                            : Colors.white,
-                      ),
                       validator: (value) {
                         if (value == null || value.isEmpty) {
                           return 'Please enter your password';
@@ -202,26 +232,47 @@ class _LoginScreenState extends State<LoginScreen> {
                                   _rememberMe = value!;
                                 });
                               },
-                              activeColor: Colors.blue.shade700,
+                              activeColor: isDarkMode
+                                  ? Colors.blue.shade400
+                                  : Colors.blue.shade700,
                               checkColor: Colors.white,
+                              side: BorderSide(
+                                color: isDarkMode
+                                    ? Colors.grey.shade400
+                                    : Colors.grey.shade600,
+                              ),
                             ),
-                            const Text('Remember me'),
+                            Text(
+                              'Remember me',
+                              style: TextStyle(
+                                color: isDarkMode ? Colors.white : Colors.black,
+                              ),
+                            ),
                           ],
                         ),
                         TextButton(
                           onPressed: () {
-                            // TODO: Implement forgot password
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Forgot password feature coming soon!'),
+                              SnackBar(
+                                content: Text(
+                                  'Forgot password feature coming soon!',
+                                  style: TextStyle(
+                                    color: isDarkMode ? Colors.white : Colors.black,
+                                  ),
+                                ),
                                 behavior: SnackBarBehavior.floating,
+                                backgroundColor: isDarkMode
+                                    ? Colors.grey.shade800
+                                    : Colors.white,
                               ),
                             );
                           },
                           child: Text(
                             'Forgot Password?',
                             style: TextStyle(
-                              color: Colors.blue.shade700,
+                              color: isDarkMode
+                                  ? Colors.blue.shade400
+                                  : Colors.blue.shade700,
                             ),
                           ),
                         ),
@@ -232,22 +283,32 @@ class _LoginScreenState extends State<LoginScreen> {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Colors.red.shade50,
+                          color: isDarkMode
+                              ? Colors.red.shade900.withOpacity(0.5)
+                              : Colors.red.shade50,
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.red.shade200),
+                          border: Border.all(
+                            color: isDarkMode
+                                ? Colors.red.shade700
+                                : Colors.red.shade200,
+                          ),
                         ),
                         child: Row(
                           children: [
                             Icon(
                               Icons.error_outline,
-                              color: Colors.red.shade700,
+                              color: isDarkMode
+                                  ? Colors.red.shade400
+                                  : Colors.red.shade700,
                             ),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
                                 authProvider.error!,
                                 style: TextStyle(
-                                  color: Colors.red.shade700,
+                                  color: isDarkMode
+                                      ? Colors.red.shade400
+                                      : Colors.red.shade700,
                                   fontSize: 14,
                                 ),
                               ),
@@ -256,7 +317,9 @@ class _LoginScreenState extends State<LoginScreen> {
                               icon: Icon(
                                 Icons.close,
                                 size: 20,
-                                color: Colors.red.shade700,
+                                color: isDarkMode
+                                    ? Colors.red.shade400
+                                    : Colors.red.shade700,
                               ),
                               onPressed: () {
                                 authProvider.clearError();
@@ -290,11 +353,16 @@ class _LoginScreenState extends State<LoginScreen> {
                                 }
                               },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue.shade700,
+                          backgroundColor: isDarkMode
+                              ? Colors.blue.shade400
+                              : Colors.blue.shade700,
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
+                          disabledBackgroundColor: isDarkMode
+                              ? Colors.grey.shade700
+                              : Colors.grey.shade300,
                         ),
                         child: authProvider.isLoading
                             ? const SizedBox(
@@ -312,6 +380,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
+                                  color: Colors.white,
                                 ),
                               ),
                       ),
@@ -326,7 +395,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   Text(
                     "Don't have an account?",
                     style: TextStyle(
-                      color: Colors.grey.shade600,
+                      color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
                     ),
                   ),
                   TextButton(
@@ -341,7 +410,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: Text(
                       'Sign Up',
                       style: TextStyle(
-                        color: Colors.blue.shade700,
+                        color: isDarkMode
+                            ? Colors.blue.shade400
+                            : Colors.blue.shade700,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -354,7 +425,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 'Version 1.0.0',
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors.grey.shade400,
+                  color: isDarkMode ? Colors.grey.shade500 : Colors.grey.shade400,
                 ),
               ),
             ],

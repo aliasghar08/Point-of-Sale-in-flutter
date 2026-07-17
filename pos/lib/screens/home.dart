@@ -51,23 +51,17 @@ class _HomeScreenState extends State<HomeScreen> {
     final settingsProvider = Provider.of<SettingsProvider>(context);
     final currencySymbol = settingsProvider.currencySymbol;
     final showProfit = settingsProvider.showProfitInPOS;
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      // home.dart
       drawer: AppDrawer(
         currentIndex: 0,
         onItemSelected: (index) {
-          // Close the drawer first
           Navigator.pop(context);
-
-          // Navigate based on the selected index
           switch (index) {
             case 0:
-              // Already on Home (POS) - do nothing
               break;
-
             case 1:
-              // Navigate to Inventory
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(
@@ -75,9 +69,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               );
               break;
-
             case 2:
-              // Navigate to User Management
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(
@@ -85,7 +77,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               );
               break;
-
             default:
               break;
           }
@@ -98,13 +89,19 @@ class _HomeScreenState extends State<HomeScreen> {
         elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.history),
+            icon: Icon(
+              Icons.history,
+              color: isDarkMode ? Colors.white : Colors.white,
+            ),
             onPressed: () {
               _showSalesHistory();
             },
           ),
           IconButton(
-            icon: const Icon(Icons.receipt_long),
+            icon: Icon(
+              Icons.receipt_long,
+              color: isDarkMode ? Colors.white : Colors.white,
+            ),
             onPressed: () {
               if (_cartItems.isNotEmpty) {
                 _showReceiptDialog();
@@ -117,33 +114,31 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       body: Column(
         children: [
-          // Search and Input Section
-          _buildSearchSection(),
-
-          // Cart Items
+          _buildSearchSection(isDarkMode),
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : _cartItems.isEmpty
-                ? _buildEmptyCart()
-                : _buildCartList(currencySymbol),
+                    ? _buildEmptyCart(isDarkMode)
+                    : _buildCartList(currencySymbol, isDarkMode),
           ),
-
-          // Summary and Checkout
-          _buildCheckoutSection(currencySymbol, showProfit),
+          _buildCheckoutSection(currencySymbol, showProfit, isDarkMode),
         ],
       ),
     );
   }
 
-  Widget _buildSearchSection() {
+  // ==================== SEARCH SECTION ====================
+  Widget _buildSearchSection(bool isDarkMode) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
+            color: isDarkMode
+                ? Colors.black.withOpacity(0.3)
+                : Colors.grey.withOpacity(0.1),
             spreadRadius: 1,
             blurRadius: 5,
             offset: const Offset(0, 2),
@@ -158,12 +153,24 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: TextField(
                   controller: _searchController,
                   focusNode: _searchFocusNode,
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.white : Colors.black,
+                  ),
                   decoration: InputDecoration(
                     hintText: 'Search product by name, barcode, or QR',
-                    prefixIcon: const Icon(Icons.search),
+                    hintStyle: TextStyle(
+                      color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                    ),
+                    prefixIcon: Icon(
+                      Icons.search,
+                      color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                    ),
                     suffixIcon: _searchController.text.isNotEmpty
                         ? IconButton(
-                            icon: const Icon(Icons.clear),
+                            icon: Icon(
+                              Icons.clear,
+                              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                            ),
                             onPressed: () {
                               _searchController.clear();
                               _searchFocusNode.unfocus();
@@ -175,9 +182,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       borderSide: BorderSide.none,
                     ),
                     filled: true,
-                    fillColor: Theme.of(context).brightness == Brightness.light
-                        ? Colors.grey.shade50
-                        : Colors.grey.shade800,
+                    fillColor: isDarkMode
+                        ? Colors.grey.shade800
+                        : Colors.grey.shade50,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                   ),
                   onSubmitted: (value) {
@@ -190,24 +197,32 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(width: 8),
               _buildActionButton(
                 icon: Icons.qr_code_scanner,
-                color: Colors.blue,
+                color: isDarkMode ? Colors.blue.shade400 : Colors.blue,
                 onPressed: _showQRScanner,
+                isDarkMode: isDarkMode,
               ),
               _buildActionButton(
                 icon: Icons.barcode_reader,
-                color: Colors.green,
+                color: isDarkMode ? Colors.green.shade400 : Colors.green,
                 onPressed: _showBarcodeScanner,
+                isDarkMode: isDarkMode,
               ),
               _buildActionButton(
                 icon: Icons.mic,
-                color: Colors.orange,
+                color: isDarkMode ? Colors.orange.shade400 : Colors.orange,
                 onPressed: _showVoiceInput,
+                isDarkMode: isDarkMode,
               ),
             ],
           ),
           if (_isSearching) ...[
             const SizedBox(height: 8),
-            const LinearProgressIndicator(),
+            LinearProgressIndicator(
+              color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+              backgroundColor: isDarkMode
+                  ? Colors.grey.shade700
+                  : Colors.grey.shade200,
+            ),
           ],
         ],
       ),
@@ -218,10 +233,11 @@ class _HomeScreenState extends State<HomeScreen> {
     required IconData icon,
     required Color color,
     required VoidCallback onPressed,
+    required bool isDarkMode,
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withOpacity(isDarkMode ? 0.2 : 0.1),
         borderRadius: BorderRadius.circular(8),
       ),
       child: IconButton(
@@ -246,7 +262,8 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Widget _buildCartList(String currencySymbol) {
+  // ==================== CART LIST ====================
+  Widget _buildCartList(String currencySymbol, bool isDarkMode) {
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: _cartItems.length,
@@ -268,7 +285,7 @@ class _HomeScreenState extends State<HomeScreen> {
             alignment: Alignment.centerRight,
             padding: const EdgeInsets.only(right: 20),
             decoration: BoxDecoration(
-              color: Colors.red,
+              color: isDarkMode ? Colors.red.shade400 : Colors.red,
               borderRadius: BorderRadius.circular(8),
             ),
             child: const Icon(
@@ -280,6 +297,7 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Card(
             elevation: 2,
             margin: const EdgeInsets.only(bottom: 8),
+            color: isDarkMode ? Colors.grey.shade800 : Colors.white,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(8),
             ),
@@ -289,27 +307,32 @@ class _HomeScreenState extends State<HomeScreen> {
                 vertical: 4,
               ),
               leading: CircleAvatar(
-                backgroundColor: Colors.blue.shade100,
+                backgroundColor: isDarkMode
+                    ? Colors.blue.shade900
+                    : Colors.blue.shade100,
                 child: Text(
                   product.stock.toString(),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    color: Colors.blue,
+                    color: isDarkMode ? Colors.blue.shade400 : Colors.blue,
                   ),
                 ),
               ),
               title: Text(
                 product.name,
-                style: const TextStyle(
+                style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
+                  color: isDarkMode ? Colors.white : Colors.black,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
               subtitle: Text(
                 '$currencySymbol${product.price.toStringAsFixed(2)} × ${product.stock}',
-                style: TextStyle(color: Colors.grey.shade600),
+                style: TextStyle(
+                  color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                ),
               ),
               trailing: Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
@@ -317,9 +340,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   Text(
                     '$currencySymbol${itemTotal.toStringAsFixed(2)}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      color: Colors.green,
+                      color: isDarkMode ? Colors.green.shade400 : Colors.green,
                       fontSize: 16,
                     ),
                   ),
@@ -327,7 +350,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
-                        icon: const Icon(Icons.remove_circle_outline),
+                        icon: Icon(
+                          Icons.remove_circle_outline,
+                          color: isDarkMode ? Colors.red.shade400 : Colors.red.shade300,
+                        ),
                         onPressed: () {
                           setState(() {
                             if (product.stock > 1) {
@@ -339,17 +365,18 @@ class _HomeScreenState extends State<HomeScreen> {
                           });
                         },
                         iconSize: 20,
-                        color: Colors.red.shade300,
                       ),
                       IconButton(
-                        icon: const Icon(Icons.add_circle_outline),
+                        icon: Icon(
+                          Icons.add_circle_outline,
+                          color: isDarkMode ? Colors.green.shade400 : Colors.green.shade300,
+                        ),
                         onPressed: () {
                           setState(() {
                             _updateCartQuantity(product, 1);
                           });
                         },
                         iconSize: 20,
-                        color: Colors.green.shade300,
                       ),
                     ],
                   ),
@@ -362,7 +389,8 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildEmptyCart() {
+  // ==================== EMPTY CART ====================
+  Widget _buildEmptyCart(bool isDarkMode) {
     return Center(
       child: SingleChildScrollView(
         child: Column(
@@ -371,7 +399,7 @@ class _HomeScreenState extends State<HomeScreen> {
             Icon(
               Icons.shopping_cart_outlined,
               size: 80,
-              color: Colors.grey.shade300,
+              color: isDarkMode ? Colors.grey.shade600 : Colors.grey.shade300,
             ),
             const SizedBox(height: 16),
             Text(
@@ -379,7 +407,7 @@ class _HomeScreenState extends State<HomeScreen> {
               style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
-                color: Colors.grey.shade600,
+                color: isDarkMode ? Colors.white : Colors.grey.shade600,
               ),
             ),
             const SizedBox(height: 8),
@@ -387,7 +415,10 @@ class _HomeScreenState extends State<HomeScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Text(
                 'Add products using barcode, QR, voice, or search',
-                style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
+                style: TextStyle(
+                  fontSize: 14,
+                  color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade500,
+                ),
                 textAlign: TextAlign.center,
               ),
             ),
@@ -399,7 +430,7 @@ class _HomeScreenState extends State<HomeScreen> {
               icon: const Icon(Icons.search),
               label: const Text('Start Searching'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue.shade700,
+                backgroundColor: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 24,
@@ -416,14 +447,17 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildCheckoutSection(String currencySymbol, bool showProfit) {
+  // ==================== CHECKOUT SECTION ====================
+  Widget _buildCheckoutSection(String currencySymbol, bool showProfit, bool isDarkMode) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
+            color: isDarkMode
+                ? Colors.black.withOpacity(0.3)
+                : Colors.grey.withOpacity(0.1),
             spreadRadius: 1,
             blurRadius: 5,
             offset: const Offset(0, -2),
@@ -435,16 +469,20 @@ class _HomeScreenState extends State<HomeScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
+              Text(
                 'Total:',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: isDarkMode ? Colors.white : Colors.black,
+                ),
               ),
               Text(
                 '$currencySymbol${_totalAmount.toStringAsFixed(2)}',
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
-                  color: Colors.green.shade700,
+                  color: isDarkMode ? Colors.green.shade400 : Colors.green.shade700,
                 ),
               ),
             ],
@@ -454,16 +492,20 @@ class _HomeScreenState extends State<HomeScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
+                Text(
                   'Total Profit:',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: isDarkMode ? Colors.white : Colors.black,
+                  ),
                 ),
                 Text(
                   '$currencySymbol${_totalProfit.toStringAsFixed(2)}',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
-                    color: Colors.blue.shade700,
+                    color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
                   ),
                 ),
               ],
@@ -483,12 +525,24 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12),
                     filled: true,
-                    fillColor: Theme.of(context).brightness == Brightness.light
-                        ? Colors.grey.shade50
-                        : Colors.grey.shade800,
+                    fillColor: isDarkMode
+                        ? Colors.grey.shade800
+                        : Colors.grey.shade50,
+                  ),
+                  dropdownColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.white : Colors.black,
                   ),
                   items: _paymentMethods.map((method) {
-                    return DropdownMenuItem(value: method, child: Text(method));
+                    return DropdownMenuItem(
+                      value: method,
+                      child: Text(
+                        method,
+                        style: TextStyle(
+                          color: isDarkMode ? Colors.white : Colors.black,
+                        ),
+                      ),
+                    );
                   }).toList(),
                   onChanged: (value) {
                     setState(() {
@@ -505,7 +559,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ? null
                       : _processCheckout,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green.shade700,
+                    backgroundColor: isDarkMode ? Colors.green.shade400 : Colors.green.shade700,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
@@ -539,7 +593,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Helper Methods
+  // ==================== HELPER METHODS ====================
   void _searchProduct(String query) async {
     if (query.isEmpty) {
       _showSnackBar('Please enter a search term');
@@ -552,7 +606,6 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     try {
-      // Search by barcode or QR code first
       QuerySnapshot barcodeResult = await _firebaseService.getProductByBarcode(
         query,
       );
@@ -571,7 +624,6 @@ class _HomeScreenState extends State<HomeScreen> {
           _searchController.clear();
           _searchFocusNode.unfocus();
         } else {
-          // Search by name
           QuerySnapshot nameResult = await _firebaseService.products
               .where('name', isGreaterThanOrEqualTo: query)
               .where('name', isLessThanOrEqualTo: query + '\uf8ff')
@@ -601,20 +653,17 @@ class _HomeScreenState extends State<HomeScreen> {
       var data = doc.data() as Map<String, dynamic>;
       Product product = Product.fromMap(data, doc.id);
 
-      // Check if product already in cart
       var existingIndex = _cartItems.indexWhere(
         (item) => item.id == product.id,
       );
 
       setState(() {
         if (existingIndex != -1) {
-          // Update quantity
           var existing = _cartItems[existingIndex];
           _cartItems[existingIndex] = existing.copyWith(
             stock: existing.stock + 1,
           );
         } else {
-          // Add new item with quantity 1
           _cartItems.add(product.copyWith(stock: 1));
         }
         _updateTotals();
@@ -659,10 +708,8 @@ class _HomeScreenState extends State<HomeScreen> {
   void _processCheckout() async {
     if (_cartItems.isEmpty) return;
 
-    // Check stock availability
     for (var item in _cartItems) {
       try {
-        // Check current stock from database
         DocumentSnapshot doc = await _firebaseService.products
             .doc(item.id)
             .get();
@@ -690,9 +737,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
     try {
       String receiptNumber = 'RCP-${DateTime.now().millisecondsSinceEpoch}';
-      String receiptDate = DateFormat(
-        'yyyy-MM-dd HH:mm:ss',
-      ).format(DateTime.now());
 
       for (var item in _cartItems) {
         Sale sale = Sale(
@@ -712,7 +756,6 @@ class _HomeScreenState extends State<HomeScreen> {
         await _firebaseService.addSale(sale.toMap());
       }
 
-      // Clear cart
       setState(() {
         _cartItems.clear();
         _updateTotals();
@@ -734,11 +777,18 @@ class _HomeScreenState extends State<HomeScreen> {
       listen: false,
     );
     final currencySymbol = settingsProvider.currencySymbol;
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Select Product'),
+        title: Text(
+          'Select Product',
+          style: TextStyle(
+            color: isDarkMode ? Colors.white : Colors.black,
+          ),
+        ),
+        backgroundColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
         content: SizedBox(
           width: double.maxFinite,
           height: 350,
@@ -748,21 +798,34 @@ class _HomeScreenState extends State<HomeScreen> {
               var data = snapshot.docs[index].data() as Map<String, dynamic>;
               return ListTile(
                 leading: CircleAvatar(
-                  backgroundColor: Colors.blue.shade100,
+                  backgroundColor: isDarkMode
+                      ? Colors.blue.shade900
+                      : Colors.blue.shade100,
                   child: Text(
                     (data['stock'] ?? 0).toString(),
                     style: TextStyle(
-                      color: Colors.blue.shade700,
+                      color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
-                title: Text(data['name'] ?? ''),
+                title: Text(
+                  data['name'] ?? '',
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.white : Colors.black,
+                  ),
+                ),
                 subtitle: Text(
                   'Price: $currencySymbol${data['price']} | Stock: ${data['stock']}',
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                  ),
                 ),
                 trailing: IconButton(
-                  icon: const Icon(Icons.add_circle, color: Colors.green),
+                  icon: Icon(
+                    Icons.add_circle,
+                    color: isDarkMode ? Colors.green.shade400 : Colors.green,
+                  ),
                   onPressed: () {
                     Navigator.pop(context);
                     _addProductToCart(snapshot.docs[index]);
@@ -779,7 +842,12 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
+            child: Text(
+              'Close',
+              style: TextStyle(
+                color: isDarkMode ? Colors.white : Colors.black,
+              ),
+            ),
           ),
         ],
       ),
@@ -835,28 +903,44 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     final currencySymbol = settingsProvider.currencySymbol;
     final showProfit = settingsProvider.showProfitInPOS;
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: Row(
           children: [
-            const Icon(Icons.receipt_long, color: Colors.blue),
+            Icon(
+              Icons.receipt_long,
+              color: isDarkMode ? Colors.blue.shade400 : Colors.blue,
+            ),
             const SizedBox(width: 8),
-            const Text('Receipt'),
+            Text(
+              'Receipt',
+              style: TextStyle(
+                color: isDarkMode ? Colors.white : Colors.black,
+              ),
+            ),
           ],
         ),
+        backgroundColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               'Receipt #: ${receiptNumber ?? 'N/A'}',
-              style: const TextStyle(fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: isDarkMode ? Colors.white : Colors.black,
+              ),
             ),
             Text(
               'Date: ${DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now())}',
-              style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+              style: TextStyle(
+                color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                fontSize: 12,
+              ),
             ),
             const Divider(),
             const SizedBox(height: 8),
@@ -869,14 +953,18 @@ class _HomeScreenState extends State<HomeScreen> {
                     Expanded(
                       child: Text(
                         '${item.name} × ${item.stock}',
-                        style: const TextStyle(fontSize: 14),
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: isDarkMode ? Colors.white : Colors.black,
+                        ),
                       ),
                     ),
                     Text(
                       '$currencySymbol${(item.price * item.stock).toStringAsFixed(2)}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.w500,
                         fontSize: 14,
+                        color: isDarkMode ? Colors.white : Colors.black,
                       ),
                     ),
                   ],
@@ -887,15 +975,19 @@ class _HomeScreenState extends State<HomeScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
+                Text(
                   'Total:',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    color: isDarkMode ? Colors.white : Colors.black,
+                  ),
                 ),
                 Text(
                   '$currencySymbol${_totalAmount.toStringAsFixed(2)}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    color: Colors.green,
+                    color: isDarkMode ? Colors.green.shade400 : Colors.green,
                     fontSize: 18,
                   ),
                 ),
@@ -908,12 +1000,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   Text(
                     'Profit:',
-                    style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+                    style: TextStyle(
+                      color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                      fontSize: 14,
+                    ),
                   ),
                   Text(
                     '$currencySymbol${_totalProfit.toStringAsFixed(2)}',
                     style: TextStyle(
-                      color: Colors.blue.shade700,
+                      color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
                     ),
@@ -928,11 +1023,17 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   Text(
                     'Payment:',
-                    style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+                    style: TextStyle(
+                      color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                      fontSize: 14,
+                    ),
                   ),
                   Text(
                     _selectedPaymentMethod,
-                    style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+                    style: TextStyle(
+                      color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                      fontSize: 14,
+                    ),
                   ),
                 ],
               ),
@@ -942,17 +1043,21 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
+            child: Text(
+              'Close',
+              style: TextStyle(
+                color: isDarkMode ? Colors.white : Colors.black,
+              ),
+            ),
           ),
           ElevatedButton.icon(
             onPressed: () {
-              // TODO: Implement print functionality
               _showSnackBar('Printing feature coming soon!');
             },
             icon: const Icon(Icons.print),
             label: const Text('Print'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue.shade700,
+              backgroundColor: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
               foregroundColor: Colors.white,
             ),
           ),
@@ -967,6 +1072,7 @@ class _HomeScreenState extends State<HomeScreen> {
       listen: false,
     );
     final currencySymbol = settingsProvider.currencySymbol;
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     showModalBottomSheet(
       context: context,
@@ -974,16 +1080,23 @@ class _HomeScreenState extends State<HomeScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
+      backgroundColor: isDarkMode ? Colors.grey.shade900 : Colors.white,
       builder: (context) => Container(
         padding: const EdgeInsets.all(16),
         height: MediaQuery.of(context).size.height * 0.8,
         child: Column(
           children: [
-            const Text(
+            Text(
               'Sales History',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: isDarkMode ? Colors.white : Colors.black,
+              ),
             ),
-            const Divider(),
+            Divider(
+              color: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade300,
+            ),
             Expanded(
               child: StreamBuilder<QuerySnapshot>(
                 stream: _firebaseService.sales
@@ -992,7 +1105,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     .snapshots(),
                 builder: (context, snapshot) {
                   if (snapshot.hasError) {
-                    return Center(child: Text('Error: ${snapshot.error}'));
+                    return Center(
+                      child: Text(
+                        'Error: ${snapshot.error}',
+                        style: TextStyle(
+                          color: isDarkMode ? Colors.white : Colors.black,
+                        ),
+                      ),
+                    );
                   }
 
                   if (snapshot.connectionState == ConnectionState.waiting) {
@@ -1000,7 +1120,14 @@ class _HomeScreenState extends State<HomeScreen> {
                   }
 
                   if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                    return const Center(child: Text('No sales yet'));
+                    return Center(
+                      child: Text(
+                        'No sales yet',
+                        style: TextStyle(
+                          color: isDarkMode ? Colors.white : Colors.black,
+                        ),
+                      ),
+                    );
                   }
 
                   return ListView.builder(
@@ -1010,23 +1137,36 @@ class _HomeScreenState extends State<HomeScreen> {
                           snapshot.data!.docs[index].data()
                               as Map<String, dynamic>;
                       return Card(
+                        color: isDarkMode ? Colors.grey.shade800 : Colors.white,
                         child: ListTile(
                           leading: CircleAvatar(
-                            backgroundColor: Colors.green.shade100,
+                            backgroundColor: isDarkMode
+                                ? Colors.green.shade900
+                                : Colors.green.shade100,
                             child: Text(
                               (data['quantity'] ?? 0).toString(),
                               style: TextStyle(
-                                color: Colors.green.shade700,
+                                color: isDarkMode
+                                    ? Colors.green.shade400
+                                    : Colors.green.shade700,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
                           ),
-                          title: Text(data['productName'] ?? ''),
+                          title: Text(
+                            data['productName'] ?? '',
+                            style: TextStyle(
+                              color: isDarkMode ? Colors.white : Colors.black,
+                            ),
+                          ),
                           subtitle: Text(
                             'Receipt: ${data['receiptNumber']}\n'
                             'Payment: ${data['paymentMethod']}',
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                            ),
                           ),
                           trailing: Column(
                             crossAxisAlignment: CrossAxisAlignment.end,
@@ -1034,16 +1174,16 @@ class _HomeScreenState extends State<HomeScreen> {
                             children: [
                               Text(
                                 '$currencySymbol${(data['total'] ?? 0).toStringAsFixed(2)}',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.green,
+                                  color: isDarkMode ? Colors.green.shade400 : Colors.green,
                                 ),
                               ),
                               Text(
                                 'Profit: $currencySymbol${(data['profit'] ?? 0).toStringAsFixed(2)}',
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: Colors.blue.shade700,
+                                  color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
                                 ),
                               ),
                             ],
@@ -1068,53 +1208,75 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     final currencySymbol = settingsProvider.currencySymbol;
     final showProfit = settingsProvider.showProfitInPOS;
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return await showDialog(
           context: context,
           builder: (context) => AlertDialog(
-            title: const Text('Confirm Checkout'),
+            title: Text(
+              'Confirm Checkout',
+              style: TextStyle(
+                color: isDarkMode ? Colors.white : Colors.black,
+              ),
+            ),
+            backgroundColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
             content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   'Total items: ${_cartItems.length}',
-                  style: const TextStyle(fontWeight: FontWeight.w500),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w500,
+                    color: isDarkMode ? Colors.white : Colors.black,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   'Total amount: $currencySymbol${_totalAmount.toStringAsFixed(2)}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: Colors.green,
+                    color: isDarkMode ? Colors.green.shade400 : Colors.green,
                   ),
                 ),
                 if (showProfit) ...[
                   const SizedBox(height: 4),
                   Text(
                     'Total profit: $currencySymbol${_totalProfit.toStringAsFixed(2)}',
-                    style: TextStyle(color: Colors.blue.shade700),
+                    style: TextStyle(
+                      color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+                    ),
                   ),
                 ],
                 const SizedBox(height: 8),
-                const Divider(),
+                Divider(
+                  color: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade300,
+                ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Proceed with checkout?',
-                  style: TextStyle(fontWeight: FontWeight.w500),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w500,
+                    color: isDarkMode ? Colors.white : Colors.black,
+                  ),
                 ),
               ],
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancel'),
+                child: Text(
+                  'Cancel',
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.white : Colors.black,
+                  ),
+                ),
               ),
               ElevatedButton(
                 onPressed: () => Navigator.pop(context, true),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green.shade700,
+                  backgroundColor: isDarkMode ? Colors.green.shade400 : Colors.green.shade700,
                   foregroundColor: Colors.white,
                 ),
                 child: const Text('Confirm'),
@@ -1126,12 +1288,22 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _showSnackBar(String message) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
+        content: Text(
+          message,
+          style: TextStyle(
+            color: isDarkMode ? Colors.white : Colors.black,
+          ),
+        ),
         duration: const Duration(seconds: 2),
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        backgroundColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
       ),
     );
   }

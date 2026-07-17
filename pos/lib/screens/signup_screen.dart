@@ -38,6 +38,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
   // List of countries with codes - Including Pakistan
   final List<Map<String, String>> _countries = [
+    // ... (keep your existing countries list)
     {'code': '+93', 'flag': '🇦🇫', 'name': 'Afghanistan'},
     {'code': '+355', 'flag': '🇦🇱', 'name': 'Albania'},
     {'code': '+213', 'flag': '🇩🇿', 'name': 'Algeria'},
@@ -528,8 +529,13 @@ class _SignupScreenState extends State<SignupScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Create Account'),
-        backgroundColor: Colors.blue.shade700,
+        title: Text(
+          'Create Account',
+          style: TextStyle(
+            color: isDarkMode ? Colors.white : Colors.white,
+          ),
+        ),
+        backgroundColor: isDarkMode ? Colors.blue.shade800 : Colors.blue.shade700,
         foregroundColor: Colors.white,
         elevation: 0,
       ),
@@ -543,13 +549,13 @@ class _SignupScreenState extends State<SignupScreen> {
               width: 80,
               height: 80,
               decoration: BoxDecoration(
-                color: Colors.blue.shade100,
+                color: isDarkMode ? Colors.blue.shade800 : Colors.blue.shade100,
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Icon(
                 Icons.person_add,
                 size: 40,
-                color: Colors.blue.shade700,
+                color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
               ),
             ),
             const SizedBox(height: 24),
@@ -564,15 +570,25 @@ class _SignupScreenState extends State<SignupScreen> {
             const SizedBox(height: 8),
             Text(
               'Fill in the details to get started',
-              style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+              style: TextStyle(
+                fontSize: 14,
+                color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+              ),
             ),
             const SizedBox(height: 8),
             // Currency display
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               decoration: BoxDecoration(
-                color: Colors.blue.shade50,
+                color: isDarkMode
+                    ? Colors.blue.shade900.withOpacity(0.5)
+                    : Colors.blue.shade50,
                 borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isDarkMode
+                      ? Colors.blue.shade700
+                      : Colors.blue.shade200,
+                ),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -580,14 +596,14 @@ class _SignupScreenState extends State<SignupScreen> {
                   Icon(
                     Icons.currency_exchange,
                     size: 14,
-                    color: Colors.blue.shade700,
+                    color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
                   ),
                   const SizedBox(width: 4),
                   Text(
                     'Currency: $currencySymbol',
                     style: TextStyle(
                       fontSize: 12,
-                      color: Colors.blue.shade700,
+                      color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -601,7 +617,9 @@ class _SignupScreenState extends State<SignupScreen> {
                 padding: const EdgeInsets.all(8),
                 margin: const EdgeInsets.only(bottom: 16),
                 decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
+                  color: isDarkMode
+                      ? Colors.blue.shade900.withOpacity(0.5)
+                      : Colors.blue.shade50,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
@@ -620,7 +638,7 @@ class _SignupScreenState extends State<SignupScreen> {
                       'Detecting your country...',
                       style: TextStyle(
                         fontSize: 12,
-                        color: Colors.blue.shade700,
+                        color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
                       ),
                     ),
                   ],
@@ -632,16 +650,22 @@ class _SignupScreenState extends State<SignupScreen> {
                 padding: const EdgeInsets.all(8),
                 margin: const EdgeInsets.only(bottom: 16),
                 decoration: BoxDecoration(
-                  color: Colors.orange.shade50,
+                  color: isDarkMode
+                      ? Colors.orange.shade900.withOpacity(0.5)
+                      : Colors.orange.shade50,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.orange.shade200),
+                  border: Border.all(
+                    color: isDarkMode
+                        ? Colors.orange.shade700
+                        : Colors.orange.shade200,
+                  ),
                 ),
                 child: Row(
                   children: [
                     Icon(
                       Icons.location_off,
                       size: 16,
-                      color: Colors.orange.shade700,
+                      color: isDarkMode ? Colors.orange.shade400 : Colors.orange.shade700,
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -649,7 +673,7 @@ class _SignupScreenState extends State<SignupScreen> {
                         'Location permission denied. Using default country.',
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.orange.shade700,
+                          color: isDarkMode ? Colors.orange.shade400 : Colors.orange.shade700,
                         ),
                       ),
                     ),
@@ -661,7 +685,7 @@ class _SignupScreenState extends State<SignupScreen> {
                         'Settings',
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.blue.shade700,
+                          color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
                         ),
                       ),
                     ),
@@ -677,10 +701,20 @@ class _SignupScreenState extends State<SignupScreen> {
                     controller: _nameController,
                     decoration: InputDecoration(
                       labelText: 'Full Name *',
+                      labelStyle: TextStyle(
+                        color: isDarkMode ? Colors.white : Colors.black,
+                      ),
                       hintText: 'Enter your full name',
-                      prefixIcon: const Icon(Icons.person),
+                      hintStyle: TextStyle(
+                        color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                      ),
+                      prefixIcon: Icon(
+                        Icons.person,
+                        color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                      ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
                       ),
                       filled: true,
                       fillColor: isDarkMode
@@ -705,10 +739,20 @@ class _SignupScreenState extends State<SignupScreen> {
                     controller: _emailController,
                     decoration: InputDecoration(
                       labelText: 'Email *',
+                      labelStyle: TextStyle(
+                        color: isDarkMode ? Colors.white : Colors.black,
+                      ),
                       hintText: 'Enter your email',
-                      prefixIcon: const Icon(Icons.email),
+                      hintStyle: TextStyle(
+                        color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                      ),
+                      prefixIcon: Icon(
+                        Icons.email,
+                        color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                      ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
                       ),
                       filled: true,
                       fillColor: isDarkMode
@@ -735,14 +779,23 @@ class _SignupScreenState extends State<SignupScreen> {
                     obscureText: _obscurePassword,
                     decoration: InputDecoration(
                       labelText: 'Password *',
+                      labelStyle: TextStyle(
+                        color: isDarkMode ? Colors.white : Colors.black,
+                      ),
                       hintText: 'Enter your password',
-                      prefixIcon: const Icon(Icons.lock),
+                      hintStyle: TextStyle(
+                        color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                      ),
+                      prefixIcon: Icon(
+                        Icons.lock,
+                        color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                      ),
                       suffixIcon: IconButton(
                         icon: Icon(
                           _obscurePassword
                               ? Icons.visibility_off
                               : Icons.visibility,
-                          color: isDarkMode ? Colors.white : Colors.black,
+                          color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
                         ),
                         onPressed: () {
                           setState(() {
@@ -752,6 +805,7 @@ class _SignupScreenState extends State<SignupScreen> {
                       ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
                       ),
                       filled: true,
                       fillColor: isDarkMode
@@ -777,14 +831,23 @@ class _SignupScreenState extends State<SignupScreen> {
                     obscureText: _obscureConfirmPassword,
                     decoration: InputDecoration(
                       labelText: 'Confirm Password *',
+                      labelStyle: TextStyle(
+                        color: isDarkMode ? Colors.white : Colors.black,
+                      ),
                       hintText: 'Confirm your password',
-                      prefixIcon: const Icon(Icons.lock_outline),
+                      hintStyle: TextStyle(
+                        color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                      ),
+                      prefixIcon: Icon(
+                        Icons.lock_outline,
+                        color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                      ),
                       suffixIcon: IconButton(
                         icon: Icon(
                           _obscureConfirmPassword
                               ? Icons.visibility_off
                               : Icons.visibility,
-                          color: isDarkMode ? Colors.white : Colors.black,
+                          color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
                         ),
                         onPressed: () {
                           setState(() {
@@ -794,6 +857,7 @@ class _SignupScreenState extends State<SignupScreen> {
                       ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
                       ),
                       filled: true,
                       fillColor: isDarkMode
@@ -822,7 +886,9 @@ class _SignupScreenState extends State<SignupScreen> {
                       Container(
                         width: 180,
                         decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey.shade300),
+                          border: Border.all(
+                            color: isDarkMode ? Colors.grey.shade600 : Colors.grey.shade300,
+                          ),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: DropdownButtonHideUnderline(
@@ -847,13 +913,16 @@ class _SignupScreenState extends State<SignupScreen> {
                                       child: Text(
                                         country['name']!,
                                         overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          color: isDarkMode ? Colors.white : Colors.black,
+                                        ),
                                       ),
                                     ),
                                     const SizedBox(width: 4),
                                     Text(
                                       country['code']!,
                                       style: TextStyle(
-                                        color: Colors.grey.shade500,
+                                        color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade500,
                                         fontSize: 11,
                                       ),
                                     ),
@@ -883,10 +952,20 @@ class _SignupScreenState extends State<SignupScreen> {
                           controller: _phoneController,
                           decoration: InputDecoration(
                             labelText: 'Phone Number *',
-                            hintText: '3XX XXX XXXX',  // Better placeholder
-                            prefixIcon: const Icon(Icons.phone),
+                            labelStyle: TextStyle(
+                              color: isDarkMode ? Colors.white : Colors.black,
+                            ),
+                            hintText: '3XX XXX XXXX',
+                            hintStyle: TextStyle(
+                              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                            ),
+                            prefixIcon: Icon(
+                              Icons.phone,
+                              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                            ),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide.none,
                             ),
                             filled: true,
                             fillColor: isDarkMode
@@ -899,7 +978,6 @@ class _SignupScreenState extends State<SignupScreen> {
                           ),
                           inputFormatters: [
                             FilteringTextInputFormatter.digitsOnly,
-                            // Optional: Add custom formatter for phone number
                           ],
                           validator: (value) {
                             if (value == null || value.isEmpty) {
@@ -924,14 +1002,14 @@ class _SignupScreenState extends State<SignupScreen> {
                             'Full Number: ',
                             style: TextStyle(
                               fontSize: 12,
-                              color: Colors.grey.shade600,
+                              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
                             ),
                           ),
                           Text(
                             '$_selectedCountryCode ${_formatPhoneNumber(_phoneController.text)}',
                             style: TextStyle(
                               fontSize: 12,
-                              color: Colors.green.shade700,
+                              color: isDarkMode ? Colors.green.shade400 : Colors.green.shade700,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
@@ -947,14 +1025,14 @@ class _SignupScreenState extends State<SignupScreen> {
                             'Default country: ',
                             style: TextStyle(
                               fontSize: 11,
-                              color: Colors.grey.shade600,
+                              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
                             ),
                           ),
                           Text(
                             '$_countryFlag $_countryName',
                             style: TextStyle(
                               fontSize: 11,
-                              color: Colors.green.shade700,
+                              color: isDarkMode ? Colors.green.shade400 : Colors.green.shade700,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
@@ -963,7 +1041,7 @@ class _SignupScreenState extends State<SignupScreen> {
                             '($_selectedCountryCode)',
                             style: TextStyle(
                               fontSize: 10,
-                              color: Colors.grey.shade400,
+                              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade400,
                             ),
                           ),
                         ],
@@ -975,10 +1053,20 @@ class _SignupScreenState extends State<SignupScreen> {
                     controller: _storeNameController,
                     decoration: InputDecoration(
                       labelText: 'Store Name *',
+                      labelStyle: TextStyle(
+                        color: isDarkMode ? Colors.white : Colors.black,
+                      ),
                       hintText: 'Enter your store name',
-                      prefixIcon: const Icon(Icons.store),
+                      hintStyle: TextStyle(
+                        color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                      ),
+                      prefixIcon: Icon(
+                        Icons.store,
+                        color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                      ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
                       ),
                       filled: true,
                       fillColor: isDarkMode
@@ -1000,7 +1088,9 @@ class _SignupScreenState extends State<SignupScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey.shade300),
+                      border: Border.all(
+                        color: isDarkMode ? Colors.grey.shade600 : Colors.grey.shade300,
+                      ),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: DropdownButtonFormField<String>(
@@ -1050,16 +1140,22 @@ class _SignupScreenState extends State<SignupScreen> {
                       vertical: 8,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.orange.shade50,
+                      color: isDarkMode
+                          ? Colors.orange.shade900.withOpacity(0.5)
+                          : Colors.orange.shade50,
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.orange.shade200),
+                      border: Border.all(
+                        color: isDarkMode
+                            ? Colors.orange.shade700
+                            : Colors.orange.shade200,
+                      ),
                     ),
                     child: Row(
                       children: [
                         Icon(
                           Icons.info_outline,
                           size: 16,
-                          color: Colors.orange.shade700,
+                          color: isDarkMode ? Colors.orange.shade400 : Colors.orange.shade700,
                         ),
                         const SizedBox(width: 8),
                         Expanded(
@@ -1067,7 +1163,7 @@ class _SignupScreenState extends State<SignupScreen> {
                             'First user will be the store owner. Additional users can be added later.',
                             style: TextStyle(
                               fontSize: 12,
-                              color: Colors.orange.shade700,
+                              color: isDarkMode ? Colors.orange.shade400 : Colors.orange.shade700,
                             ),
                           ),
                         ),
@@ -1079,19 +1175,28 @@ class _SignupScreenState extends State<SignupScreen> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.red.shade50,
+                        color: isDarkMode
+                            ? Colors.red.shade900.withOpacity(0.5)
+                            : Colors.red.shade50,
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.red.shade200),
+                        border: Border.all(
+                          color: isDarkMode
+                              ? Colors.red.shade700
+                              : Colors.red.shade200,
+                        ),
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.error_outline, color: Colors.red.shade700),
+                          Icon(
+                            Icons.error_outline,
+                            color: isDarkMode ? Colors.red.shade400 : Colors.red.shade700,
+                          ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               authProvider.error!,
                               style: TextStyle(
-                                color: Colors.red.shade700,
+                                color: isDarkMode ? Colors.red.shade400 : Colors.red.shade700,
                                 fontSize: 14,
                               ),
                             ),
@@ -1100,7 +1205,7 @@ class _SignupScreenState extends State<SignupScreen> {
                             icon: Icon(
                               Icons.close,
                               size: 20,
-                              color: Colors.red.shade700,
+                              color: isDarkMode ? Colors.red.shade400 : Colors.red.shade700,
                             ),
                             onPressed: () {
                               authProvider.clearError();
@@ -1131,11 +1236,16 @@ class _SignupScreenState extends State<SignupScreen> {
 
                                 if (success && context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
+                                    SnackBar(
                                       content: Text(
                                         'Account created successfully! Please sign in.',
+                                        style: TextStyle(
+                                          color: isDarkMode ? Colors.white : Colors.black,
+                                        ),
                                       ),
-                                      backgroundColor: Colors.green,
+                                      backgroundColor: isDarkMode
+                                          ? Colors.green.shade400
+                                          : Colors.green,
                                       behavior: SnackBarBehavior.floating,
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.vertical(
@@ -1155,11 +1265,16 @@ class _SignupScreenState extends State<SignupScreen> {
                               }
                             },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue.shade700,
+                        backgroundColor: isDarkMode
+                            ? Colors.blue.shade400
+                            : Colors.blue.shade700,
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
+                        disabledBackgroundColor: isDarkMode
+                            ? Colors.grey.shade700
+                            : Colors.grey.shade300,
                       ),
                       child: authProvider.isLoading
                           ? const SizedBox(
@@ -1177,6 +1292,7 @@ class _SignupScreenState extends State<SignupScreen> {
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
+                                color: Colors.white,
                               ),
                             ),
                     ),
@@ -1190,7 +1306,9 @@ class _SignupScreenState extends State<SignupScreen> {
               children: [
                 Text(
                   'Already have an account?',
-                  style: TextStyle(color: Colors.grey.shade600),
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                  ),
                 ),
                 TextButton(
                   onPressed: () {
@@ -1204,7 +1322,9 @@ class _SignupScreenState extends State<SignupScreen> {
                   child: Text(
                     'Sign In',
                     style: TextStyle(
-                      color: Colors.blue.shade700,
+                      color: isDarkMode
+                          ? Colors.blue.shade400
+                          : Colors.blue.shade700,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -1215,7 +1335,10 @@ class _SignupScreenState extends State<SignupScreen> {
             // Version info
             Text(
               'Version 1.0.0',
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade400),
+              style: TextStyle(
+                fontSize: 12,
+                color: isDarkMode ? Colors.grey.shade500 : Colors.grey.shade400,
+              ),
             ),
           ],
         ),

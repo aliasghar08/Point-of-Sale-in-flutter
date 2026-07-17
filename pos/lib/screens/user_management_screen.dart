@@ -58,7 +58,6 @@ class _UserManagementContentState extends State<_UserManagementContent> {
       print('🔍 Checking user: ${currentUser.uid}');
       print('📧 Email: ${currentUser.email}');
 
-      // Check if user document exists
       final doc = await FirebaseFirestore.instance
           .collection('users')
           .doc(currentUser.uid)
@@ -86,9 +85,6 @@ class _UserManagementContentState extends State<_UserManagementContent> {
         }
       } else {
         print('❌ User document does NOT exist!');
-        print('⚠️ This is the cause of permission issues');
-        
-        // Try to create the document
         await _createUserDocument(currentUser);
       }
     } catch (e) {
@@ -112,7 +108,7 @@ class _UserManagementContentState extends State<_UserManagementContent> {
         'id': user.uid,
         'email': user.email ?? '',
         'name': user.displayName ?? 'User',
-        'role': 'owner',  // Make first user owner
+        'role': 'owner',
         'phone': '',
         'storeName': 'My Store',
         'createdAt': FieldValue.serverTimestamp(),
@@ -149,29 +145,42 @@ class _UserManagementContentState extends State<_UserManagementContent> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('User Management'),
-        backgroundColor: Colors.blue.shade700,
+        title: Text(
+          'User Management',
+          style: TextStyle(
+            color: isDarkMode ? Colors.white : Colors.white,
+          ),
+        ),
+        backgroundColor: isDarkMode ? Colors.blue.shade800 : Colors.blue.shade700,
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.add),
+            icon: Icon(
+              Icons.add,
+              color: isDarkMode ? Colors.white : Colors.white,
+            ),
             onPressed: () {
               _showAddUserDialog(context);
             },
             tooltip: 'Add User',
           ),
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: Icon(
+              Icons.refresh,
+              color: isDarkMode ? Colors.white : Colors.white,
+            ),
             onPressed: () {
               _checkUserPermissions();
               setState(() {});
             },
             tooltip: 'Refresh',
           ),
-          // Debug button
           IconButton(
-            icon: const Icon(Icons.bug_report),
+            icon: Icon(
+              Icons.bug_report,
+              color: isDarkMode ? Colors.white : Colors.white,
+            ),
             onPressed: () {
               _checkUserPermissions();
               ScaffoldMessenger.of(context).showSnackBar(
@@ -186,7 +195,11 @@ class _UserManagementContentState extends State<_UserManagementContent> {
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(
+              child: CircularProgressIndicator(
+                color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+              ),
+            )
           : _errorMessage != null
               ? _buildErrorScreen(isDarkMode)
               : _buildUserList(isDarkMode),
@@ -204,7 +217,7 @@ class _UserManagementContentState extends State<_UserManagementContent> {
             Icon(
               Icons.error_outline,
               size: 60,
-              color: Colors.red.shade300,
+              color: isDarkMode ? Colors.red.shade400 : Colors.red.shade300,
             ),
             const SizedBox(height: 16),
             Text(
@@ -236,10 +249,18 @@ class _UserManagementContentState extends State<_UserManagementContent> {
             const SizedBox(height: 24),
             ElevatedButton.icon(
               onPressed: _checkUserPermissions,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Retry'),
+              icon: Icon(
+                Icons.refresh,
+                color: isDarkMode ? Colors.white : Colors.white,
+              ),
+              label: Text(
+                'Retry',
+                style: TextStyle(
+                  color: isDarkMode ? Colors.white : Colors.white,
+                ),
+              ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue.shade700,
+                backgroundColor: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
                 foregroundColor: Colors.white,
               ),
             ),
@@ -260,8 +281,13 @@ class _UserManagementContentState extends State<_UserManagementContent> {
             print('❌ Stream error: $error');
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('Error: $error'),
-                backgroundColor: Colors.red,
+                content: Text(
+                  'Error: $error',
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.white : Colors.black,
+                  ),
+                ),
+                backgroundColor: isDarkMode ? Colors.red.shade400 : Colors.red,
                 behavior: SnackBarBehavior.floating,
               ),
             );
@@ -275,7 +301,7 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                 Icon(
                   Icons.error_outline,
                   size: 60,
-                  color: Colors.red.shade300,
+                  color: isDarkMode ? Colors.red.shade400 : Colors.red.shade300,
                 ),
                 const SizedBox(height: 16),
                 Text(
@@ -303,6 +329,10 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                     _checkUserPermissions();
                     setState(() {});
                   },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+                    foregroundColor: Colors.white,
+                  ),
                   child: const Text('Retry'),
                 ),
               ],
@@ -311,7 +341,11 @@ class _UserManagementContentState extends State<_UserManagementContent> {
         }
 
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return Center(
+            child: CircularProgressIndicator(
+              color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+            ),
+          );
         }
 
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
@@ -346,9 +380,14 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                     _showAddUserDialog(context);
                   },
                   icon: const Icon(Icons.add),
-                  label: const Text('Add User'),
+                  label: Text(
+                    'Add User',
+                    style: TextStyle(
+                      color: isDarkMode ? Colors.white : Colors.white,
+                    ),
+                  ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue.shade700,
+                    backgroundColor: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
                     foregroundColor: Colors.white,
                   ),
                 ),
@@ -393,12 +432,14 @@ class _UserManagementContentState extends State<_UserManagementContent> {
           children: [
             CircleAvatar(
               backgroundColor: user.isActive
-                  ? Colors.green.shade100
-                  : Colors.red.shade100,
+                  ? (isDarkMode ? Colors.green.shade900 : Colors.green.shade100)
+                  : (isDarkMode ? Colors.red.shade900 : Colors.red.shade100),
               child: Text(
                 user.name.substring(0, 1).toUpperCase(),
                 style: TextStyle(
-                  color: user.isActive ? Colors.green : Colors.red,
+                  color: user.isActive
+                      ? (isDarkMode ? Colors.green.shade400 : Colors.green)
+                      : (isDarkMode ? Colors.red.shade400 : Colors.red),
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -442,13 +483,13 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: _getRoleColor(user.role).withOpacity(0.2),
+                          color: _getRoleColor(user.role, isDarkMode).withOpacity(0.2),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
                           user.roleDisplay,
                           style: TextStyle(
-                            color: _getRoleColor(user.role),
+                            color: _getRoleColor(user.role, isDarkMode),
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
                           ),
@@ -461,13 +502,15 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.red.withOpacity(0.2),
+                            color: isDarkMode
+                                ? Colors.red.shade900.withOpacity(0.5)
+                                : Colors.red.withOpacity(0.2),
                             borderRadius: BorderRadius.circular(4),
                           ),
-                          child: const Text(
+                          child: Text(
                             'Inactive',
                             style: TextStyle(
-                              color: Colors.red,
+                              color: isDarkMode ? Colors.red.shade400 : Colors.red,
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
                             ),
@@ -480,13 +523,15 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.blue.withOpacity(0.2),
+                            color: isDarkMode
+                                ? Colors.blue.shade900.withOpacity(0.5)
+                                : Colors.blue.withOpacity(0.2),
                             borderRadius: BorderRadius.circular(4),
                           ),
-                          child: const Text(
+                          child: Text(
                             'You',
                             style: TextStyle(
-                              color: Colors.blue,
+                              color: isDarkMode ? Colors.blue.shade400 : Colors.blue,
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
                             ),
@@ -518,13 +563,22 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                   }
                 },
                 itemBuilder: (context) => [
-                  const PopupMenuItem(
+                  PopupMenuItem(
                     value: 'edit',
                     child: Row(
                       children: [
-                        Icon(Icons.edit, size: 20),
-                        SizedBox(width: 8),
-                        Text('Edit Role'),
+                        Icon(
+                          Icons.edit,
+                          size: 20,
+                          color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Edit Role',
+                          style: TextStyle(
+                            color: isDarkMode ? Colors.white : Colors.black,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -535,20 +589,36 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                         Icon(
                           user.isActive ? Icons.block : Icons.check_circle,
                           size: 20,
-                          color: user.isActive ? Colors.red : Colors.green,
+                          color: user.isActive
+                              ? (isDarkMode ? Colors.red.shade400 : Colors.red)
+                              : (isDarkMode ? Colors.green.shade400 : Colors.green),
                         ),
                         const SizedBox(width: 8),
-                        Text(user.isActive ? 'Deactivate' : 'Activate'),
+                        Text(
+                          user.isActive ? 'Deactivate' : 'Activate',
+                          style: TextStyle(
+                            color: isDarkMode ? Colors.white : Colors.black,
+                          ),
+                        ),
                       ],
                     ),
                   ),
-                  const PopupMenuItem(
+                  PopupMenuItem(
                     value: 'delete',
                     child: Row(
                       children: [
-                        Icon(Icons.delete, size: 20, color: Colors.red),
-                        SizedBox(width: 8),
-                        Text('Delete', style: TextStyle(color: Colors.red)),
+                        Icon(
+                          Icons.delete,
+                          size: 20,
+                          color: isDarkMode ? Colors.red.shade400 : Colors.red,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Delete',
+                          style: TextStyle(
+                            color: isDarkMode ? Colors.red.shade400 : Colors.red,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -560,16 +630,16 @@ class _UserManagementContentState extends State<_UserManagementContent> {
     );
   }
 
-  Color _getRoleColor(String role) {
+  Color _getRoleColor(String role, bool isDarkMode) {
     switch (role) {
       case 'owner':
-        return Colors.green;
+        return isDarkMode ? Colors.green.shade400 : Colors.green;
       case 'manager':
-        return Colors.blue;
+        return isDarkMode ? Colors.blue.shade400 : Colors.blue;
       case 'worker':
-        return Colors.orange;
+        return isDarkMode ? Colors.orange.shade400 : Colors.orange;
       default:
-        return Colors.grey;
+        return isDarkMode ? Colors.grey.shade400 : Colors.grey;
     }
   }
 
@@ -587,7 +657,12 @@ class _UserManagementContentState extends State<_UserManagementContent> {
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: const Text('Add New User'),
+        title: Text(
+          'Add New User',
+          style: TextStyle(
+            color: isDarkMode ? Colors.white : Colors.black,
+          ),
+        ),
         backgroundColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
         content: SingleChildScrollView(
           child: Form(
@@ -597,14 +672,17 @@ class _UserManagementContentState extends State<_UserManagementContent> {
               children: [
                 TextFormField(
                   controller: _nameController,
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.white : Colors.black,
+                  ),
                   decoration: InputDecoration(
                     labelText: 'Full Name *',
+                    labelStyle: TextStyle(
+                      color: isDarkMode ? Colors.white : Colors.black,
+                    ),
                     border: const OutlineInputBorder(),
                     fillColor: isDarkMode ? Colors.grey.shade700 : Colors.white,
                     filled: true,
-                  ),
-                  style: TextStyle(
-                    color: isDarkMode ? Colors.white : Colors.black,
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
@@ -616,16 +694,19 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _emailController,
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.white : Colors.black,
+                  ),
                   decoration: InputDecoration(
                     labelText: 'Email *',
+                    labelStyle: TextStyle(
+                      color: isDarkMode ? Colors.white : Colors.black,
+                    ),
                     border: const OutlineInputBorder(),
                     fillColor: isDarkMode ? Colors.grey.shade700 : Colors.white,
                     filled: true,
                   ),
                   keyboardType: TextInputType.emailAddress,
-                  style: TextStyle(
-                    color: isDarkMode ? Colors.white : Colors.black,
-                  ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
                       return 'Please enter email';
@@ -639,16 +720,19 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _passwordController,
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.white : Colors.black,
+                  ),
                   decoration: InputDecoration(
                     labelText: 'Password *',
+                    labelStyle: TextStyle(
+                      color: isDarkMode ? Colors.white : Colors.black,
+                    ),
                     border: const OutlineInputBorder(),
                     fillColor: isDarkMode ? Colors.grey.shade700 : Colors.white,
                     filled: true,
                   ),
                   obscureText: true,
-                  style: TextStyle(
-                    color: isDarkMode ? Colors.white : Colors.black,
-                  ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
                       return 'Please enter password';
@@ -662,16 +746,19 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _phoneController,
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.white : Colors.black,
+                  ),
                   decoration: InputDecoration(
                     labelText: 'Phone Number',
+                    labelStyle: TextStyle(
+                      color: isDarkMode ? Colors.white : Colors.black,
+                    ),
                     border: const OutlineInputBorder(),
                     fillColor: isDarkMode ? Colors.grey.shade700 : Colors.white,
                     filled: true,
                   ),
                   keyboardType: TextInputType.phone,
-                  style: TextStyle(
-                    color: isDarkMode ? Colors.white : Colors.black,
-                  ),
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
@@ -705,7 +792,12 @@ class _UserManagementContentState extends State<_UserManagementContent> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                color: isDarkMode ? Colors.white : Colors.black,
+              ),
+            ),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -717,22 +809,32 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                     name: _nameController.text.trim(),
                     role: _selectedRole,
                     phone: _phoneController.text.trim(),
-                    storeName: '', // Owner can set this or leave empty
+                    storeName: '',
                   );
                   
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('User added successfully!'),
-                      backgroundColor: Colors.green,
+                    SnackBar(
+                      content: Text(
+                        'User added successfully!',
+                        style: TextStyle(
+                          color: isDarkMode ? Colors.white : Colors.black,
+                        ),
+                      ),
+                      backgroundColor: isDarkMode ? Colors.green.shade400 : Colors.green,
                       behavior: SnackBarBehavior.floating,
                     ),
                   );
                 } catch (e) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('Error: $e'),
-                      backgroundColor: Colors.red,
+                      content: Text(
+                        'Error: $e',
+                        style: TextStyle(
+                          color: isDarkMode ? Colors.white : Colors.black,
+                        ),
+                      ),
+                      backgroundColor: isDarkMode ? Colors.red.shade400 : Colors.red,
                       behavior: SnackBarBehavior.floating,
                     ),
                   );
@@ -740,7 +842,7 @@ class _UserManagementContentState extends State<_UserManagementContent> {
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue.shade700,
+              backgroundColor: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
               foregroundColor: Colors.white,
             ),
             child: const Text('Add User'),
@@ -759,7 +861,12 @@ class _UserManagementContentState extends State<_UserManagementContent> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Edit User Role'),
+        title: Text(
+          'Edit User Role',
+          style: TextStyle(
+            color: isDarkMode ? Colors.white : Colors.black,
+          ),
+        ),
         backgroundColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -792,7 +899,12 @@ class _UserManagementContentState extends State<_UserManagementContent> {
               items: roles.map((role) {
                 return DropdownMenuItem(
                   value: role,
-                  child: Text(role.toUpperCase()),
+                  child: Text(
+                    role.toUpperCase(),
+                    style: TextStyle(
+                      color: isDarkMode ? Colors.white : Colors.black,
+                    ),
+                  ),
                 );
               }).toList(),
               onChanged: (value) {
@@ -804,7 +916,12 @@ class _UserManagementContentState extends State<_UserManagementContent> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                color: isDarkMode ? Colors.white : Colors.black,
+              ),
+            ),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -812,24 +929,34 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                 await _authService.updateUserRole(user.id, selectedRole);
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('User role updated successfully!'),
-                    backgroundColor: Colors.green,
+                  SnackBar(
+                    content: Text(
+                      'User role updated successfully!',
+                      style: TextStyle(
+                        color: isDarkMode ? Colors.white : Colors.black,
+                      ),
+                    ),
+                    backgroundColor: isDarkMode ? Colors.green.shade400 : Colors.green,
                     behavior: SnackBarBehavior.floating,
                   ),
                 );
               } catch (e) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('Error: $e'),
-                    backgroundColor: Colors.red,
+                    content: Text(
+                      'Error: $e',
+                      style: TextStyle(
+                        color: isDarkMode ? Colors.white : Colors.black,
+                      ),
+                    ),
+                    backgroundColor: isDarkMode ? Colors.red.shade400 : Colors.red,
                     behavior: SnackBarBehavior.floating,
                   ),
                 );
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue.shade700,
+              backgroundColor: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
               foregroundColor: Colors.white,
             ),
             child: const Text('Update'),
@@ -866,7 +993,12 @@ class _UserManagementContentState extends State<_UserManagementContent> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                color: isDarkMode ? Colors.white : Colors.black,
+              ),
+            ),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -879,26 +1011,41 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                       user.isActive
                           ? 'User deactivated successfully!'
                           : 'User activated successfully!',
+                      style: TextStyle(
+                        color: isDarkMode ? Colors.white : Colors.black,
+                      ),
                     ),
-                    backgroundColor: Colors.green,
+                    backgroundColor: isDarkMode ? Colors.green.shade400 : Colors.green,
                     behavior: SnackBarBehavior.floating,
                   ),
                 );
               } catch (e) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('Error: $e'),
-                    backgroundColor: Colors.red,
+                    content: Text(
+                      'Error: $e',
+                      style: TextStyle(
+                        color: isDarkMode ? Colors.white : Colors.black,
+                      ),
+                    ),
+                    backgroundColor: isDarkMode ? Colors.red.shade400 : Colors.red,
                     behavior: SnackBarBehavior.floating,
                   ),
                 );
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: user.isActive ? Colors.red : Colors.green,
+              backgroundColor: user.isActive
+                  ? (isDarkMode ? Colors.red.shade400 : Colors.red)
+                  : (isDarkMode ? Colors.green.shade400 : Colors.green),
               foregroundColor: Colors.white,
             ),
-            child: Text(user.isActive ? 'Deactivate' : 'Activate'),
+            child: Text(
+              user.isActive ? 'Deactivate' : 'Activate',
+              style: TextStyle(
+                color: isDarkMode ? Colors.white : Colors.white,
+              ),
+            ),
           ),
         ],
       ),
@@ -912,7 +1059,12 @@ class _UserManagementContentState extends State<_UserManagementContent> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete User'),
+        title: Text(
+          'Delete User',
+          style: TextStyle(
+            color: isDarkMode ? Colors.white : Colors.black,
+          ),
+        ),
         backgroundColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
         content: Text(
           'Are you sure you want to delete ${user.name}?\n\n'
@@ -924,7 +1076,12 @@ class _UserManagementContentState extends State<_UserManagementContent> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                color: isDarkMode ? Colors.white : Colors.black,
+              ),
+            ),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -935,24 +1092,34 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                     .delete();
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('User deleted successfully!'),
-                    backgroundColor: Colors.green,
+                  SnackBar(
+                    content: Text(
+                      'User deleted successfully!',
+                      style: TextStyle(
+                        color: isDarkMode ? Colors.white : Colors.black,
+                      ),
+                    ),
+                    backgroundColor: isDarkMode ? Colors.green.shade400 : Colors.green,
                     behavior: SnackBarBehavior.floating,
                   ),
                 );
               } catch (e) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('Error: $e'),
-                    backgroundColor: Colors.red,
+                    content: Text(
+                      'Error: $e',
+                      style: TextStyle(
+                        color: isDarkMode ? Colors.white : Colors.black,
+                      ),
+                    ),
+                    backgroundColor: isDarkMode ? Colors.red.shade400 : Colors.red,
                     behavior: SnackBarBehavior.floating,
                   ),
                 );
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red.shade700,
+              backgroundColor: isDarkMode ? Colors.red.shade400 : Colors.red.shade700,
               foregroundColor: Colors.white,
             ),
             child: const Text('Delete'),
