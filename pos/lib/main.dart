@@ -6,7 +6,7 @@ import 'package:pos/providers/auth_provider.dart';
 import 'package:pos/providers/theme_provider.dart';
 import 'package:pos/providers/settings_provider.dart';
 import 'package:pos/screens/login_screen.dart';
-import 'package:pos/screens/dashboard_screen.dart';
+import 'package:pos/utils/dashboard_screen.dart';
 import 'firebase_options.dart';
 
 void main() async {

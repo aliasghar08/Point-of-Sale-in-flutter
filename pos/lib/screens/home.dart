@@ -1,9 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:pos/screens/inventory_screen.dart';
-import 'package:pos/screens/user_management_screen.dart';
 import 'package:pos/widgets/barcode_scanner.dart';
-import 'package:pos/widgets/drawer.dart';
 import 'package:pos/widgets/qr_scanner.dart';
 import 'package:pos/widgets/voice_input.dart';
 import 'package:provider/provider.dart';
@@ -54,64 +51,6 @@ class _HomeScreenState extends State<HomeScreen> {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      drawer: AppDrawer(
-        currentIndex: 0,
-        onItemSelected: (index) {
-          Navigator.pop(context);
-          switch (index) {
-            case 0:
-              break;
-            case 1:
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const InventoryScreen(),
-                ),
-              );
-              break;
-            case 2:
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const UserManagementScreen(),
-                ),
-              );
-              break;
-            default:
-              break;
-          }
-        },
-      ),
-      appBar: AppBar(
-        title: const Text('Point of Sale'),
-        backgroundColor: Colors.blue.shade700,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: Icon(
-              Icons.history,
-              color: isDarkMode ? Colors.white : Colors.white,
-            ),
-            onPressed: () {
-              _showSalesHistory();
-            },
-          ),
-          IconButton(
-            icon: Icon(
-              Icons.receipt_long,
-              color: isDarkMode ? Colors.white : Colors.white,
-            ),
-            onPressed: () {
-              if (_cartItems.isNotEmpty) {
-                _showReceiptDialog();
-              } else {
-                _showSnackBar('Cart is empty');
-              }
-            },
-          ),
-        ],
-      ),
       body: Column(
         children: [
           _buildSearchSection(isDarkMode),
@@ -119,8 +58,8 @@ class _HomeScreenState extends State<HomeScreen> {
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : _cartItems.isEmpty
-                    ? _buildEmptyCart(isDarkMode)
-                    : _buildCartList(currencySymbol, isDarkMode),
+                ? _buildEmptyCart(isDarkMode)
+                : _buildCartList(currencySymbol, isDarkMode),
           ),
           _buildCheckoutSection(currencySymbol, showProfit, isDarkMode),
         ],
@@ -159,17 +98,23 @@ class _HomeScreenState extends State<HomeScreen> {
                   decoration: InputDecoration(
                     hintText: 'Search product by name, barcode, or QR',
                     hintStyle: TextStyle(
-                      color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                      color: isDarkMode
+                          ? Colors.grey.shade400
+                          : Colors.grey.shade600,
                     ),
                     prefixIcon: Icon(
                       Icons.search,
-                      color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                      color: isDarkMode
+                          ? Colors.grey.shade400
+                          : Colors.grey.shade600,
                     ),
                     suffixIcon: _searchController.text.isNotEmpty
                         ? IconButton(
                             icon: Icon(
                               Icons.clear,
-                              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                              color: isDarkMode
+                                  ? Colors.grey.shade400
+                                  : Colors.grey.shade600,
                             ),
                             onPressed: () {
                               _searchController.clear();
@@ -195,35 +140,70 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               const SizedBox(width: 8),
-              _buildActionButton(
-                icon: Icons.qr_code_scanner,
-                color: isDarkMode ? Colors.blue.shade400 : Colors.blue,
-                onPressed: _showQRScanner,
-                isDarkMode: isDarkMode,
+              // QR Scanner Button
+              Container(
+                decoration: BoxDecoration(
+                  color: isDarkMode
+                      ? Colors.blue.shade900
+                      : Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: IconButton(
+                  icon: Icon(
+                    Icons.qr_code_scanner,
+                    color: isDarkMode
+                        ? Colors.blue.shade400
+                        : Colors.blue.shade700,
+                  ),
+                  onPressed: _showQRScanner,
+                  tooltip: 'Scan QR Code',
+                  iconSize: 24,
+                ),
               ),
-              _buildActionButton(
-                icon: Icons.barcode_reader,
-                color: isDarkMode ? Colors.green.shade400 : Colors.green,
-                onPressed: _showBarcodeScanner,
-                isDarkMode: isDarkMode,
+              const SizedBox(width: 4),
+              // Barcode Scanner Button
+              Container(
+                decoration: BoxDecoration(
+                  color: isDarkMode
+                      ? Colors.green.shade900
+                      : Colors.green.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: IconButton(
+                  icon: Icon(
+                    Icons.barcode_reader,
+                    color: isDarkMode
+                        ? Colors.green.shade400
+                        : Colors.green.shade700,
+                  ),
+                  onPressed: _showBarcodeScanner,
+                  tooltip: 'Scan Barcode',
+                  iconSize: 24,
+                ),
               ),
-              _buildActionButton(
-                icon: Icons.mic,
-                color: isDarkMode ? Colors.orange.shade400 : Colors.orange,
-                onPressed: _showVoiceInput,
-                isDarkMode: isDarkMode,
+              const SizedBox(width: 4),
+              // Voice Input Button
+              Container(
+                decoration: BoxDecoration(
+                  color: isDarkMode
+                      ? Colors.orange.shade900
+                      : Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: IconButton(
+                  icon: Icon(
+                    Icons.mic,
+                    color: isDarkMode
+                        ? Colors.orange.shade400
+                        : Colors.orange.shade700,
+                  ),
+                  onPressed: _showVoiceInput,
+                  tooltip: 'Voice Input',
+                  iconSize: 24,
+                ),
               ),
             ],
           ),
-          if (_isSearching) ...[
-            const SizedBox(height: 8),
-            LinearProgressIndicator(
-              color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
-              backgroundColor: isDarkMode
-                  ? Colors.grey.shade700
-                  : Colors.grey.shade200,
-            ),
-          ],
         ],
       ),
     );
@@ -331,7 +311,9 @@ class _HomeScreenState extends State<HomeScreen> {
               subtitle: Text(
                 '$currencySymbol${product.price.toStringAsFixed(2)} × ${product.stock}',
                 style: TextStyle(
-                  color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                  color: isDarkMode
+                      ? Colors.grey.shade400
+                      : Colors.grey.shade600,
                 ),
               ),
               trailing: Column(
@@ -352,7 +334,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       IconButton(
                         icon: Icon(
                           Icons.remove_circle_outline,
-                          color: isDarkMode ? Colors.red.shade400 : Colors.red.shade300,
+                          color: isDarkMode
+                              ? Colors.red.shade400
+                              : Colors.red.shade300,
                         ),
                         onPressed: () {
                           setState(() {
@@ -369,7 +353,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       IconButton(
                         icon: Icon(
                           Icons.add_circle_outline,
-                          color: isDarkMode ? Colors.green.shade400 : Colors.green.shade300,
+                          color: isDarkMode
+                              ? Colors.green.shade400
+                              : Colors.green.shade300,
                         ),
                         onPressed: () {
                           setState(() {
@@ -417,7 +403,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 'Add products using barcode, QR, voice, or search',
                 style: TextStyle(
                   fontSize: 14,
-                  color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade500,
+                  color: isDarkMode
+                      ? Colors.grey.shade400
+                      : Colors.grey.shade500,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -430,7 +418,9 @@ class _HomeScreenState extends State<HomeScreen> {
               icon: const Icon(Icons.search),
               label: const Text('Start Searching'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+                backgroundColor: isDarkMode
+                    ? Colors.blue.shade400
+                    : Colors.blue.shade700,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 24,
@@ -448,7 +438,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // ==================== CHECKOUT SECTION ====================
-  Widget _buildCheckoutSection(String currencySymbol, bool showProfit, bool isDarkMode) {
+  Widget _buildCheckoutSection(
+    String currencySymbol,
+    bool showProfit,
+    bool isDarkMode,
+  ) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -482,7 +476,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
-                  color: isDarkMode ? Colors.green.shade400 : Colors.green.shade700,
+                  color: isDarkMode
+                      ? Colors.green.shade400
+                      : Colors.green.shade700,
                 ),
               ),
             ],
@@ -505,7 +501,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
-                    color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+                    color: isDarkMode
+                        ? Colors.blue.shade400
+                        : Colors.blue.shade700,
                   ),
                 ),
               ],
@@ -529,7 +527,9 @@ class _HomeScreenState extends State<HomeScreen> {
                         ? Colors.grey.shade800
                         : Colors.grey.shade50,
                   ),
-                  dropdownColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
+                  dropdownColor: isDarkMode
+                      ? Colors.grey.shade800
+                      : Colors.white,
                   style: TextStyle(
                     color: isDarkMode ? Colors.white : Colors.black,
                   ),
@@ -559,7 +559,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       ? null
                       : _processCheckout,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: isDarkMode ? Colors.green.shade400 : Colors.green.shade700,
+                    backgroundColor: isDarkMode
+                        ? Colors.green.shade400
+                        : Colors.green.shade700,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
@@ -784,9 +786,7 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (context) => AlertDialog(
         title: Text(
           'Select Product',
-          style: TextStyle(
-            color: isDarkMode ? Colors.white : Colors.black,
-          ),
+          style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
         ),
         backgroundColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
         content: SizedBox(
@@ -804,7 +804,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Text(
                     (data['stock'] ?? 0).toString(),
                     style: TextStyle(
-                      color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+                      color: isDarkMode
+                          ? Colors.blue.shade400
+                          : Colors.blue.shade700,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -818,7 +820,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 subtitle: Text(
                   'Price: $currencySymbol${data['price']} | Stock: ${data['stock']}',
                   style: TextStyle(
-                    color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                    color: isDarkMode
+                        ? Colors.grey.shade400
+                        : Colors.grey.shade600,
                   ),
                 ),
                 trailing: IconButton(
@@ -844,9 +848,7 @@ class _HomeScreenState extends State<HomeScreen> {
             onPressed: () => Navigator.pop(context),
             child: Text(
               'Close',
-              style: TextStyle(
-                color: isDarkMode ? Colors.white : Colors.black,
-              ),
+              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
             ),
           ),
         ],
@@ -917,9 +919,7 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(width: 8),
             Text(
               'Receipt',
-              style: TextStyle(
-                color: isDarkMode ? Colors.white : Colors.black,
-              ),
+              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
             ),
           ],
         ),
@@ -1001,14 +1001,18 @@ class _HomeScreenState extends State<HomeScreen> {
                   Text(
                     'Profit:',
                     style: TextStyle(
-                      color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                      color: isDarkMode
+                          ? Colors.grey.shade400
+                          : Colors.grey.shade600,
                       fontSize: 14,
                     ),
                   ),
                   Text(
                     '$currencySymbol${_totalProfit.toStringAsFixed(2)}',
                     style: TextStyle(
-                      color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+                      color: isDarkMode
+                          ? Colors.blue.shade400
+                          : Colors.blue.shade700,
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
                     ),
@@ -1024,14 +1028,18 @@ class _HomeScreenState extends State<HomeScreen> {
                   Text(
                     'Payment:',
                     style: TextStyle(
-                      color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                      color: isDarkMode
+                          ? Colors.grey.shade400
+                          : Colors.grey.shade600,
                       fontSize: 14,
                     ),
                   ),
                   Text(
                     _selectedPaymentMethod,
                     style: TextStyle(
-                      color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                      color: isDarkMode
+                          ? Colors.grey.shade400
+                          : Colors.grey.shade600,
                       fontSize: 14,
                     ),
                   ),
@@ -1045,9 +1053,7 @@ class _HomeScreenState extends State<HomeScreen> {
             onPressed: () => Navigator.pop(context),
             child: Text(
               'Close',
-              style: TextStyle(
-                color: isDarkMode ? Colors.white : Colors.black,
-              ),
+              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
             ),
           ),
           ElevatedButton.icon(
@@ -1057,7 +1063,9 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: const Icon(Icons.print),
             label: const Text('Print'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+              backgroundColor: isDarkMode
+                  ? Colors.blue.shade400
+                  : Colors.blue.shade700,
               foregroundColor: Colors.white,
             ),
           ),
@@ -1165,7 +1173,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                              color: isDarkMode
+                                  ? Colors.grey.shade400
+                                  : Colors.grey.shade600,
                             ),
                           ),
                           trailing: Column(
@@ -1176,14 +1186,18 @@ class _HomeScreenState extends State<HomeScreen> {
                                 '$currencySymbol${(data['total'] ?? 0).toStringAsFixed(2)}',
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  color: isDarkMode ? Colors.green.shade400 : Colors.green,
+                                  color: isDarkMode
+                                      ? Colors.green.shade400
+                                      : Colors.green,
                                 ),
                               ),
                               Text(
                                 'Profit: $currencySymbol${(data['profit'] ?? 0).toStringAsFixed(2)}',
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+                                  color: isDarkMode
+                                      ? Colors.blue.shade400
+                                      : Colors.blue.shade700,
                                 ),
                               ),
                             ],
@@ -1215,9 +1229,7 @@ class _HomeScreenState extends State<HomeScreen> {
           builder: (context) => AlertDialog(
             title: Text(
               'Confirm Checkout',
-              style: TextStyle(
-                color: isDarkMode ? Colors.white : Colors.black,
-              ),
+              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
             ),
             backgroundColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
             content: Column(
@@ -1245,13 +1257,17 @@ class _HomeScreenState extends State<HomeScreen> {
                   Text(
                     'Total profit: $currencySymbol${_totalProfit.toStringAsFixed(2)}',
                     style: TextStyle(
-                      color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+                      color: isDarkMode
+                          ? Colors.blue.shade400
+                          : Colors.blue.shade700,
                     ),
                   ),
                 ],
                 const SizedBox(height: 8),
                 Divider(
-                  color: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade300,
+                  color: isDarkMode
+                      ? Colors.grey.shade700
+                      : Colors.grey.shade300,
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -1276,7 +1292,9 @@ class _HomeScreenState extends State<HomeScreen> {
               ElevatedButton(
                 onPressed: () => Navigator.pop(context, true),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: isDarkMode ? Colors.green.shade400 : Colors.green.shade700,
+                  backgroundColor: isDarkMode
+                      ? Colors.green.shade400
+                      : Colors.green.shade700,
                   foregroundColor: Colors.white,
                 ),
                 child: const Text('Confirm'),
@@ -1289,21 +1307,17 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _showSnackBar(String message) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
           message,
-          style: TextStyle(
-            color: isDarkMode ? Colors.white : Colors.black,
-          ),
+          style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
         ),
         duration: const Duration(seconds: 2),
         behavior: SnackBarBehavior.floating,
         backgroundColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );
   }

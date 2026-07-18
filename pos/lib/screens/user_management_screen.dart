@@ -38,7 +38,7 @@ class _UserManagementContentState extends State<_UserManagementContent> {
     _checkUserPermissions();
   }
 
-  // ========== DEBUG: Check User Permissions ==========
+  // ========== CHECK USER PERMISSIONS ==========
   Future<void> _checkUserPermissions() async {
     setState(() {
       _isLoading = true;
@@ -50,7 +50,7 @@ class _UserManagementContentState extends State<_UserManagementContent> {
       if (currentUser == null) {
         setState(() {
           _errorMessage = 'No user logged in';
-          _isLoading = false;
+          _isLoading = false;  // ✅ Fixed: Set loading to false
         });
         return;
       }
@@ -80,12 +80,13 @@ class _UserManagementContentState extends State<_UserManagementContent> {
           print('⚠️ User is NOT owner. Role: ${data?['role']}');
           setState(() {
             _errorMessage = 'You are not an owner. Role: ${data?['role']}';
-            _isLoading = false;
+            _isLoading = false;  // ✅ Fixed: Set loading to false
           });
         }
       } else {
         print('❌ User document does NOT exist!');
         await _createUserDocument(currentUser);
+        // ✅ _createUserDocument already sets _isLoading = false
       }
     } catch (e) {
       print('❌ Error: $e');
@@ -122,13 +123,15 @@ class _UserManagementContentState extends State<_UserManagementContent> {
         _isLoading = false;
       });
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('✅ User document created successfully!'),
-          backgroundColor: Colors.green,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ User document created successfully!'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     } catch (e) {
       print('❌ Error creating user document: $e');
       setState(() {
@@ -144,56 +147,7 @@ class _UserManagementContentState extends State<_UserManagementContent> {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          'User Management',
-          style: TextStyle(
-            color: isDarkMode ? Colors.white : Colors.white,
-          ),
-        ),
-        backgroundColor: isDarkMode ? Colors.blue.shade800 : Colors.blue.shade700,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: Icon(
-              Icons.add,
-              color: isDarkMode ? Colors.white : Colors.white,
-            ),
-            onPressed: () {
-              _showAddUserDialog(context);
-            },
-            tooltip: 'Add User',
-          ),
-          IconButton(
-            icon: Icon(
-              Icons.refresh,
-              color: isDarkMode ? Colors.white : Colors.white,
-            ),
-            onPressed: () {
-              _checkUserPermissions();
-              setState(() {});
-            },
-            tooltip: 'Refresh',
-          ),
-          IconButton(
-            icon: Icon(
-              Icons.bug_report,
-              color: isDarkMode ? Colors.white : Colors.white,
-            ),
-            onPressed: () {
-              _checkUserPermissions();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('🔍 Checking permissions...'),
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
-            },
-            tooltip: 'Debug Permissions',
-          ),
-        ],
-      ),
+     
       body: _isLoading
           ? Center(
               child: CircularProgressIndicator(
@@ -279,20 +233,23 @@ class _UserManagementContentState extends State<_UserManagementContent> {
           .snapshots()
           .handleError((error) {
             print('❌ Stream error: $error');
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  'Error: $error',
-                  style: TextStyle(
-                    color: isDarkMode ? Colors.white : Colors.black,
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'Error loading users: $error',
+                    style: TextStyle(
+                      color: isDarkMode ? Colors.white : Colors.black,
+                    ),
                   ),
+                  backgroundColor: isDarkMode ? Colors.red.shade400 : Colors.red,
+                  behavior: SnackBarBehavior.floating,
                 ),
-                backgroundColor: isDarkMode ? Colors.red.shade400 : Colors.red,
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
+              );
+            }
           }),
       builder: (context, snapshot) {
+        // ===== FIXED: Better error handling =====
         if (snapshot.hasError) {
           return Center(
             child: Column(
@@ -340,6 +297,7 @@ class _UserManagementContentState extends State<_UserManagementContent> {
           );
         }
 
+        // ===== FIXED: Check if data exists properly =====
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Center(
             child: CircularProgressIndicator(
@@ -813,31 +771,35 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                   );
                   
                   Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        'User added successfully!',
-                        style: TextStyle(
-                          color: isDarkMode ? Colors.white : Colors.black,
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'User added successfully!',
+                          style: TextStyle(
+                            color: isDarkMode ? Colors.white : Colors.black,
+                          ),
                         ),
+                        backgroundColor: isDarkMode ? Colors.green.shade400 : Colors.green,
+                        behavior: SnackBarBehavior.floating,
                       ),
-                      backgroundColor: isDarkMode ? Colors.green.shade400 : Colors.green,
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
+                    );
+                  }
                 } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        'Error: $e',
-                        style: TextStyle(
-                          color: isDarkMode ? Colors.white : Colors.black,
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'Error: $e',
+                          style: TextStyle(
+                            color: isDarkMode ? Colors.white : Colors.black,
+                          ),
                         ),
+                        backgroundColor: isDarkMode ? Colors.red.shade400 : Colors.red,
+                        behavior: SnackBarBehavior.floating,
                       ),
-                      backgroundColor: isDarkMode ? Colors.red.shade400 : Colors.red,
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
+                    );
+                  }
                 }
               }
             },
@@ -928,31 +890,35 @@ class _UserManagementContentState extends State<_UserManagementContent> {
               try {
                 await _authService.updateUserRole(user.id, selectedRole);
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'User role updated successfully!',
-                      style: TextStyle(
-                        color: isDarkMode ? Colors.white : Colors.black,
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'User role updated successfully!',
+                        style: TextStyle(
+                          color: isDarkMode ? Colors.white : Colors.black,
+                        ),
                       ),
+                      backgroundColor: isDarkMode ? Colors.green.shade400 : Colors.green,
+                      behavior: SnackBarBehavior.floating,
                     ),
-                    backgroundColor: isDarkMode ? Colors.green.shade400 : Colors.green,
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
+                  );
+                }
               } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'Error: $e',
-                      style: TextStyle(
-                        color: isDarkMode ? Colors.white : Colors.black,
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'Error: $e',
+                        style: TextStyle(
+                          color: isDarkMode ? Colors.white : Colors.black,
+                        ),
                       ),
+                      backgroundColor: isDarkMode ? Colors.red.shade400 : Colors.red,
+                      behavior: SnackBarBehavior.floating,
                     ),
-                    backgroundColor: isDarkMode ? Colors.red.shade400 : Colors.red,
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
+                  );
+                }
               }
             },
             style: ElevatedButton.styleFrom(
@@ -1005,33 +971,37 @@ class _UserManagementContentState extends State<_UserManagementContent> {
               try {
                 await _authService.toggleUserActive(user.id, !user.isActive);
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      user.isActive
-                          ? 'User deactivated successfully!'
-                          : 'User activated successfully!',
-                      style: TextStyle(
-                        color: isDarkMode ? Colors.white : Colors.black,
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        user.isActive
+                            ? 'User deactivated successfully!'
+                            : 'User activated successfully!',
+                        style: TextStyle(
+                          color: isDarkMode ? Colors.white : Colors.black,
+                        ),
                       ),
+                      backgroundColor: isDarkMode ? Colors.green.shade400 : Colors.green,
+                      behavior: SnackBarBehavior.floating,
                     ),
-                    backgroundColor: isDarkMode ? Colors.green.shade400 : Colors.green,
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
+                  );
+                }
               } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'Error: $e',
-                      style: TextStyle(
-                        color: isDarkMode ? Colors.white : Colors.black,
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'Error: $e',
+                        style: TextStyle(
+                          color: isDarkMode ? Colors.white : Colors.black,
+                        ),
                       ),
+                      backgroundColor: isDarkMode ? Colors.red.shade400 : Colors.red,
+                      behavior: SnackBarBehavior.floating,
                     ),
-                    backgroundColor: isDarkMode ? Colors.red.shade400 : Colors.red,
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
+                  );
+                }
               }
             },
             style: ElevatedButton.styleFrom(
@@ -1091,31 +1061,35 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                     .doc(user.id)
                     .delete();
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'User deleted successfully!',
-                      style: TextStyle(
-                        color: isDarkMode ? Colors.white : Colors.black,
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'User deleted successfully!',
+                        style: TextStyle(
+                          color: isDarkMode ? Colors.white : Colors.black,
+                        ),
                       ),
+                      backgroundColor: isDarkMode ? Colors.green.shade400 : Colors.green,
+                      behavior: SnackBarBehavior.floating,
                     ),
-                    backgroundColor: isDarkMode ? Colors.green.shade400 : Colors.green,
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
+                  );
+                }
               } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'Error: $e',
-                      style: TextStyle(
-                        color: isDarkMode ? Colors.white : Colors.black,
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'Error: $e',
+                        style: TextStyle(
+                          color: isDarkMode ? Colors.white : Colors.black,
+                        ),
                       ),
+                      backgroundColor: isDarkMode ? Colors.red.shade400 : Colors.red,
+                      behavior: SnackBarBehavior.floating,
                     ),
-                    backgroundColor: isDarkMode ? Colors.red.shade400 : Colors.red,
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
+                  );
+                }
               }
             },
             style: ElevatedButton.styleFrom(

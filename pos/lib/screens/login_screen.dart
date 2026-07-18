@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:pos/screens/dashboard_screen.dart';
+import 'package:pos/utils/dashboard_screen.dart';
 import 'package:pos/screens/signup_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:email_validator/email_validator.dart';
