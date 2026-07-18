@@ -121,7 +121,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     List<BottomNavigationBarItem> navItems = _getNavItems(user, isDarkMode);
 
     return Scaffold(
-      // ✅ ADDED APP BAR WITH DRAWER ICON
       appBar: AppBar(
         title: Text(_getTitle()),
         backgroundColor: isDarkMode ? Colors.blue.shade800 : Colors.blue.shade700,
