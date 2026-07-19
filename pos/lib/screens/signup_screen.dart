@@ -249,7 +249,9 @@ class _SignupScreenState extends State<SignupScreen> {
 
         if (await PermissionService.isLocationPermissionGranted()) {
           try {
-            print('📍 Location permission granted, using IP detection fallback');
+            print(
+              '📍 Location permission granted, using IP detection fallback',
+            );
           } catch (e) {
             print('Location detection failed: $e');
           }
@@ -531,11 +533,11 @@ class _SignupScreenState extends State<SignupScreen> {
       appBar: AppBar(
         title: Text(
           'Create Account',
-          style: TextStyle(
-            color: isDarkMode ? Colors.white : Colors.white,
-          ),
+          style: TextStyle(color: isDarkMode ? Colors.white : Colors.white),
         ),
-        backgroundColor: isDarkMode ? Colors.blue.shade800 : Colors.blue.shade700,
+        backgroundColor: isDarkMode
+            ? Colors.blue.shade800
+            : Colors.blue.shade700,
         foregroundColor: Colors.white,
         elevation: 0,
       ),
@@ -596,14 +598,18 @@ class _SignupScreenState extends State<SignupScreen> {
                   Icon(
                     Icons.currency_exchange,
                     size: 14,
-                    color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+                    color: isDarkMode
+                        ? Colors.blue.shade400
+                        : Colors.blue.shade700,
                   ),
                   const SizedBox(width: 4),
                   Text(
                     'Currency: $currencySymbol',
                     style: TextStyle(
                       fontSize: 12,
-                      color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+                      color: isDarkMode
+                          ? Colors.blue.shade400
+                          : Colors.blue.shade700,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -638,7 +644,9 @@ class _SignupScreenState extends State<SignupScreen> {
                       'Detecting your country...',
                       style: TextStyle(
                         fontSize: 12,
-                        color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+                        color: isDarkMode
+                            ? Colors.blue.shade400
+                            : Colors.blue.shade700,
                       ),
                     ),
                   ],
@@ -665,7 +673,9 @@ class _SignupScreenState extends State<SignupScreen> {
                     Icon(
                       Icons.location_off,
                       size: 16,
-                      color: isDarkMode ? Colors.orange.shade400 : Colors.orange.shade700,
+                      color: isDarkMode
+                          ? Colors.orange.shade400
+                          : Colors.orange.shade700,
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -673,7 +683,9 @@ class _SignupScreenState extends State<SignupScreen> {
                         'Location permission denied. Using default country.',
                         style: TextStyle(
                           fontSize: 12,
-                          color: isDarkMode ? Colors.orange.shade400 : Colors.orange.shade700,
+                          color: isDarkMode
+                              ? Colors.orange.shade400
+                              : Colors.orange.shade700,
                         ),
                       ),
                     ),
@@ -685,7 +697,9 @@ class _SignupScreenState extends State<SignupScreen> {
                         'Settings',
                         style: TextStyle(
                           fontSize: 12,
-                          color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+                          color: isDarkMode
+                              ? Colors.blue.shade400
+                              : Colors.blue.shade700,
                         ),
                       ),
                     ),
@@ -706,11 +720,15 @@ class _SignupScreenState extends State<SignupScreen> {
                       ),
                       hintText: 'Enter your full name',
                       hintStyle: TextStyle(
-                        color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                        color: isDarkMode
+                            ? Colors.grey.shade400
+                            : Colors.grey.shade600,
                       ),
                       prefixIcon: Icon(
                         Icons.person,
-                        color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                        color: isDarkMode
+                            ? Colors.grey.shade400
+                            : Colors.grey.shade600,
                       ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -744,11 +762,15 @@ class _SignupScreenState extends State<SignupScreen> {
                       ),
                       hintText: 'Enter your email',
                       hintStyle: TextStyle(
-                        color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                        color: isDarkMode
+                            ? Colors.grey.shade400
+                            : Colors.grey.shade600,
                       ),
                       prefixIcon: Icon(
                         Icons.email,
-                        color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                        color: isDarkMode
+                            ? Colors.grey.shade400
+                            : Colors.grey.shade600,
                       ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -784,18 +806,24 @@ class _SignupScreenState extends State<SignupScreen> {
                       ),
                       hintText: 'Enter your password',
                       hintStyle: TextStyle(
-                        color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                        color: isDarkMode
+                            ? Colors.grey.shade400
+                            : Colors.grey.shade600,
                       ),
                       prefixIcon: Icon(
                         Icons.lock,
-                        color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                        color: isDarkMode
+                            ? Colors.grey.shade400
+                            : Colors.grey.shade600,
                       ),
                       suffixIcon: IconButton(
                         icon: Icon(
                           _obscurePassword
                               ? Icons.visibility_off
                               : Icons.visibility,
-                          color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                          color: isDarkMode
+                              ? Colors.grey.shade400
+                              : Colors.grey.shade600,
                         ),
                         onPressed: () {
                           setState(() {
@@ -836,18 +864,24 @@ class _SignupScreenState extends State<SignupScreen> {
                       ),
                       hintText: 'Confirm your password',
                       hintStyle: TextStyle(
-                        color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                        color: isDarkMode
+                            ? Colors.grey.shade400
+                            : Colors.grey.shade600,
                       ),
                       prefixIcon: Icon(
                         Icons.lock_outline,
-                        color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                        color: isDarkMode
+                            ? Colors.grey.shade400
+                            : Colors.grey.shade600,
                       ),
                       suffixIcon: IconButton(
                         icon: Icon(
                           _obscureConfirmPassword
                               ? Icons.visibility_off
                               : Icons.visibility,
-                          color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                          color: isDarkMode
+                              ? Colors.grey.shade400
+                              : Colors.grey.shade600,
                         ),
                         onPressed: () {
                           setState(() {
@@ -887,7 +921,9 @@ class _SignupScreenState extends State<SignupScreen> {
                         width: 180,
                         decoration: BoxDecoration(
                           border: Border.all(
-                            color: isDarkMode ? Colors.grey.shade600 : Colors.grey.shade300,
+                            color: isDarkMode
+                                ? Colors.grey.shade600
+                                : Colors.grey.shade300,
                           ),
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -911,10 +947,12 @@ class _SignupScreenState extends State<SignupScreen> {
                                     const SizedBox(width: 4),
                                     Expanded(
                                       child: Text(
-                                        country['name']!,
+                                        country['iso']!,
                                         overflow: TextOverflow.ellipsis,
                                         style: TextStyle(
-                                          color: isDarkMode ? Colors.white : Colors.black,
+                                          color: isDarkMode
+                                              ? Colors.white
+                                              : Colors.black,
                                         ),
                                       ),
                                     ),
@@ -922,7 +960,9 @@ class _SignupScreenState extends State<SignupScreen> {
                                     Text(
                                       country['code']!,
                                       style: TextStyle(
-                                        color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade500,
+                                        color: isDarkMode
+                                            ? Colors.grey.shade400
+                                            : Colors.grey.shade500,
                                         fontSize: 11,
                                       ),
                                     ),
@@ -957,11 +997,15 @@ class _SignupScreenState extends State<SignupScreen> {
                             ),
                             hintText: '3XX XXX XXXX',
                             hintStyle: TextStyle(
-                              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                              color: isDarkMode
+                                  ? Colors.grey.shade400
+                                  : Colors.grey.shade600,
                             ),
                             prefixIcon: Icon(
                               Icons.phone,
-                              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                              color: isDarkMode
+                                  ? Colors.grey.shade400
+                                  : Colors.grey.shade600,
                             ),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
@@ -1002,14 +1046,18 @@ class _SignupScreenState extends State<SignupScreen> {
                             'Full Number: ',
                             style: TextStyle(
                               fontSize: 12,
-                              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                              color: isDarkMode
+                                  ? Colors.grey.shade400
+                                  : Colors.grey.shade600,
                             ),
                           ),
                           Text(
                             '$_selectedCountryCode ${_formatPhoneNumber(_phoneController.text)}',
                             style: TextStyle(
                               fontSize: 12,
-                              color: isDarkMode ? Colors.green.shade400 : Colors.green.shade700,
+                              color: isDarkMode
+                                  ? Colors.green.shade400
+                                  : Colors.green.shade700,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
@@ -1025,14 +1073,18 @@ class _SignupScreenState extends State<SignupScreen> {
                             'Default country: ',
                             style: TextStyle(
                               fontSize: 11,
-                              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                              color: isDarkMode
+                                  ? Colors.grey.shade400
+                                  : Colors.grey.shade600,
                             ),
                           ),
                           Text(
                             '$_countryFlag $_countryName',
                             style: TextStyle(
                               fontSize: 11,
-                              color: isDarkMode ? Colors.green.shade400 : Colors.green.shade700,
+                              color: isDarkMode
+                                  ? Colors.green.shade400
+                                  : Colors.green.shade700,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
@@ -1041,7 +1093,9 @@ class _SignupScreenState extends State<SignupScreen> {
                             '($_selectedCountryCode)',
                             style: TextStyle(
                               fontSize: 10,
-                              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade400,
+                              color: isDarkMode
+                                  ? Colors.grey.shade400
+                                  : Colors.grey.shade400,
                             ),
                           ),
                         ],
@@ -1058,11 +1112,15 @@ class _SignupScreenState extends State<SignupScreen> {
                       ),
                       hintText: 'Enter your store name',
                       hintStyle: TextStyle(
-                        color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                        color: isDarkMode
+                            ? Colors.grey.shade400
+                            : Colors.grey.shade600,
                       ),
                       prefixIcon: Icon(
                         Icons.store,
-                        color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                        color: isDarkMode
+                            ? Colors.grey.shade400
+                            : Colors.grey.shade600,
                       ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -1089,7 +1147,9 @@ class _SignupScreenState extends State<SignupScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     decoration: BoxDecoration(
                       border: Border.all(
-                        color: isDarkMode ? Colors.grey.shade600 : Colors.grey.shade300,
+                        color: isDarkMode
+                            ? Colors.grey.shade600
+                            : Colors.grey.shade300,
                       ),
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -1155,7 +1215,9 @@ class _SignupScreenState extends State<SignupScreen> {
                         Icon(
                           Icons.info_outline,
                           size: 16,
-                          color: isDarkMode ? Colors.orange.shade400 : Colors.orange.shade700,
+                          color: isDarkMode
+                              ? Colors.orange.shade400
+                              : Colors.orange.shade700,
                         ),
                         const SizedBox(width: 8),
                         Expanded(
@@ -1163,7 +1225,9 @@ class _SignupScreenState extends State<SignupScreen> {
                             'First user will be the store owner. Additional users can be added later.',
                             style: TextStyle(
                               fontSize: 12,
-                              color: isDarkMode ? Colors.orange.shade400 : Colors.orange.shade700,
+                              color: isDarkMode
+                                  ? Colors.orange.shade400
+                                  : Colors.orange.shade700,
                             ),
                           ),
                         ),
@@ -1189,14 +1253,18 @@ class _SignupScreenState extends State<SignupScreen> {
                         children: [
                           Icon(
                             Icons.error_outline,
-                            color: isDarkMode ? Colors.red.shade400 : Colors.red.shade700,
+                            color: isDarkMode
+                                ? Colors.red.shade400
+                                : Colors.red.shade700,
                           ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               authProvider.error!,
                               style: TextStyle(
-                                color: isDarkMode ? Colors.red.shade400 : Colors.red.shade700,
+                                color: isDarkMode
+                                    ? Colors.red.shade400
+                                    : Colors.red.shade700,
                                 fontSize: 14,
                               ),
                             ),
@@ -1205,7 +1273,9 @@ class _SignupScreenState extends State<SignupScreen> {
                             icon: Icon(
                               Icons.close,
                               size: 20,
-                              color: isDarkMode ? Colors.red.shade400 : Colors.red.shade700,
+                              color: isDarkMode
+                                  ? Colors.red.shade400
+                                  : Colors.red.shade700,
                             ),
                             onPressed: () {
                               authProvider.clearError();
@@ -1240,7 +1310,9 @@ class _SignupScreenState extends State<SignupScreen> {
                                       content: Text(
                                         'Account created successfully! Please sign in.',
                                         style: TextStyle(
-                                          color: isDarkMode ? Colors.white : Colors.black,
+                                          color: isDarkMode
+                                              ? Colors.white
+                                              : Colors.black,
                                         ),
                                       ),
                                       backgroundColor: isDarkMode
@@ -1307,7 +1379,9 @@ class _SignupScreenState extends State<SignupScreen> {
                 Text(
                   'Already have an account?',
                   style: TextStyle(
-                    color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                    color: isDarkMode
+                        ? Colors.grey.shade400
+                        : Colors.grey.shade600,
                   ),
                 ),
                 TextButton(
@@ -1346,19 +1420,14 @@ class _SignupScreenState extends State<SignupScreen> {
     );
   }
 
-  // ===== HELPER METHOD TO FORMAT PHONE NUMBER =====
   String _formatPhoneNumber(String phone) {
-    // Remove any non-digit characters
     String cleaned = phone.replaceAll(RegExp(r'\D'), '');
-    
     if (cleaned.length <= 3) {
-      return cleaned;
+      return cleaned; // 308
     } else if (cleaned.length <= 6) {
-      return '${cleaned.substring(0, 3)} ${cleaned.substring(3)}';
-    } else if (cleaned.length <= 10) {
-      return '${cleaned.substring(0, 3)} ${cleaned.substring(3, 6)} ${cleaned.substring(6)}';
+      return '${cleaned.substring(0, 3)} ${cleaned.substring(3)}'; // 308 750
     } else {
-      return '${cleaned.substring(0, 3)} ${cleaned.substring(3, 6)} ${cleaned.substring(6, 10)}';
+      return '${cleaned.substring(0, 3)} ${cleaned.substring(3, 6)} ${cleaned.substring(6)}'; // 308 750 2250
     }
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:pos/screens/product_form_screen.dart';  // ✅ Fixed import
 import 'package:provider/provider.dart';
 import 'package:pos/models/product.dart';
 import 'package:pos/services/firebase_service.dart';
@@ -72,7 +73,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-     
       body: Column(
         children: [
           _buildSearchBar(isDarkMode),
@@ -129,7 +129,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _showAddProductDialog,
+        onPressed: _showAddProductScreen,
         backgroundColor: isDarkMode ? Colors.blue.shade500 : Colors.blue.shade700,
         child: const Icon(Icons.add, color: Colors.white),
       ),
@@ -522,7 +522,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
           ElevatedButton.icon(
             onPressed: () {
               Navigator.pop(context);
-              _showEditProductDialog(product);
+              _showEditProductScreen(product);
             },
             icon: const Icon(Icons.edit),
             label: const Text('Edit'),
@@ -605,7 +605,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
           ElevatedButton.icon(
             onPressed: () {
               Navigator.pop(context);
-              _showAddProductDialogWithCode(code);
+              _showAddProductScreenWithCode(code);
             },
             icon: const Icon(Icons.add),
             label: const Text('Add Product'),
@@ -619,8 +619,27 @@ class _InventoryScreenState extends State<InventoryScreen> {
     );
   }
 
-  void _showAddProductDialogWithCode(String code) {
-    // Create a product with the code pre-filled (detect if it's QR or Barcode)
+  // ==================== NAVIGATION METHODS ====================
+  
+  // ✅ Navigate to full Product Form Screen for adding
+  void _showAddProductScreen() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const ProductFormScreen(
+          isEditing: false,
+        ),
+      ),
+    ).then((result) {
+      if (result == true) {
+        _showSnackBar('✅ Product added successfully!');
+      }
+    });
+  }
+
+  // ✅ Navigate to full Product Form Screen with pre-filled code
+  void _showAddProductScreenWithCode(String code) {
+    // Create a product with the code pre-filled
     final product = Product(
       id: '',
       name: '',
@@ -629,17 +648,42 @@ class _InventoryScreenState extends State<InventoryScreen> {
       stock: 0,
       minStock: 0,
       category: 'Uncategorized',
-      qrCode: code, // Pre-fill QR code
-      barcode: '',  // Will be determined by the user
+      barcode: code.isNotEmpty ? code : '', // Detect if it's a barcode
+      qrCode: '', // Will be determined by the user
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
     );
     
-    _showProductDialog(
-      title: 'Add Product',
-      product: product,
-      isEdit: false,
-    );
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ProductFormScreen(
+          product: product,
+          isEditing: false,
+        ),
+      ),
+    ).then((result) {
+      if (result == true) {
+        _showSnackBar('✅ Product added successfully!');
+      }
+    });
+  }
+
+  // ✅ Navigate to full Product Form Screen for editing
+  void _showEditProductScreen(Product product) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ProductFormScreen(
+          product: product,
+          isEditing: true,
+        ),
+      ),
+    ).then((result) {
+      if (result == true) {
+        _showSnackBar('✅ Product updated successfully!');
+      }
+    });
   }
 
   // ==================== STATS SUMMARY ====================
@@ -886,7 +930,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                           size: 20,
                           color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
                         ),
-                        onPressed: () => _showEditProductDialog(product),
+                        onPressed: () => _showEditProductScreen(product),
                         tooltip: 'Edit Product',
                       ),
                       IconButton(
@@ -939,7 +983,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
           ),
           const SizedBox(height: 24),
           ElevatedButton.icon(
-            onPressed: _showAddProductDialog,
+            onPressed: _showAddProductScreen,
             icon: const Icon(Icons.add),
             label: const Text('Add Product'),
             style: ElevatedButton.styleFrom(
@@ -1219,7 +1263,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   child: ElevatedButton.icon(
                     onPressed: () {
                       Navigator.pop(context);
-                      _showEditProductDialog(product);
+                      _showEditProductScreen(product);
                     },
                     icon: const Icon(Icons.edit),
                     label: const Text('Edit'),
@@ -1273,369 +1317,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
               fontSize: 14,
               color: isDarkMode ? Colors.white : Colors.black,
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ==================== ADD/EDIT PRODUCT DIALOG ====================
-  void _showAddProductDialog() {
-    _showProductDialog(
-      title: 'Add Product',
-      product: Product(
-        id: '',
-        name: '',
-        price: 0,
-        costPrice: 0,
-        stock: 0,
-        minStock: 0,
-        category: 'Uncategorized',
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      ),
-      isEdit: false,
-    );
-  }
-
-  void _showEditProductDialog(Product product) {
-    _showProductDialog(
-      title: 'Edit Product',
-      product: product,
-      isEdit: true,
-    );
-  }
-
-  void _showProductDialog({
-    required String title,
-    required Product product,
-    required bool isEdit,
-  }) {
-    final settingsProvider = Provider.of<SettingsProvider>(context, listen: false);
-    final currencySymbol = settingsProvider.currencySymbol;
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-
-    final nameController = TextEditingController(text: product.name);
-    final priceController = TextEditingController(
-      text: product.price.toStringAsFixed(2),
-    );
-    final costController = TextEditingController(
-      text: product.costPrice.toStringAsFixed(2),
-    );
-    final stockController = TextEditingController(
-      text: product.stock.toString(),
-    );
-    final minStockController = TextEditingController(
-      text: product.minStock.toString(),
-    );
-    final barcodeController = TextEditingController(text: product.barcode);
-    final qrCodeController = TextEditingController(text: product.qrCode);
-    final categoryController = TextEditingController(text: product.category);
-
-    final GlobalKey<FormState> formKey = GlobalKey<FormState>();
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(
-              isEdit ? Icons.edit : Icons.add,
-              color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              title,
-              style: TextStyle(
-                color: isDarkMode ? Colors.white : Colors.black,
-              ),
-            ),
-          ],
-        ),
-        backgroundColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
-        content: SingleChildScrollView(
-          child: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: nameController,
-                  style: TextStyle(
-                    color: isDarkMode ? Colors.white : Colors.black,
-                  ),
-                  decoration: InputDecoration(
-                    labelText: 'Product Name *',
-                    labelStyle: TextStyle(
-                      color: isDarkMode ? Colors.white : Colors.black,
-                    ),
-                    border: const OutlineInputBorder(),
-                    prefixIcon: Icon(
-                      Icons.production_quantity_limits,
-                      color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                    ),
-                    fillColor: isDarkMode ? Colors.grey.shade700 : Colors.white,
-                    filled: true,
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter product name';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: priceController,
-                        style: TextStyle(
-                          color: isDarkMode ? Colors.white : Colors.black,
-                        ),
-                        decoration: InputDecoration(
-                          labelText: 'Price *',
-                          labelStyle: TextStyle(
-                            color: isDarkMode ? Colors.white : Colors.black,
-                          ),
-                          border: const OutlineInputBorder(),
-                          prefixText: '$currencySymbol ',
-                          prefixIcon: Icon(
-                            Icons.currency_exchange,
-                            color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                          ),
-                          fillColor: isDarkMode ? Colors.grey.shade700 : Colors.white,
-                          filled: true,
-                        ),
-                        keyboardType: TextInputType.number,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Required';
-                          }
-                          if (double.tryParse(value) == null) {
-                            return 'Invalid number';
-                          }
-                          return null;
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextFormField(
-                        controller: costController,
-                        style: TextStyle(
-                          color: isDarkMode ? Colors.white : Colors.black,
-                        ),
-                        decoration: InputDecoration(
-                          labelText: 'Cost Price *',
-                          labelStyle: TextStyle(
-                            color: isDarkMode ? Colors.white : Colors.black,
-                          ),
-                          border: const OutlineInputBorder(),
-                          prefixText: '$currencySymbol ',
-                          prefixIcon: Icon(
-                            Icons.currency_exchange,
-                            color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                          ),
-                          fillColor: isDarkMode ? Colors.grey.shade700 : Colors.white,
-                          filled: true,
-                        ),
-                        keyboardType: TextInputType.number,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Required';
-                          }
-                          if (double.tryParse(value) == null) {
-                            return 'Invalid number';
-                          }
-                          return null;
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: stockController,
-                        style: TextStyle(
-                          color: isDarkMode ? Colors.white : Colors.black,
-                        ),
-                        decoration: InputDecoration(
-                          labelText: 'Stock *',
-                          labelStyle: TextStyle(
-                            color: isDarkMode ? Colors.white : Colors.black,
-                          ),
-                          border: const OutlineInputBorder(),
-                          prefixIcon: Icon(
-                            Icons.inventory,
-                            color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                          ),
-                          fillColor: isDarkMode ? Colors.grey.shade700 : Colors.white,
-                          filled: true,
-                        ),
-                        keyboardType: TextInputType.number,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Required';
-                          }
-                          if (int.tryParse(value) == null) {
-                            return 'Invalid number';
-                          }
-                          return null;
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextFormField(
-                        controller: minStockController,
-                        style: TextStyle(
-                          color: isDarkMode ? Colors.white : Colors.black,
-                        ),
-                        decoration: InputDecoration(
-                          labelText: 'Min Stock *',
-                          labelStyle: TextStyle(
-                            color: isDarkMode ? Colors.white : Colors.black,
-                          ),
-                          border: const OutlineInputBorder(),
-                          prefixIcon: Icon(
-                            Icons.warning,
-                            color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                          ),
-                          fillColor: isDarkMode ? Colors.grey.shade700 : Colors.white,
-                          filled: true,
-                        ),
-                        keyboardType: TextInputType.number,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Required';
-                          }
-                          if (int.tryParse(value) == null) {
-                            return 'Invalid number';
-                          }
-                          return null;
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: barcodeController,
-                  style: TextStyle(
-                    color: isDarkMode ? Colors.white : Colors.black,
-                  ),
-                  decoration: InputDecoration(
-                    labelText: 'Barcode',
-                    labelStyle: TextStyle(
-                      color: isDarkMode ? Colors.white : Colors.black,
-                    ),
-                    border: const OutlineInputBorder(),
-                    prefixIcon: Icon(
-                      Icons.barcode_reader,
-                      color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                    ),
-                    fillColor: isDarkMode ? Colors.grey.shade700 : Colors.white,
-                    filled: true,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: qrCodeController,
-                  style: TextStyle(
-                    color: isDarkMode ? Colors.white : Colors.black,
-                  ),
-                  decoration: InputDecoration(
-                    labelText: 'QR Code',
-                    labelStyle: TextStyle(
-                      color: isDarkMode ? Colors.white : Colors.black,
-                    ),
-                    border: const OutlineInputBorder(),
-                    prefixIcon: Icon(
-                      Icons.qr_code,
-                      color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                    ),
-                    fillColor: isDarkMode ? Colors.grey.shade700 : Colors.white,
-                    filled: true,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: categoryController,
-                  style: TextStyle(
-                    color: isDarkMode ? Colors.white : Colors.black,
-                  ),
-                  decoration: InputDecoration(
-                    labelText: 'Category',
-                    labelStyle: TextStyle(
-                      color: isDarkMode ? Colors.white : Colors.black,
-                    ),
-                    border: const OutlineInputBorder(),
-                    prefixIcon: Icon(
-                      Icons.category,
-                      color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                    ),
-                    fillColor: isDarkMode ? Colors.grey.shade700 : Colors.white,
-                    filled: true,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Cancel',
-              style: TextStyle(
-                color: isDarkMode ? Colors.white : Colors.black,
-              ),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (formKey.currentState?.validate() ?? false) {
-                final newProduct = product.copyWith(
-                  name: nameController.text.trim(),
-                  price: double.parse(priceController.text),
-                  costPrice: double.parse(costController.text),
-                  stock: int.parse(stockController.text),
-                  minStock: int.parse(minStockController.text),
-                  barcode: barcodeController.text.trim(),
-                  qrCode: qrCodeController.text.trim(),
-                  category: categoryController.text.trim().isNotEmpty
-                      ? categoryController.text.trim()
-                      : 'Uncategorized',
-                  updatedAt: DateTime.now(),
-                );
-
-                try {
-                  if (isEdit) {
-                    await _firebaseService.updateProduct(
-                      product.id,
-                      newProduct.toMap(),
-                    );
-                    if (mounted) _showSnackBar('✅ Product updated successfully!');
-                  } else {
-                    await _firebaseService.addProduct(newProduct.toMap());
-                    if (mounted) _showSnackBar('✅ Product added successfully!');
-                  }
-                  if (mounted) Navigator.pop(context);
-                } catch (e) {
-                  if (mounted) _showSnackBar('❌ Error: $e', isError: true);
-                }
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
-              foregroundColor: Colors.white,
-            ),
-            child: Text(isEdit ? 'Update' : 'Add'),
           ),
         ],
       ),

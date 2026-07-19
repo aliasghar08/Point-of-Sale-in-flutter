@@ -3,12 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:pos/widgets/barcode_scanner.dart';
 import 'package:pos/widgets/qr_scanner.dart';
 import 'package:pos/widgets/voice_input.dart';
-import 'package:provider/provider.dart';
-import '../services/firebase_service.dart';
-import '../models/product.dart';
-import '../models/sale.dart';
-import '../providers/settings_provider.dart';
+import 'package:pos/models/product.dart';
+import 'package:pos/models/sale.dart';
 import 'package:intl/intl.dart';
+import 'package:pos/services/firebase_service.dart';
+import 'package:pos/providers/settings_provider.dart';
+import 'package:provider/provider.dart';
+import 'package:pos/models/product_reference.dart';
+import 'package:pos/widgets/product_autocomplete.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -28,6 +30,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoading = false;
   String _selectedPaymentMethod = 'Cash';
   bool _isSearching = false;
+  bool _useAutocomplete = true;
 
   final List<String> _paymentMethods = [
     'Cash',
@@ -86,58 +89,116 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       child: Column(
         children: [
+          // Search Mode Toggle
           Row(
             children: [
               Expanded(
-                child: TextField(
-                  controller: _searchController,
-                  focusNode: _searchFocusNode,
-                  style: TextStyle(
-                    color: isDarkMode ? Colors.white : Colors.black,
-                  ),
-                  decoration: InputDecoration(
-                    hintText: 'Search product by name, barcode, or QR',
-                    hintStyle: TextStyle(
-                      color: isDarkMode
-                          ? Colors.grey.shade400
-                          : Colors.grey.shade600,
-                    ),
-                    prefixIcon: Icon(
-                      Icons.search,
-                      color: isDarkMode
-                          ? Colors.grey.shade400
-                          : Colors.grey.shade600,
-                    ),
-                    suffixIcon: _searchController.text.isNotEmpty
-                        ? IconButton(
-                            icon: Icon(
-                              Icons.clear,
-                              color: isDarkMode
-                                  ? Colors.grey.shade400
-                                  : Colors.grey.shade600,
-                            ),
-                            onPressed: () {
-                              _searchController.clear();
-                              _searchFocusNode.unfocus();
-                            },
-                          )
-                        : null,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                    filled: true,
-                    fillColor: isDarkMode
-                        ? Colors.grey.shade800
-                        : Colors.grey.shade50,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                  ),
-                  onSubmitted: (value) {
-                    if (value.isNotEmpty) {
-                      _searchProduct(value);
-                    }
+                child: ToggleButtons(
+                  isSelected: [_useAutocomplete, !_useAutocomplete],
+                  onPressed: (index) {
+                    setState(() {
+                      _useAutocomplete = index == 0;
+                      _searchController.clear();
+                      _searchFocusNode.unfocus();
+                    });
                   },
+                  borderRadius: BorderRadius.circular(8),
+                  selectedColor: isDarkMode
+                      ? Colors.white
+                      : Colors.blue.shade700,
+                  fillColor: isDarkMode
+                      ? Colors.blue.shade900.withOpacity(0.3)
+                      : Colors.blue.shade50,
+                  selectedBorderColor: isDarkMode
+                      ? Colors.blue.shade400
+                      : Colors.blue.shade700,
+                  borderColor: isDarkMode
+                      ? Colors.grey.shade700
+                      : Colors.grey.shade300,
+                  children: const [
+                    Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      child: Text('Smart Search'),
+                    ),
+                    Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      child: Text('Manual Search'),
+                    ),
+                  ],
                 ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Search Input
+          Row(
+            children: [
+              Expanded(
+                child: _useAutocomplete
+                    ? ProductAutocomplete(
+                        onProductSelected: (productName) {
+                          _searchProduct(productName);
+                        },
+                        hintText: 'Search product by name...',
+                      )
+                    : TextField(
+                        controller: _searchController,
+                        focusNode: _searchFocusNode,
+                        style: TextStyle(
+                          color: isDarkMode ? Colors.white : Colors.black,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: 'Search by barcode or QR code',
+                          hintStyle: TextStyle(
+                            color: isDarkMode
+                                ? Colors.grey.shade400
+                                : Colors.grey.shade600,
+                          ),
+                          prefixIcon: Icon(
+                            Icons.search,
+                            color: isDarkMode
+                                ? Colors.grey.shade400
+                                : Colors.grey.shade600,
+                          ),
+                          suffixIcon: _searchController.text.isNotEmpty
+                              ? IconButton(
+                                  icon: Icon(
+                                    Icons.clear,
+                                    color: isDarkMode
+                                        ? Colors.grey.shade400
+                                        : Colors.grey.shade600,
+                                  ),
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    _searchFocusNode.unfocus();
+                                  },
+                                )
+                              : null,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          filled: true,
+                          fillColor: isDarkMode
+                              ? Colors.grey.shade800
+                              : Colors.grey.shade50,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                          ),
+                        ),
+                        onSubmitted: (value) {
+                          if (value.isNotEmpty) {
+                            _searchProduct(value);
+                          }
+                        },
+                      ),
               ),
               const SizedBox(width: 8),
               // QR Scanner Button
@@ -204,7 +265,55 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
           ),
+
+          // Category Quick Filters (only for Smart Search)
+          if (_useAutocomplete) ...[
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 36,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                children: [
+                  _buildCategoryChip('All', null, isDarkMode),
+                  ...ProductReference.getCategories().map(
+                    (category) =>
+                        _buildCategoryChip(category, category, isDarkMode),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildCategoryChip(String label, String? category, bool isDarkMode) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: FilterChip(
+        label: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            color: isDarkMode ? Colors.white : Colors.black,
+          ),
+        ),
+        selected: false,
+        onSelected: (selected) {
+          // Category filtering can be implemented here
+          // You can pass category to ProductAutocomplete
+        },
+        backgroundColor: isDarkMode
+            ? Colors.grey.shade800
+            : Colors.grey.shade100,
+        selectedColor: isDarkMode ? Colors.blue.shade900 : Colors.blue.shade100,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(
+            color: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade300,
+          ),
+        ),
       ),
     );
   }
@@ -595,7 +704,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ==================== HELPER METHODS ====================
+  // ==================== IMPROVED SEARCH LOGIC ====================
   void _searchProduct(String query) async {
     if (query.isEmpty) {
       _showSnackBar('Please enter a search term');
@@ -608,6 +717,7 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     try {
+      // Step 1: Search by Barcode
       QuerySnapshot barcodeResult = await _firebaseService.getProductByBarcode(
         query,
       );
@@ -616,28 +726,44 @@ class _HomeScreenState extends State<HomeScreen> {
         _addProductToCart(barcodeResult.docs.first);
         _searchController.clear();
         _searchFocusNode.unfocus();
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      // Step 2: Search by QR Code
+      QuerySnapshot qrResult = await _firebaseService.getProductByQRCode(query);
+
+      if (qrResult.docs.isNotEmpty) {
+        _addProductToCart(qrResult.docs.first);
+        _searchController.clear();
+        _searchFocusNode.unfocus();
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      // Step 3: Search by Name in Firebase
+      QuerySnapshot nameResult = await _firebaseService.products
+          .where('name', isGreaterThanOrEqualTo: query)
+          .where('name', isLessThanOrEqualTo: query + '\uf8ff')
+          .limit(20)
+          .get();
+
+      if (nameResult.docs.isNotEmpty) {
+        _showProductSelection(nameResult);
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      // Step 4: Fallback to ProductReference for suggestions
+      final suggestions = ProductReference.searchProducts(
+        query: query,
+        limit: 10,
+      );
+
+      if (suggestions.isNotEmpty) {
+        _showSuggestionDialog(suggestions, query);
       } else {
-        QuerySnapshot qrResult = await _firebaseService.getProductByQRCode(
-          query,
-        );
-
-        if (qrResult.docs.isNotEmpty) {
-          _addProductToCart(qrResult.docs.first);
-          _searchController.clear();
-          _searchFocusNode.unfocus();
-        } else {
-          QuerySnapshot nameResult = await _firebaseService.products
-              .where('name', isGreaterThanOrEqualTo: query)
-              .where('name', isLessThanOrEqualTo: query + '\uf8ff')
-              .limit(20)
-              .get();
-
-          if (nameResult.docs.isNotEmpty) {
-            _showProductSelection(nameResult);
-          } else {
-            _showSnackBar('No product found');
-          }
-        }
+        _showSnackBar('No product found. Try adding it to inventory first.');
       }
     } catch (e) {
       _showSnackBar('Error: $e');
@@ -647,6 +773,267 @@ class _HomeScreenState extends State<HomeScreen> {
         _isLoading = false;
         _isSearching = false;
       });
+    }
+  }
+
+  // Show suggestion dialog with products from ProductReference
+  void _showSuggestionDialog(List<String> suggestions, String query) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          'Product Suggestions',
+          style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+        ),
+        backgroundColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
+        content: SizedBox(
+          width: double.maxFinite,
+          height: 350,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'No product found in inventory for "$query".',
+                style: TextStyle(
+                  color: isDarkMode
+                      ? Colors.grey.shade400
+                      : Colors.grey.shade600,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Would you like to add one of these?',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: isDarkMode ? Colors.white : Colors.black,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Expanded(
+                child: ListView.builder(
+                  itemCount: suggestions.length,
+                  itemBuilder: (context, index) {
+                    final productName = suggestions[index];
+                    return ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: isDarkMode
+                            ? Colors.blue.shade900
+                            : Colors.blue.shade100,
+                        child: Text(
+                          productName.substring(0, 1).toUpperCase(),
+                          style: TextStyle(
+                            color: isDarkMode
+                                ? Colors.blue.shade400
+                                : Colors.blue.shade700,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      title: Text(
+                        productName,
+                        style: TextStyle(
+                          color: isDarkMode ? Colors.white : Colors.black,
+                        ),
+                      ),
+                      trailing: IconButton(
+                        icon: Icon(
+                          Icons.add_circle,
+                          color: isDarkMode
+                              ? Colors.green.shade400
+                              : Colors.green,
+                        ),
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _showAddProductDialog(productName);
+                        },
+                      ),
+                      onTap: () {
+                        Navigator.pop(context);
+                        _showAddProductDialog(productName);
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Close',
+              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Dialog to add new product from suggestion
+  void _showAddProductDialog(String productName) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final priceController = TextEditingController();
+    final costController = TextEditingController();
+    final stockController = TextEditingController();
+    final barcodeController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          'Add New Product',
+          style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+        ),
+        backgroundColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                productName,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: isDarkMode ? Colors.white : Colors.black,
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: priceController,
+                decoration: const InputDecoration(
+                  labelText: 'Selling Price',
+                  prefixIcon: Icon(Icons.attach_money),
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.number,
+                style: TextStyle(
+                  color: isDarkMode ? Colors.white : Colors.black,
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: costController,
+                decoration: const InputDecoration(
+                  labelText: 'Cost Price',
+                  prefixIcon: Icon(Icons.money_off),
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.number,
+                style: TextStyle(
+                  color: isDarkMode ? Colors.white : Colors.black,
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: stockController,
+                decoration: const InputDecoration(
+                  labelText: 'Stock Quantity',
+                  prefixIcon: Icon(Icons.inventory),
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.number,
+                style: TextStyle(
+                  color: isDarkMode ? Colors.white : Colors.black,
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: barcodeController,
+                decoration: const InputDecoration(
+                  labelText: 'Barcode (optional)',
+                  prefixIcon: const Icon(Icons.barcode_reader),
+                  border: OutlineInputBorder(),
+                ),
+                style: TextStyle(
+                  color: isDarkMode ? Colors.white : Colors.black,
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final price = double.tryParse(priceController.text);
+              final cost = double.tryParse(costController.text);
+              final stock = int.tryParse(stockController.text);
+
+              if (price == null || cost == null || stock == null || stock < 0) {
+                _showSnackBar('Please enter valid values');
+                return;
+              }
+
+              Navigator.pop(context);
+              _createAndAddProduct(
+                productName,
+                price,
+                cost,
+                stock,
+                barcodeController.text,
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isDarkMode
+                  ? Colors.green.shade400
+                  : Colors.green.shade700,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Add Product'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Create and add product to Firebase
+  void _createAndAddProduct(
+    String name,
+    double price,
+    double cost,
+    int stock,
+    String barcode,
+  ) async {
+    setState(() => _isLoading = true);
+
+    try {
+      final now = DateTime.now();
+      final product = Product(
+        id: '',
+        name: name,
+        price: price,
+        costPrice: cost,
+        stock: stock,
+        minStock: 0,
+        createdAt: now,
+        updatedAt: now,
+        barcode: barcode.isNotEmpty ? barcode : '',
+      );
+
+      final docRef = await _firebaseService.products.add(product.toMap());
+      final newProduct = product.copyWith(id: docRef.id);
+
+      // Add to cart
+      setState(() {
+        _cartItems.add(newProduct.copyWith(stock: 1));
+        _updateTotals();
+      });
+
+      _showSnackBar('✅ ${newProduct.name} added to inventory and cart');
+    } catch (e) {
+      _showSnackBar('Error adding product: $e');
+    } finally {
+      setState(() => _isLoading = false);
     }
   }
 

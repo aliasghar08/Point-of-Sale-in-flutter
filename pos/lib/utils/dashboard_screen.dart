@@ -38,61 +38,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return tabs;
   }
 
-  List<BottomNavigationBarItem> _getNavItems(AppUser user, bool isDarkMode) {
-    List<BottomNavigationBarItem> items = [];
-
-    // POS
-    items.add(
-      BottomNavigationBarItem(
-        icon: Icon(
-          Icons.shopping_cart,
-          color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-        ),
-        activeIcon: Icon(
-          Icons.shopping_cart,
-          color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
-        ),
-        label: 'POS',
-      ),
-    );
-
-    // Inventory - Only owner and manager
-    if (user.canManageInventory) {
-      items.add(
-        BottomNavigationBarItem(
-          icon: Icon(
-            Icons.inventory_2,
-            color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-          ),
-          activeIcon: Icon(
-            Icons.inventory_2,
-            color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
-          ),
-          label: 'Inventory',
-        ),
-      );
-    }
-
-    // User Management - Only owner
-    if (user.canManageUsers) {
-      items.add(
-        BottomNavigationBarItem(
-          icon: Icon(
-            Icons.people,
-            color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-          ),
-          activeIcon: Icon(
-            Icons.people,
-            color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
-          ),
-          label: 'Users',
-        ),
-      );
-    }
-
-    return items;
-  }
-
   // Get title based on current tab
   String _getTitle() {
     switch (_currentIndex) {
@@ -118,7 +63,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
 
     List<Widget> tabs = _getTabs(user);
-    List<BottomNavigationBarItem> navItems = _getNavItems(user, isDarkMode);
 
     return Scaffold(
       appBar: AppBar(
@@ -126,8 +70,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         backgroundColor: isDarkMode ? Colors.blue.shade800 : Colors.blue.shade700,
         foregroundColor: Colors.white,
         elevation: 0,
-        // ✅ The drawer icon (☰) appears automatically
-        // because the Scaffold has a drawer
         actions: [
           // Optional: Add global actions here
           IconButton(
@@ -145,24 +87,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ],
       ),
       body: tabs[_currentIndex],
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
-        selectedItemColor: isDarkMode
-            ? Colors.blue.shade400
-            : Colors.blue.shade700,
-        unselectedItemColor: isDarkMode
-            ? Colors.grey.shade500
-            : Colors.grey.shade600,
-        backgroundColor: isDarkMode ? Colors.grey.shade900 : Colors.white,
-        type: BottomNavigationBarType.fixed,
-        elevation: 8,
-        items: navItems,
-      ),
       drawer: AppDrawer(
         currentIndex: _currentIndex,
         onItemSelected: (index) {
