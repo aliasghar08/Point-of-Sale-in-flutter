@@ -124,8 +124,6 @@ class _SignupScreenState extends State<SignupScreen> {
       }
 
       // ===== SET FINAL COUNTRY =====
-      // ✅ Only update if detection was successful AND it's not US/Canada
-      // ✅ Keep Pakistan as default for US/Canada
       if (detectedCountryCode != null && 
           detectedCountryCode.isNotEmpty && 
           detectedCountryCode != 'US' && 
@@ -141,14 +139,12 @@ class _SignupScreenState extends State<SignupScreen> {
           });
           print('✅ Country set to: $_countryName ($_selectedCountryCode)');
         } else {
-          // If country not found, keep Pakistan
           print('⚠️ Country not found, keeping Pakistan');
           setState(() {
             _isDetectingCountry = false;
           });
         }
       } else {
-        // ✅ Keep Pakistan as default
         print('⚠️ Keeping default country: Pakistan (+92)');
         setState(() {
           _isDetectingCountry = false;
@@ -156,7 +152,6 @@ class _SignupScreenState extends State<SignupScreen> {
       }
     } catch (e) {
       print('❌ Country detection error: $e');
-      // ✅ On error, keep Pakistan
       setState(() {
         _isDetectingCountry = false;
       });
@@ -207,14 +202,14 @@ class _SignupScreenState extends State<SignupScreen> {
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Icon(
-                Icons.person_add,
+                Icons.storefront,
                 size: 40,
                 color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
               ),
             ),
             const SizedBox(height: 24),
             Text(
-              'Create your account',
+              'Create Your Business',
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
@@ -223,7 +218,7 @@ class _SignupScreenState extends State<SignupScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Fill in the details to get started',
+              'Set up your business and add your first team member',
               style: TextStyle(
                 fontSize: 14,
                 color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
@@ -363,10 +358,55 @@ class _SignupScreenState extends State<SignupScreen> {
               key: _formKey,
               child: Column(
                 children: [
+                  // ===== BUSINESS/STORE NAME (NEW) =====
+                  TextFormField(
+                    controller: _storeNameController,
+                    decoration: InputDecoration(
+                      labelText: 'Business / Store Name *',
+                      labelStyle: TextStyle(
+                        color: isDarkMode ? Colors.white : Colors.black,
+                      ),
+                      hintText: 'Enter your business name',
+                      hintStyle: TextStyle(
+                        color: isDarkMode
+                            ? Colors.grey.shade400
+                            : Colors.grey.shade600,
+                      ),
+                      prefixIcon: Icon(
+                        Icons.storefront,
+                        color: isDarkMode
+                            ? Colors.grey.shade400
+                            : Colors.grey.shade600,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      filled: true,
+                      fillColor: isDarkMode
+                          ? Colors.grey.shade800
+                          : Colors.grey.shade50,
+                    ),
+                    style: TextStyle(
+                      color: isDarkMode ? Colors.white : Colors.black,
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter your business name';
+                      }
+                      if (value.length < 3) {
+                        return 'Business name must be at least 3 characters';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // ===== YOUR NAME (Owner) =====
                   TextFormField(
                     controller: _nameController,
                     decoration: InputDecoration(
-                      labelText: 'Full Name *',
+                      labelText: 'Your Full Name (Owner) *',
                       labelStyle: TextStyle(
                         color: isDarkMode ? Colors.white : Colors.black,
                       ),
@@ -405,6 +445,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     },
                   ),
                   const SizedBox(height: 16),
+                  
                   TextFormField(
                     controller: _emailController,
                     decoration: InputDecoration(
@@ -448,6 +489,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     },
                   ),
                   const SizedBox(height: 16),
+                  
                   TextFormField(
                     controller: _passwordController,
                     obscureText: _obscurePassword,
@@ -506,6 +548,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     },
                   ),
                   const SizedBox(height: 16),
+                  
                   TextFormField(
                     controller: _confirmPasswordController,
                     obscureText: _obscureConfirmPassword,
@@ -564,11 +607,11 @@ class _SignupScreenState extends State<SignupScreen> {
                     },
                   ),
                   const SizedBox(height: 16),
+                  
                   // ===== PHONE NUMBER WITH COUNTRY CODE =====
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Country Code Dropdown - ✅ Compact with ISO
                       Container(
                         width: 140,
                         decoration: BoxDecoration(
@@ -637,7 +680,6 @@ class _SignupScreenState extends State<SignupScreen> {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      // Phone Number Input
                       Expanded(
                         child: TextFormField(
                           controller: _phoneController,
@@ -689,7 +731,6 @@ class _SignupScreenState extends State<SignupScreen> {
                       ),
                     ],
                   ),
-                  // Show country name and formatted number preview
                   if (!_isDetectingCountry)
                     Padding(
                       padding: const EdgeInsets.only(top: 4, left: 4),
@@ -720,97 +761,59 @@ class _SignupScreenState extends State<SignupScreen> {
                       ),
                     ),
                   const SizedBox(height: 16),
-                  // ===== REST OF THE FORM =====
-                  TextFormField(
-                    controller: _storeNameController,
-                    decoration: InputDecoration(
-                      labelText: 'Store Name *',
-                      labelStyle: TextStyle(
-                        color: isDarkMode ? Colors.white : Colors.black,
-                      ),
-                      hintText: 'Enter your store name',
-                      hintStyle: TextStyle(
-                        color: isDarkMode
-                            ? Colors.grey.shade400
-                            : Colors.grey.shade600,
-                      ),
-                      prefixIcon: Icon(
-                        Icons.store,
-                        color: isDarkMode
-                            ? Colors.grey.shade400
-                            : Colors.grey.shade600,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
-                      ),
-                      filled: true,
-                      fillColor: isDarkMode
-                          ? Colors.grey.shade800
-                          : Colors.grey.shade50,
-                    ),
-                    style: TextStyle(
-                      color: isDarkMode ? Colors.white : Colors.black,
-                    ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter your store name';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  // Role selection
+                  
+                  // ===== ROLE SELECTION (Now only Owner is shown, others added later) =====
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
+                      color: isDarkMode
+                          ? Colors.blue.shade900.withOpacity(0.3)
+                          : Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: isDarkMode
-                            ? Colors.grey.shade600
-                            : Colors.grey.shade300,
+                            ? Colors.blue.shade700
+                            : Colors.blue.shade200,
                       ),
-                      borderRadius: BorderRadius.circular(12),
                     ),
-                    child: DropdownButtonFormField<String>(
-                      value: _selectedRole,
-                      decoration: const InputDecoration(
-                        labelText: 'Role *',
-                        border: InputBorder.none,
-                        prefixIcon: Icon(Icons.admin_panel_settings),
-                      ),
-                      dropdownColor: isDarkMode
-                          ? Colors.grey.shade800
-                          : Colors.white,
-                      style: TextStyle(
-                        color: isDarkMode ? Colors.white : Colors.black,
-                      ),
-                      items: const [
-                        DropdownMenuItem(
-                          value: 'owner',
-                          child: Text('Store Owner'),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.admin_panel_settings,
+                          color: isDarkMode
+                              ? Colors.blue.shade400
+                              : Colors.blue.shade700,
                         ),
-                        DropdownMenuItem(
-                          value: 'manager',
-                          child: Text('Manager'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'worker',
-                          child: Text('Worker'),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Role: Owner',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                  color: isDarkMode ? Colors.white : Colors.black,
+                                ),
+                              ),
+                              Text(
+                                'You are creating this business as the owner. '
+                                'You can add managers and workers later.',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isDarkMode
+                                      ? Colors.grey.shade400
+                                      : Colors.grey.shade600,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedRole = value!;
-                        });
-                      },
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please select a role';
-                        }
-                        return null;
-                      },
                     ),
                   ),
+                  
                   const SizedBox(height: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(
@@ -840,7 +843,8 @@ class _SignupScreenState extends State<SignupScreen> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'First user will be the store owner. Additional users can be added later.',
+                            'Each business can have only ONE manager. '
+                            'Additional managers cannot be added.',
                             style: TextStyle(
                               fontSize: 12,
                               color: isDarkMode
@@ -853,6 +857,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     ),
                   ),
                   const SizedBox(height: 24),
+                  
                   if (authProvider.error != null)
                     Container(
                       padding: const EdgeInsets.all(12),
@@ -903,6 +908,7 @@ class _SignupScreenState extends State<SignupScreen> {
                       ),
                     ),
                   const SizedBox(height: 16),
+                  
                   SizedBox(
                     width: double.infinity,
                     height: 50,
@@ -912,11 +918,14 @@ class _SignupScreenState extends State<SignupScreen> {
                           : () async {
                               if (_formKey.currentState?.validate() ?? false) {
                                 final phoneDigits = _phoneController.text.replaceAll(RegExp(r'\D'), '');
+                                
+                                // ✅ The business name is now stored as the storeName
+                                // ✅ The owner is created with role 'owner'
                                 bool success = await authProvider.signUp(
                                   email: _emailController.text.trim(),
                                   password: _passwordController.text,
                                   name: _nameController.text.trim(),
-                                  role: _selectedRole,
+                                  role: 'owner',  // Always owner for the first user
                                   phone: _selectedCountryCode + phoneDigits,
                                   storeName: _storeNameController.text.trim(),
                                 );
@@ -925,7 +934,7 @@ class _SignupScreenState extends State<SignupScreen> {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                       content: Text(
-                                        'Account created successfully! Please sign in.',
+                                        'Business created successfully! Please sign in.',
                                         style: TextStyle(
                                           color: isDarkMode
                                               ? Colors.white
@@ -977,7 +986,7 @@ class _SignupScreenState extends State<SignupScreen> {
                               ),
                             )
                           : const Text(
-                              'Create Account',
+                              'Create Business',
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,

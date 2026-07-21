@@ -17,6 +17,9 @@ class AuthProvider extends ChangeNotifier {
   bool get isManager => _currentUser?.isManager ?? false;
   bool get canManageInventory => _currentUser?.canManageInventory ?? false;
   bool get canManageUsers => _currentUser?.canManageUsers ?? false;
+  
+  // ✅ Helper to get business ID
+  String? get businessId => _currentUser?.businessId;
 
   // Initialize auth state
   Future<void> init() async {
@@ -25,15 +28,21 @@ class AuthProvider extends ChangeNotifier {
 
     try {
       _currentUser = await _authService.getCurrentUserData();
+      if (_currentUser != null) {
+        print('✅ User loaded: ${_currentUser!.name}');
+        print('✅ Business ID: ${_currentUser!.businessId}');
+        print('✅ Role: ${_currentUser!.role}');
+      }
     } catch (e) {
       _error = e.toString();
+      print('❌ Init error: $e');
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
 
-  // Sign up
+  // ✅ Sign up with business structure
   Future<bool> signUp({
     required String email,
     required String password,
@@ -55,9 +64,18 @@ class AuthProvider extends ChangeNotifier {
         phone: phone,
         storeName: storeName,
       );
-      return true;
+      
+      if (_currentUser != null) {
+        print('✅ Signup successful!');
+        print('✅ User: ${_currentUser!.name}');
+        print('✅ Business ID: ${_currentUser!.businessId}');
+        print('✅ Role: ${_currentUser!.role}');
+      }
+      
+      return _currentUser != null;
     } catch (e) {
       _error = e.toString();
+      print('❌ Signup error: $e');
       return false;
     } finally {
       _isLoading = false;
@@ -79,9 +97,18 @@ class AuthProvider extends ChangeNotifier {
         email: email,
         password: password,
       );
-      return true;
+      
+      if (_currentUser != null) {
+        print('✅ Signin successful!');
+        print('✅ User: ${_currentUser!.name}');
+        print('✅ Business ID: ${_currentUser!.businessId}');
+        print('✅ Role: ${_currentUser!.role}');
+      }
+      
+      return _currentUser != null;
     } catch (e) {
       _error = e.toString();
+      print('❌ Signin error: $e');
       return false;
     } finally {
       _isLoading = false;
@@ -97,8 +124,10 @@ class AuthProvider extends ChangeNotifier {
     try {
       await _authService.signOut();
       _currentUser = null;
+      print('✅ Signout successful');
     } catch (e) {
       _error = e.toString();
+      print('❌ Signout error: $e');
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -116,4 +145,10 @@ class AuthProvider extends ChangeNotifier {
     _currentUser = user;
     notifyListeners();
   }
+  
+  // ✅ Check if user has a business
+  bool get hasBusiness => _currentUser?.businessId != null;
+  
+  // ✅ Get user's role display name
+  String get roleDisplay => _currentUser?.roleDisplay ?? 'User';
 }

@@ -30,7 +30,6 @@ class _HomeScreenState extends State<HomeScreen> {
   double _totalProfit = 0.0;
   bool _isLoading = false;
   String _selectedPaymentMethod = 'Cash';
-  bool _isSearching = false;
   bool _useAutocomplete = true;
 
   final List<String> _paymentMethods = [
@@ -55,6 +54,23 @@ class _HomeScreenState extends State<HomeScreen> {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('POS System'),
+        backgroundColor: isDarkMode ? Colors.grey.shade900 : Colors.blue.shade700,
+        foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.history),
+            onPressed: _showSalesHistory,
+            tooltip: 'Sales History',
+          ),
+          IconButton(
+            icon: const Icon(Icons.clear_all),
+            onPressed: _clearCart,
+            tooltip: 'Clear Cart',
+          ),
+        ],
+      ),
       body: Column(
         children: [
           _buildSearchSection(isDarkMode),
@@ -63,8 +79,8 @@ class _HomeScreenState extends State<HomeScreen> {
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : _cartItems.isEmpty
-                ? _buildEmptyCart(isDarkMode)
-                : _buildCartList(currencySymbol, isDarkMode),
+                    ? _buildEmptyCart(isDarkMode)
+                    : _buildCartList(currencySymbol, isDarkMode),
           ),
           _buildCheckoutSection(currencySymbol, showProfit, isDarkMode),
         ],
@@ -317,39 +333,6 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
-  }
-
-  Widget _buildActionButton({
-    required IconData icon,
-    required Color color,
-    required VoidCallback onPressed,
-    required bool isDarkMode,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: color.withOpacity(isDarkMode ? 0.2 : 0.1),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: IconButton(
-        icon: Icon(icon, color: color),
-        onPressed: onPressed,
-        iconSize: 28,
-        tooltip: _getTooltip(icon),
-      ),
-    );
-  }
-
-  String _getTooltip(IconData icon) {
-    switch (icon) {
-      case Icons.qr_code_scanner:
-        return 'Scan QR Code';
-      case Icons.barcode_reader:
-        return 'Scan Barcode';
-      case Icons.mic:
-        return 'Voice Input';
-      default:
-        return '';
-    }
   }
 
   // ==================== CART LIST ====================
@@ -715,35 +698,34 @@ class _HomeScreenState extends State<HomeScreen> {
 
     setState(() {
       _isLoading = true;
-      _isSearching = true;
     });
 
     try {
-      // Step 1: Search by Barcode
-      QuerySnapshot barcodeResult = await _firebaseService.getProductByBarcode(
-        query,
-      );
+      // ✅ OPTIMIZATION: Use Future.wait for parallel queries
+      final results = await Future.wait([
+        _firebaseService.getProductByBarcode(query),
+        _firebaseService.getProductByQRCode(query),
+      ]);
 
-      if (barcodeResult.docs.isNotEmpty) {
-        _addProductToCart(barcodeResult.docs.first);
+      // Check barcode result
+      if (results[0].docs.isNotEmpty) {
+        _addProductToCart(results[0].docs.first);
         _searchController.clear();
         _searchFocusNode.unfocus();
-        setState(() => _isLoading = false);
+        if (mounted) setState(() => _isLoading = false);
         return;
       }
 
-      // Step 2: Search by QR Code
-      QuerySnapshot qrResult = await _firebaseService.getProductByQRCode(query);
-
-      if (qrResult.docs.isNotEmpty) {
-        _addProductToCart(qrResult.docs.first);
+      // Check QR result
+      if (results[1].docs.isNotEmpty) {
+        _addProductToCart(results[1].docs.first);
         _searchController.clear();
         _searchFocusNode.unfocus();
-        setState(() => _isLoading = false);
+        if (mounted) setState(() => _isLoading = false);
         return;
       }
 
-      // Step 3: Search by Name in Firebase
+      // Search by Name in Firebase
       try {
         QuerySnapshot nameResult = await _firebaseService.products
             .where('name', isGreaterThanOrEqualTo: query)
@@ -753,14 +735,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
         if (nameResult.docs.isNotEmpty) {
           _showProductSelection(nameResult);
-          setState(() => _isLoading = false);
+          if (mounted) setState(() => _isLoading = false);
           return;
         }
       } catch (e) {
-        print('Name search failed: $e');
+        debugPrint('Name search failed: $e');
       }
 
-      // Step 4: Fallback to ProductReference for suggestions
+      // Fallback to ProductReference for suggestions
       final suggestions = ProductReference.searchProducts(
         query: query,
         limit: 10,
@@ -773,12 +755,13 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     } catch (e) {
       _showSnackBar('Error: $e');
-      print('Search error: $e');
+      debugPrint('Search error: $e');
     } finally {
-      setState(() {
-        _isLoading = false;
-        _isSearching = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -822,43 +805,48 @@ class _HomeScreenState extends State<HomeScreen> {
                   itemCount: suggestions.length,
                   itemBuilder: (context, index) {
                     final productName = suggestions[index];
-                    return ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: isDarkMode
-                            ? Colors.blue.shade900
-                            : Colors.blue.shade100,
-                        child: Text(
-                          productName.substring(0, 1).toUpperCase(),
-                          style: TextStyle(
-                            color: isDarkMode
-                                ? Colors.blue.shade400
-                                : Colors.blue.shade700,
-                            fontWeight: FontWeight.bold,
+                    // ✅ FIX: Wrap ListTile in Material to handle ink effects
+                    return Material(
+                      color: Colors.transparent,
+                      borderRadius: BorderRadius.circular(8),
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: isDarkMode
+                              ? Colors.blue.shade900
+                              : Colors.blue.shade100,
+                          child: Text(
+                            productName.substring(0, 1).toUpperCase(),
+                            style: TextStyle(
+                              color: isDarkMode
+                                  ? Colors.blue.shade400
+                                  : Colors.blue.shade700,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
-                      ),
-                      title: Text(
-                        productName,
-                        style: TextStyle(
-                          color: isDarkMode ? Colors.white : Colors.black,
+                        title: Text(
+                          productName,
+                          style: TextStyle(
+                            color: isDarkMode ? Colors.white : Colors.black,
+                          ),
                         ),
-                      ),
-                      trailing: IconButton(
-                        icon: Icon(
-                          Icons.add_circle,
-                          color: isDarkMode
-                              ? Colors.green.shade400
-                              : Colors.green,
+                        trailing: IconButton(
+                          icon: Icon(
+                            Icons.add_circle,
+                            color: isDarkMode
+                                ? Colors.green.shade400
+                                : Colors.green,
+                          ),
+                          onPressed: () {
+                            Navigator.pop(context);
+                            _showAddProductDialog(productName);
+                          },
                         ),
-                        onPressed: () {
+                        onTap: () {
                           Navigator.pop(context);
                           _showAddProductDialog(productName);
                         },
                       ),
-                      onTap: () {
-                        Navigator.pop(context);
-                        _showAddProductDialog(productName);
-                      },
                     );
                   },
                 ),
@@ -951,7 +939,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 controller: barcodeController,
                 decoration: const InputDecoration(
                   labelText: 'Barcode (optional)',
-                  prefixIcon: const Icon(Icons.barcode_reader),
+                  prefixIcon: Icon(Icons.barcode_reader),
                   border: OutlineInputBorder(),
                 ),
                 style: TextStyle(
@@ -963,7 +951,14 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () {
+              // ✅ FIX: Dispose controllers when dialog closes
+              priceController.dispose();
+              costController.dispose();
+              stockController.dispose();
+              barcodeController.dispose();
+              Navigator.pop(context);
+            },
             child: Text(
               'Cancel',
               style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
@@ -980,6 +975,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 return;
               }
 
+              // ✅ FIX: Dispose controllers before navigating
+              priceController.dispose();
+              costController.dispose();
+              stockController.dispose();
+              barcodeController.dispose();
               Navigator.pop(context);
               _createAndAddProduct(
                 productName,
@@ -1010,6 +1010,7 @@ class _HomeScreenState extends State<HomeScreen> {
     int stock,
     String barcode,
   ) async {
+    if (!mounted) return;
     setState(() => _isLoading = true);
 
     try {
@@ -1030,16 +1031,20 @@ class _HomeScreenState extends State<HomeScreen> {
       final newProduct = product.copyWith(id: docRef.id);
 
       // Add to cart
-      setState(() {
-        _cartItems.add(newProduct.copyWith(stock: 1));
-        _updateTotals();
-      });
+      if (mounted) {
+        setState(() {
+          _cartItems.add(newProduct.copyWith(stock: 1));
+          _updateTotals();
+        });
+      }
 
       _showSnackBar('✅ ${newProduct.name} added to inventory and cart');
     } catch (e) {
       _showSnackBar('Error adding product: $e');
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -1091,19 +1096,16 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _updateTotals() {
-    _totalAmount = 0;
-    _totalProfit = 0;
-
-    for (var item in _cartItems) {
-      _totalAmount += item.price * item.stock;
-      _totalProfit += (item.price - item.costPrice) * item.stock;
-    }
+    // ✅ OPTIMIZATION: Use fold for better performance
+    _totalAmount = _cartItems.fold(0.0, (sum, item) => sum + (item.price * item.stock));
+    _totalProfit = _cartItems.fold(0.0, (sum, item) => sum + ((item.price - item.costPrice) * item.stock));
   }
 
   void _processCheckout() async {
     if (_cartItems.isEmpty) return;
 
-    for (var item in _cartItems) {
+    // ✅ OPTIMIZATION: Batch stock check using Future.wait
+    final stockChecks = _cartItems.map((item) async {
       try {
         DocumentSnapshot doc = await _firebaseService.products
             .doc(item.id)
@@ -1111,16 +1113,28 @@ class _HomeScreenState extends State<HomeScreen> {
         if (doc.exists) {
           var data = doc.data() as Map<String, dynamic>;
           int availableStock = (data['stock'] ?? 0).toInt();
-
-          if (availableStock < item.stock) {
-            _showSnackBar(
-              'Insufficient stock for ${item.name}. Available: $availableStock',
-            );
-            return;
-          }
+          return {'item': item, 'available': availableStock};
         }
+        return {'item': item, 'available': 0};
       } catch (e) {
-        _showSnackBar('Error checking stock: $e');
+        return {'item': item, 'available': -1};
+      }
+    }).toList();
+
+    final results = await Future.wait(stockChecks);
+    
+    // Check results
+    for (var result in results) {
+      final item = result['item'] as Product;
+      final available = result['available'] as int;
+      if (available < item.stock) {
+        _showSnackBar(
+          'Insufficient stock for ${item.name}. Available: $available',
+        );
+        return;
+      }
+      if (available == -1) {
+        _showSnackBar('Error checking stock for ${item.name}');
         return;
       }
     }
@@ -1133,8 +1147,9 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       String receiptNumber = 'RCP-${DateTime.now().millisecondsSinceEpoch}';
 
-      for (var item in _cartItems) {
-        Sale sale = Sale(
+      // ✅ OPTIMIZATION: Batch sales creation
+      final sales = _cartItems.map((item) {
+        return Sale(
           id: '',
           productId: item.id,
           productName: item.name,
@@ -1147,9 +1162,27 @@ class _HomeScreenState extends State<HomeScreen> {
           paymentMethod: _selectedPaymentMethod,
           receiptNumber: receiptNumber,
         );
+      }).toList();
 
-        await _firebaseService.addSale(sale.toMap());
+      // ✅ OPTIMIZATION: Use writeBatch for atomic operation
+      final batch = _firebaseService.firestore.batch();
+      
+      // Add sales
+      for (var sale in sales) {
+        final saleRef = _firebaseService.sales.doc();
+        batch.set(saleRef, sale.toMap());
       }
+      
+      // Update product stock
+      for (var item in _cartItems) {
+        final productRef = _firebaseService.products.doc(item.id);
+        batch.update(productRef, {
+          'stock': FieldValue.increment(-item.stock),
+          'updatedAt': DateTime.now(),
+        });
+      }
+      
+      await batch.commit();
 
       setState(() {
         _cartItems.clear();
@@ -1160,9 +1193,11 @@ class _HomeScreenState extends State<HomeScreen> {
       _showReceiptDialog(receiptNumber: receiptNumber);
     } catch (e) {
       _showSnackBar('❌ Checkout failed: $e');
-      print('Checkout error: $e');
+      debugPrint('Checkout error: $e');
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -1194,49 +1229,54 @@ class _HomeScreenState extends State<HomeScreen> {
             itemCount: snapshot.docs.length,
             itemBuilder: (context, index) {
               var data = snapshot.docs[index].data() as Map<String, dynamic>;
-              return ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: isDarkMode
-                      ? Colors.blue.shade900
-                      : Colors.blue.shade100,
-                  child: Text(
-                    (data['stock'] ?? 0).toString(),
-                    style: TextStyle(
-                      color: isDarkMode
-                          ? Colors.blue.shade400
-                          : Colors.blue.shade700,
-                      fontWeight: FontWeight.bold,
+              // ✅ FIX: Wrap ListTile in Material to handle ink effects
+              return Material(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(8),
+                child: ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: isDarkMode
+                        ? Colors.blue.shade900
+                        : Colors.blue.shade100,
+                    child: Text(
+                      (data['stock'] ?? 0).toString(),
+                      style: TextStyle(
+                        color: isDarkMode
+                            ? Colors.blue.shade400
+                            : Colors.blue.shade700,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
-                ),
-                title: Text(
-                  data['name'] ?? '',
-                  style: TextStyle(
-                    color: isDarkMode ? Colors.white : Colors.black,
+                  title: Text(
+                    data['name'] ?? '',
+                    style: TextStyle(
+                      color: isDarkMode ? Colors.white : Colors.black,
+                    ),
                   ),
-                ),
-                subtitle: Text(
-                  'Price: $currencySymbol${data['price']} | Stock: ${data['stock']}',
-                  style: TextStyle(
-                    color: isDarkMode
-                        ? Colors.grey.shade400
-                        : Colors.grey.shade600,
+                  subtitle: Text(
+                    'Price: $currencySymbol${data['price']} | Stock: ${data['stock']}',
+                    style: TextStyle(
+                      color: isDarkMode
+                          ? Colors.grey.shade400
+                          : Colors.grey.shade600,
+                    ),
                   ),
-                ),
-                trailing: IconButton(
-                  icon: Icon(
-                    Icons.add_circle,
-                    color: isDarkMode ? Colors.green.shade400 : Colors.green,
+                  trailing: IconButton(
+                    icon: Icon(
+                      Icons.add_circle,
+                      color: isDarkMode ? Colors.green.shade400 : Colors.green,
+                    ),
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _addProductToCart(snapshot.docs[index]);
+                    },
                   ),
-                  onPressed: () {
+                  onTap: () {
                     Navigator.pop(context);
                     _addProductToCart(snapshot.docs[index]);
                   },
                 ),
-                onTap: () {
-                  Navigator.pop(context);
-                  _addProductToCart(snapshot.docs[index]);
-                },
               );
             },
           ),
@@ -1379,63 +1419,68 @@ class _HomeScreenState extends State<HomeScreen> {
                       var data =
                           snapshot.data!.docs[index].data()
                               as Map<String, dynamic>;
-                      return Card(
-                        color: isDarkMode ? Colors.grey.shade800 : Colors.white,
-                        child: ListTile(
-                          leading: CircleAvatar(
-                            backgroundColor: isDarkMode
-                                ? Colors.green.shade900
-                                : Colors.green.shade100,
-                            child: Text(
-                              (data['quantity'] ?? 0).toString(),
-                              style: TextStyle(
-                                color: isDarkMode
-                                    ? Colors.green.shade400
-                                    : Colors.green.shade700,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                          title: Text(
-                            data['productName'] ?? '',
-                            style: TextStyle(
-                              color: isDarkMode ? Colors.white : Colors.black,
-                            ),
-                          ),
-                          subtitle: Text(
-                            'Receipt: ${data['receiptNumber']}\n'
-                            'Payment: ${data['paymentMethod']}',
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: isDarkMode
-                                  ? Colors.grey.shade400
-                                  : Colors.grey.shade600,
-                            ),
-                          ),
-                          trailing: Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                '$currencySymbol${(data['total'] ?? 0).toStringAsFixed(2)}',
+                      // ✅ FIX: Wrap ListTile in Material to handle ink effects
+                      return Material(
+                        color: Colors.transparent,
+                        borderRadius: BorderRadius.circular(8),
+                        child: Card(
+                          color: isDarkMode ? Colors.grey.shade800 : Colors.white,
+                          child: ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: isDarkMode
+                                  ? Colors.green.shade900
+                                  : Colors.green.shade100,
+                              child: Text(
+                                (data['quantity'] ?? 0).toString(),
                                 style: TextStyle(
-                                  fontWeight: FontWeight.bold,
                                   color: isDarkMode
                                       ? Colors.green.shade400
-                                      : Colors.green,
+                                      : Colors.green.shade700,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
-                              Text(
-                                'Profit: $currencySymbol${(data['profit'] ?? 0).toStringAsFixed(2)}',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: isDarkMode
-                                      ? Colors.blue.shade400
-                                      : Colors.blue.shade700,
-                                ),
+                            ),
+                            title: Text(
+                              data['productName'] ?? '',
+                              style: TextStyle(
+                                color: isDarkMode ? Colors.white : Colors.black,
                               ),
-                            ],
+                            ),
+                            subtitle: Text(
+                              'Receipt: ${data['receiptNumber']}\n'
+                              'Payment: ${data['paymentMethod']}',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: isDarkMode
+                                    ? Colors.grey.shade400
+                                    : Colors.grey.shade600,
+                              ),
+                            ),
+                            trailing: Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  '$currencySymbol${(data['total'] ?? 0).toStringAsFixed(2)}',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: isDarkMode
+                                        ? Colors.green.shade400
+                                        : Colors.green,
+                                  ),
+                                ),
+                                Text(
+                                  'Profit: $currencySymbol${(data['profit'] ?? 0).toStringAsFixed(2)}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: isDarkMode
+                                        ? Colors.blue.shade400
+                                        : Colors.blue.shade700,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       );
@@ -1446,6 +1491,35 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _clearCart() {
+    if (_cartItems.isEmpty) return;
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Clear Cart'),
+        content: const Text('Are you sure you want to clear all items from cart?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              setState(() {
+                _cartItems.clear();
+                _updateTotals();
+              });
+              _showSnackBar('Cart cleared');
+            },
+            child: const Text('Clear All'),
+          ),
+        ],
       ),
     );
   }

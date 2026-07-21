@@ -19,7 +19,6 @@ class InventoryScreen extends StatefulWidget {
 class _InventoryScreenState extends State<InventoryScreen> {
   final FirebaseService _firebaseService = FirebaseService();
   String _searchQuery = '';
-  bool _isLoading = true;
   bool _isScanning = false;
 
   @override
@@ -45,9 +44,10 @@ class _InventoryScreenState extends State<InventoryScreen> {
           _buildStatsSummary(isDarkMode),
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
-              stream: _firebaseService.products.snapshots(),
+              // ✅ FIXED: Use productsStream() instead of products.snapshots()
+              stream: _firebaseService.productsStream(),
               builder: (context, snapshot) {
-                // ✅ Handle loading state
+                // Handle loading state
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(
                     child: Column(
@@ -61,7 +61,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   );
                 }
 
-                // ✅ Handle error state
+                // Handle error state
                 if (snapshot.hasError) {
                   return Center(
                     child: Column(
@@ -97,40 +97,37 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   );
                 }
 
-                // ✅ Check if we have data
+                // Check if we have data
                 if (!snapshot.hasData || snapshot.data == null) {
                   return _buildEmptyState(isDarkMode);
                 }
 
-                // ✅ Check if documents exist
+                // Check if documents exist
                 if (snapshot.data!.docs.isEmpty) {
                   return _buildEmptyState(isDarkMode);
                 }
 
-                // ✅ Parse products
+                // Parse products
                 List<Product> products = [];
                 for (var doc in snapshot.data!.docs) {
                   try {
                     final data = doc.data() as Map<String, dynamic>;
-                    // ✅ Skip if no name field
+                    // Skip if no name field
                     if (!data.containsKey('name')) {
-                      print('⚠️ Document missing "name" field: ${doc.id}');
+                      debugPrint('⚠️ Document missing "name" field: ${doc.id}');
                       continue;
                     }
                     final product = Product.fromMap(data, doc.id);
                     products.add(product);
                   } catch (e) {
-                    print('❌ Error parsing product: $e');
+                    debugPrint('❌ Error parsing product: $e');
                   }
                 }
 
-                // ✅ Debug: Print products count
-                print('📦 Found ${products.length} products');
-
-                // ✅ Filter products
+                // Filter products
                 List<Product> filteredProducts = _filterProducts(products);
 
-                // ✅ Show no results if filtered list is empty
+                // Show no results if filtered list is empty but products exist
                 if (filteredProducts.isEmpty && products.isNotEmpty) {
                   return _buildNoResultsState(isDarkMode);
                 }
@@ -139,7 +136,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   return _buildEmptyState(isDarkMode);
                 }
 
-                // ✅ Build product list
+                // Build product list
                 return ListView.builder(
                   padding: const EdgeInsets.all(16),
                   itemCount: filteredProducts.length,
@@ -374,7 +371,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
     } catch (e) {
       _showSnackBar('❌ Error: $e', isError: true);
     } finally {
-      setState(() => _isScanning = false);
+      if (mounted) {
+        setState(() => _isScanning = false);
+      }
     }
   }
 
@@ -546,7 +545,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
         ),
       ),
     ).then((result) {
-      if (result == true) {
+      if (result == true && mounted) {
         _showSnackBar('✅ Product added successfully!');
         setState(() {});
       }
@@ -577,7 +576,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
         ),
       ),
     ).then((result) {
-      if (result == true) {
+      if (result == true && mounted) {
         _showSnackBar('✅ Product added successfully!');
         setState(() {});
       }
@@ -594,7 +593,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
         ),
       ),
     ).then((result) {
-      if (result == true) {
+      if (result == true && mounted) {
         _showSnackBar('✅ Product updated successfully!');
         setState(() {});
       }
@@ -604,7 +603,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
   // ==================== STATS SUMMARY ====================
   Widget _buildStatsSummary(bool isDarkMode) {
     return StreamBuilder<QuerySnapshot>(
-      stream: _firebaseService.products.snapshots(),
+      // ✅ FIXED: Use productsStream() instead of products.snapshots()
+      stream: _firebaseService.productsStream(),
       builder: (context, snapshot) {
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
           return const SizedBox.shrink();
@@ -1103,7 +1103,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
   }
 
   // ==================== DELETE PRODUCT ====================
-  void _deleteProduct(Product product) async {
+  Future<void> _deleteProduct(Product product) async {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     
     bool confirm = await showDialog(
@@ -1148,10 +1148,14 @@ class _InventoryScreenState extends State<InventoryScreen> {
     if (confirm) {
       try {
         await _firebaseService.deleteProduct(product.id);
-        if (mounted) _showSnackBar('✅ Product deleted successfully!');
-        setState(() {});
+        if (mounted) {
+          _showSnackBar('✅ Product deleted successfully!');
+          setState(() {});
+        }
       } catch (e) {
-        if (mounted) _showSnackBar('❌ Error deleting product: $e', isError: true);
+        if (mounted) {
+          _showSnackBar('❌ Error deleting product: $e', isError: true);
+        }
       }
     }
   }

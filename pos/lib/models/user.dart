@@ -6,7 +6,7 @@ class AppUser {
   final String name;
   final String role; // 'owner', 'manager', 'worker'
   final String phone;
-  final String storeName;
+  final String? businessId; // Reference to the business
   final DateTime createdAt;
   final bool isActive;
   final String? profileImageUrl;
@@ -17,7 +17,7 @@ class AppUser {
     required this.name,
     required this.role,
     this.phone = '',
-    this.storeName = '',
+    this.businessId,
     required this.createdAt,
     this.isActive = true,
     this.profileImageUrl,
@@ -30,21 +30,38 @@ class AppUser {
       'name': name,
       'role': role,
       'phone': phone,
-      'storeName': storeName,
+      'businessId': businessId,
       'createdAt': createdAt,
       'isActive': isActive,
       'profileImageUrl': profileImageUrl,
     };
   }
 
-  factory AppUser.fromMap(Map<String, dynamic> map, String id) {
+  // ✅ Updated: fromMap with optional businessId override
+  factory AppUser.fromMap(Map<String, dynamic> map, String id, {String? businessId}) {
     return AppUser(
       id: id,
       email: map['email'] ?? '',
       name: map['name'] ?? '',
       role: map['role'] ?? 'worker',
       phone: map['phone'] ?? '',
-      storeName: map['storeName'] ?? '',
+      // Use provided businessId or get from map
+      businessId: businessId ?? map['businessId'],
+      createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      isActive: map['isActive'] ?? true,
+      profileImageUrl: map['profileImageUrl'],
+    );
+  }
+
+  // ✅ Helper to create from business user document
+  factory AppUser.fromBusinessUser(Map<String, dynamic> map, String id, String businessId) {
+    return AppUser(
+      id: id,
+      email: map['email'] ?? '',
+      name: map['name'] ?? '',
+      role: map['role'] ?? 'worker',
+      phone: map['phone'] ?? '',
+      businessId: businessId,
       createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       isActive: map['isActive'] ?? true,
       profileImageUrl: map['profileImageUrl'],
@@ -72,4 +89,7 @@ class AppUser {
         return 'User';
     }
   }
+  
+  // ✅ Helper to check if user belongs to a business
+  bool get hasBusiness => businessId != null && businessId!.isNotEmpty;
 }
