@@ -1,37 +1,37 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     
-    <!-- ===== ADD THESE PERMISSIONS ===== -->
+    <!-- ===== PERMISSIONS ===== -->
+    
     <!-- Camera permission for QR/Barcode scanning -->
     <uses-permission android:name="android.permission.CAMERA" />
 
-     <!-- ===== STORAGE PERMISSIONS (For Android 13+) ===== -->
+    <!-- Storage Permissions -->
+    <!-- For Android 13+ (API 33) -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <!-- For Android 12 and below -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" 
+        android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" 
+        android:maxSdkVersion="29" />
     
     <!-- Microphone permission for voice input -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
-     <!-- ===== INTERNET PERMISSIONS ===== -->
+    <!-- Internet permissions -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
-     <!-- ===== LOCATION PERMISSIONS (Optional - for country detection) ===== -->
+    <!-- Location permissions (Optional - for country detection) -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- For background location (if needed) -->
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
     
-    <!-- Internet permission (Firebase needs this) -->
-    <uses-permission android:name="android.permission.INTERNET" />
-    
-    <!-- For vibration feedback during scanning (optional) -->
+    <!-- For vibration feedback during scanning -->
     <uses-permission android:name="android.permission.VIBRATE" />
     
-    <!-- For Android 13+ (API 33) specific camera permission -->
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
-    
-    <!-- Camera features -->
+    <!-- Camera features (optional, but good to specify) -->
     <uses-feature
         android:name="android.hardware.camera"
         android:required="false" />
@@ -41,13 +41,16 @@
     <uses-feature
         android:name="android.hardware.camera.flash"
         android:required="false" />
-    <!-- ===== END OF PERMISSIONS ===== -->
     
+    <!-- ===== APPLICATION ===== -->
     <application
-        android:label="pos"
+        android:label="PosHub"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
-        android:usesCleartextTraffic="true">
+        android:usesCleartextTraffic="true"
+        android:allowBackup="true"
+        android:fullBackupContent="true"
+        android:requestLegacyExternalStorage="true">
         
         <activity
             android:name=".MainActivity"
@@ -59,25 +62,64 @@
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize">
             
+            <!-- Theme meta-data -->
             <meta-data
                 android:name="io.flutter.embedding.android.NormalTheme"
                 android:resource="@style/NormalTheme" />
             
+            <!-- Firebase meta-data -->
+            <meta-data
+                android:name="com.google.firebase.messaging.default_notification_channel_id"
+                android:value="daily_planner_channel" />
+            
+            <!-- Intent filters -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            
+            <!-- Handle barcode scanning intents -->
+            <intent-filter>
+                <action android:name="com.google.zxing.client.android.SCAN" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
         </activity>
         
+        <!-- Flutter embedding -->
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        
+        <!-- Firebase services -->
+        <service
+            android:name="com.google.firebase.messaging.FirebaseMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+        
+        <!-- Notification channels -->
+        <service
+            android:name="com.dexterous.flutterlocalnotifications.ForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
+            
     </application>
     
+    <!-- Queries for URL handling -->
     <queries>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
+        <!-- For Google Sign-In -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
+        <!-- For barcode scanning apps -->
+        <package android:name="com.google.zxing.client.android" />
     </queries>
+    
 </manifest>

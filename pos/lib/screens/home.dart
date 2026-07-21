@@ -11,6 +11,7 @@ import 'package:pos/providers/settings_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:pos/models/product_reference.dart';
 import 'package:pos/widgets/product_autocomplete.dart';
+import 'package:pos/widgets/receipt_dialog.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -58,6 +59,7 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           _buildSearchSection(isDarkMode),
           Expanded(
+            flex: 1,
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : _cartItems.isEmpty
@@ -302,7 +304,6 @@ class _HomeScreenState extends State<HomeScreen> {
         selected: false,
         onSelected: (selected) {
           // Category filtering can be implemented here
-          // You can pass category to ProductAutocomplete
         },
         backgroundColor: isDarkMode
             ? Colors.grey.shade800
@@ -488,6 +489,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildEmptyCart(bool isDarkMode) {
     return Center(
       child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(vertical: 40),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -507,7 +509,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 8),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
+              padding: const EdgeInsets.symmetric(horizontal: 40),
               child: Text(
                 'Add products using barcode, QR, voice, or search',
                 style: TextStyle(
@@ -742,16 +744,20 @@ class _HomeScreenState extends State<HomeScreen> {
       }
 
       // Step 3: Search by Name in Firebase
-      QuerySnapshot nameResult = await _firebaseService.products
-          .where('name', isGreaterThanOrEqualTo: query)
-          .where('name', isLessThanOrEqualTo: query + '\uf8ff')
-          .limit(20)
-          .get();
+      try {
+        QuerySnapshot nameResult = await _firebaseService.products
+            .where('name', isGreaterThanOrEqualTo: query)
+            .where('name', isLessThanOrEqualTo: query + '\uf8ff')
+            .limit(20)
+            .get();
 
-      if (nameResult.docs.isNotEmpty) {
-        _showProductSelection(nameResult);
-        setState(() => _isLoading = false);
-        return;
+        if (nameResult.docs.isNotEmpty) {
+          _showProductSelection(nameResult);
+          setState(() => _isLoading = false);
+          return;
+        }
+      } catch (e) {
+        print('Name search failed: $e');
       }
 
       // Step 4: Fallback to ProductReference for suggestions
@@ -1168,6 +1174,11 @@ class _HomeScreenState extends State<HomeScreen> {
     final currencySymbol = settingsProvider.currencySymbol;
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
+    if (snapshot.docs.isEmpty) {
+      _showSnackBar('No products found in inventory');
+      return;
+    }
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -1286,177 +1297,14 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _showReceiptDialog({String? receiptNumber}) {
-    final settingsProvider = Provider.of<SettingsProvider>(
-      context,
-      listen: false,
-    );
-    final currencySymbol = settingsProvider.currencySymbol;
-    final showProfit = settingsProvider.showProfitInPOS;
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(
-              Icons.receipt_long,
-              color: isDarkMode ? Colors.blue.shade400 : Colors.blue,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'Receipt',
-              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
-            ),
-          ],
-        ),
-        backgroundColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Receipt #: ${receiptNumber ?? 'N/A'}',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: isDarkMode ? Colors.white : Colors.black,
-              ),
-            ),
-            Text(
-              'Date: ${DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now())}',
-              style: TextStyle(
-                color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                fontSize: 12,
-              ),
-            ),
-            const Divider(),
-            const SizedBox(height: 8),
-            ..._cartItems.map(
-              (item) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        '${item.name} × ${item.stock}',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: isDarkMode ? Colors.white : Colors.black,
-                        ),
-                      ),
-                    ),
-                    Text(
-                      '$currencySymbol${(item.price * item.stock).toStringAsFixed(2)}',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w500,
-                        fontSize: 14,
-                        color: isDarkMode ? Colors.white : Colors.black,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const Divider(),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Total:',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    color: isDarkMode ? Colors.white : Colors.black,
-                  ),
-                ),
-                Text(
-                  '$currencySymbol${_totalAmount.toStringAsFixed(2)}',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: isDarkMode ? Colors.green.shade400 : Colors.green,
-                    fontSize: 18,
-                  ),
-                ),
-              ],
-            ),
-            if (showProfit) ...[
-              const SizedBox(height: 4),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Profit:',
-                    style: TextStyle(
-                      color: isDarkMode
-                          ? Colors.grey.shade400
-                          : Colors.grey.shade600,
-                      fontSize: 14,
-                    ),
-                  ),
-                  Text(
-                    '$currencySymbol${_totalProfit.toStringAsFixed(2)}',
-                    style: TextStyle(
-                      color: isDarkMode
-                          ? Colors.blue.shade400
-                          : Colors.blue.shade700,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-            if (_selectedPaymentMethod.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Payment:',
-                    style: TextStyle(
-                      color: isDarkMode
-                          ? Colors.grey.shade400
-                          : Colors.grey.shade600,
-                      fontSize: 14,
-                    ),
-                  ),
-                  Text(
-                    _selectedPaymentMethod,
-                    style: TextStyle(
-                      color: isDarkMode
-                          ? Colors.grey.shade400
-                          : Colors.grey.shade600,
-                      fontSize: 14,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Close',
-              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
-            ),
-          ),
-          ElevatedButton.icon(
-            onPressed: () {
-              _showSnackBar('Printing feature coming soon!');
-            },
-            icon: const Icon(Icons.print),
-            label: const Text('Print'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: isDarkMode
-                  ? Colors.blue.shade400
-                  : Colors.blue.shade700,
-              foregroundColor: Colors.white,
-            ),
-          ),
-        ],
+      builder: (context) => ReceiptDialog(
+        cartItems: _cartItems,
+        totalAmount: _totalAmount,
+        totalProfit: _totalProfit,
+        selectedPaymentMethod: _selectedPaymentMethod,
+        receiptNumber: receiptNumber ?? 'N/A',
       ),
     );
   }

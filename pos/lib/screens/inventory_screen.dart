@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:pos/screens/product_form_screen.dart';  // ✅ Fixed import
+import 'package:pos/screens/product_form_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:pos/models/product.dart';
 import 'package:pos/services/firebase_service.dart';
@@ -20,45 +20,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
   final FirebaseService _firebaseService = FirebaseService();
   String _searchQuery = '';
   bool _isLoading = true;
-  bool _hasLoaded = false;
   bool _isScanning = false;
-  
-  // Stream subscription for real-time updates
-  Stream<QuerySnapshot>? _productsStream;
 
   @override
   void initState() {
     super.initState();
-    _setupRealtimeUpdates();
-  }
-
-  void _setupRealtimeUpdates() {
-    _productsStream = _firebaseService.products.snapshots();
-    _loadProducts();
-  }
-
-  Future<void> _loadProducts() async {
-    setState(() {
-      _isLoading = true;
-      _hasLoaded = false;
-    });
-    try {
-      await _firebaseService.products.get();
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _hasLoaded = true;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _hasLoaded = true;
-        });
-        _showSnackBar('Error loading products: $e', isError: true);
-      }
-    }
   }
 
   @override
@@ -78,53 +44,112 @@ class _InventoryScreenState extends State<InventoryScreen> {
           _buildSearchBar(isDarkMode),
           _buildStatsSummary(isDarkMode),
           Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : StreamBuilder<QuerySnapshot>(
-                    stream: _productsStream,
-                    builder: (context, snapshot) {
-                      if (snapshot.hasError) {
-                        final errorMessage = snapshot.error?.toString() ?? 'Unknown error';
-                        return _buildErrorState(errorMessage, isDarkMode);
-                      }
+            child: StreamBuilder<QuerySnapshot>(
+              stream: _firebaseService.products.snapshots(),
+              builder: (context, snapshot) {
+                // ✅ Handle loading state
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CircularProgressIndicator(),
+                        SizedBox(height: 16),
+                        Text('Loading products...'),
+                      ],
+                    ),
+                  );
+                }
 
-                      if (snapshot.connectionState == ConnectionState.waiting && !_hasLoaded) {
-                        return const Center(
-                          child: CircularProgressIndicator(),
-                        );
-                      }
+                // ✅ Handle error state
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.error_outline,
+                          size: 60,
+                          color: isDarkMode ? Colors.red.shade400 : Colors.red.shade300,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Error loading products',
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: isDarkMode ? Colors.white : Colors.grey.shade600,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 24),
+                          child: Text(
+                            snapshot.error.toString(),
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade500,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
 
-                      if (!snapshot.hasData || snapshot.data == null) {
-                        return _buildEmptyState(isDarkMode);
-                      }
+                // ✅ Check if we have data
+                if (!snapshot.hasData || snapshot.data == null) {
+                  return _buildEmptyState(isDarkMode);
+                }
 
-                      if (snapshot.data!.docs.isEmpty) {
-                        return _buildEmptyState(isDarkMode);
-                      }
+                // ✅ Check if documents exist
+                if (snapshot.data!.docs.isEmpty) {
+                  return _buildEmptyState(isDarkMode);
+                }
 
-                      List<Product> products = snapshot.data!.docs.map((doc) {
-                        return Product.fromMap(
-                          doc.data() as Map<String, dynamic>,
-                          doc.id,
-                        );
-                      }).toList();
+                // ✅ Parse products
+                List<Product> products = [];
+                for (var doc in snapshot.data!.docs) {
+                  try {
+                    final data = doc.data() as Map<String, dynamic>;
+                    // ✅ Skip if no name field
+                    if (!data.containsKey('name')) {
+                      print('⚠️ Document missing "name" field: ${doc.id}');
+                      continue;
+                    }
+                    final product = Product.fromMap(data, doc.id);
+                    products.add(product);
+                  } catch (e) {
+                    print('❌ Error parsing product: $e');
+                  }
+                }
 
-                      List<Product> filteredProducts = _filterProducts(products);
+                // ✅ Debug: Print products count
+                print('📦 Found ${products.length} products');
 
-                      if (filteredProducts.isEmpty) {
-                        return _buildNoResultsState(isDarkMode);
-                      }
+                // ✅ Filter products
+                List<Product> filteredProducts = _filterProducts(products);
 
-                      return ListView.builder(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: filteredProducts.length,
-                        itemBuilder: (context, index) {
-                          final product = filteredProducts[index];
-                          return _buildProductCard(product, currencySymbol, isDarkMode);
-                        },
-                      );
-                    },
-                  ),
+                // ✅ Show no results if filtered list is empty
+                if (filteredProducts.isEmpty && products.isNotEmpty) {
+                  return _buildNoResultsState(isDarkMode);
+                }
+
+                if (filteredProducts.isEmpty) {
+                  return _buildEmptyState(isDarkMode);
+                }
+
+                // ✅ Build product list
+                return ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: filteredProducts.length,
+                  itemBuilder: (context, index) {
+                    final product = filteredProducts[index];
+                    return _buildProductCard(product, currencySymbol, isDarkMode);
+                  },
+                );
+              },
+            ),
           ),
         ],
       ),
@@ -136,7 +161,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
     );
   }
 
-  // ==================== SEARCH BAR WITH QR, BARCODE & VOICE ====================
+  // ==================== SEARCH BAR ====================
   Widget _buildSearchBar(bool isDarkMode) {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -153,125 +178,120 @@ class _InventoryScreenState extends State<InventoryScreen> {
           ),
         ],
       ),
-      child: Column(
+      child: Row(
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  style: TextStyle(
-                    color: isDarkMode ? Colors.white : Colors.black,
-                  ),
-                  decoration: InputDecoration(
-                    hintText: 'Search products...',
-                    hintStyle: TextStyle(
-                      color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                    ),
-                    prefixIcon: Icon(
-                      Icons.search,
-                      color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                    ),
-                    suffixIcon: _searchQuery.isNotEmpty
-                        ? IconButton(
-                            icon: Icon(
-                              Icons.clear,
-                              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                            ),
-                            onPressed: () {
-                              setState(() => _searchQuery = '');
-                            },
-                          )
-                        : null,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                    filled: true,
-                    fillColor: isDarkMode
-                        ? Colors.grey.shade800
-                        : Colors.grey.shade50,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                  ),
-                  onChanged: (value) {
-                    setState(() {
-                      _searchQuery = value.toLowerCase().trim();
-                    });
-                  },
-                  onSubmitted: (value) {
-                    if (value.isNotEmpty) {
-                      setState(() {
-                        _searchQuery = value.toLowerCase().trim();
-                      });
-                    }
-                  },
+          Expanded(
+            child: TextField(
+              style: TextStyle(
+                color: isDarkMode ? Colors.white : Colors.black,
+              ),
+              decoration: InputDecoration(
+                hintText: 'Search products...',
+                hintStyle: TextStyle(
+                  color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                ),
+                prefixIcon: Icon(
+                  Icons.search,
+                  color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                ),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: Icon(
+                          Icons.clear,
+                          color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                        ),
+                        onPressed: () {
+                          setState(() => _searchQuery = '');
+                        },
+                      )
+                    : null,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                filled: true,
+                fillColor: isDarkMode
+                    ? Colors.grey.shade800
+                    : Colors.grey.shade50,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
                 ),
               ),
-              const SizedBox(width: 8),
-              // QR Scanner Button
-              Container(
-                decoration: BoxDecoration(
-                  color: isDarkMode
-                      ? Colors.blue.shade900
-                      : Colors.blue.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: IconButton(
-                  icon: Icon(
-                    Icons.qr_code_scanner,
-                    color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
-                  ),
-                  onPressed: _scanQRCode,
-                  tooltip: 'Scan QR Code',
-                ),
+              onChanged: (value) {
+                setState(() {
+                  _searchQuery = value.toLowerCase().trim();
+                });
+              },
+              onSubmitted: (value) {
+                if (value.isNotEmpty) {
+                  setState(() {
+                    _searchQuery = value.toLowerCase().trim();
+                  });
+                }
+              },
+            ),
+          ),
+          const SizedBox(width: 8),
+          // QR Scanner Button
+          Container(
+            decoration: BoxDecoration(
+              color: isDarkMode
+                  ? Colors.blue.shade900
+                  : Colors.blue.shade50,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: IconButton(
+              icon: Icon(
+                Icons.qr_code_scanner,
+                color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
               ),
-              const SizedBox(width: 4),
-              // Barcode Scanner Button
-              Container(
-                decoration: BoxDecoration(
-                  color: isDarkMode
-                      ? Colors.green.shade900
-                      : Colors.green.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: IconButton(
-                  icon: Icon(
-                    Icons.barcode_reader,
-                    color: isDarkMode ? Colors.green.shade400 : Colors.green.shade700,
-                  ),
-                  onPressed: _scanBarcode,
-                  tooltip: 'Scan Barcode',
-                ),
+              onPressed: _scanQRCode,
+              tooltip: 'Scan QR Code',
+            ),
+          ),
+          const SizedBox(width: 4),
+          // Barcode Scanner Button
+          Container(
+            decoration: BoxDecoration(
+              color: isDarkMode
+                  ? Colors.green.shade900
+                  : Colors.green.shade50,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: IconButton(
+              icon: Icon(
+                Icons.barcode_reader,
+                color: isDarkMode ? Colors.green.shade400 : Colors.green.shade700,
               ),
-              const SizedBox(width: 4),
-              // Voice Input Button
-              Container(
-                decoration: BoxDecoration(
-                  color: isDarkMode
-                      ? Colors.orange.shade900
-                      : Colors.orange.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: IconButton(
-                  icon: Icon(
-                    Icons.mic,
-                    color: isDarkMode ? Colors.orange.shade400 : Colors.orange.shade700,
-                  ),
-                  onPressed: _showVoiceInput,
-                  tooltip: 'Voice Input',
-                ),
+              onPressed: _scanBarcode,
+              tooltip: 'Scan Barcode',
+            ),
+          ),
+          const SizedBox(width: 4),
+          // Voice Input Button
+          Container(
+            decoration: BoxDecoration(
+              color: isDarkMode
+                  ? Colors.orange.shade900
+                  : Colors.orange.shade50,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: IconButton(
+              icon: Icon(
+                Icons.mic,
+                color: isDarkMode ? Colors.orange.shade400 : Colors.orange.shade700,
               ),
-            ],
+              onPressed: _showVoiceInput,
+              tooltip: 'Voice Input',
+            ),
           ),
         ],
       ),
     );
   }
 
-  // ==================== VOICE INPUT FUNCTIONALITY ====================
-  
+  // ==================== VOICE INPUT ====================
   void _showVoiceInput() {
     showModalBottomSheet(
       context: context,
@@ -284,7 +304,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
           setState(() {
             _searchQuery = text.toLowerCase().trim();
           });
-          // If the voice input is a QR or barcode, try to find the product
           if (text.isNotEmpty) {
             _handleScanResult(text, 'Voice Input');
           }
@@ -293,8 +312,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
     );
   }
 
-  // ==================== QR SCANNER FUNCTIONALITY ====================
-  
+  // ==================== QR SCANNER ====================
   void _scanQRCode() {
     Navigator.push(
       context,
@@ -308,8 +326,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
     );
   }
 
-  // ==================== BARCODE SCANNER FUNCTIONALITY ====================
-  
+  // ==================== BARCODE SCANNER ====================
   void _scanBarcode() {
     Navigator.push(
       context,
@@ -324,7 +341,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
   }
 
   // ==================== HANDLE SCAN RESULTS ====================
-  
   Future<void> _handleScanResult(String code, String scanType) async {
     if (_isScanning) return;
     
@@ -333,7 +349,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
     try {
       _showSnackBar('🔍 Searching for product...');
       
-      // Search by QR code first
       QuerySnapshot qrResult = await _firebaseService
           .getProductByQRCode(code);
       
@@ -344,7 +359,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
         return;
       }
       
-      // If not found, search by barcode
       QuerySnapshot barcodeResult = await _firebaseService
           .getProductByBarcode(code);
       
@@ -355,19 +369,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
         return;
       }
       
-      // If not found by barcode, search by name (for voice input)
-      QuerySnapshot nameResult = await _firebaseService.products
-          .where('name', isGreaterThanOrEqualTo: code)
-          .where('name', isLessThanOrEqualTo: code + '\uf8ff')
-          .limit(10)
-          .get();
-      
-      if (nameResult.docs.isNotEmpty) {
-        _showProductSelectionDialog(nameResult, scanType);
-        return;
-      }
-      
-      // Product not found
       _showProductNotFoundDialog(code);
       
     } catch (e) {
@@ -377,91 +378,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
     }
   }
 
-  // ==================== PRODUCT SELECTION DIALOG (For Voice Search) ====================
-  
-  void _showProductSelectionDialog(QuerySnapshot snapshot, String scanType) {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final settingsProvider = Provider.of<SettingsProvider>(context, listen: false);
-    final currencySymbol = settingsProvider.currencySymbol;
-    
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(
-          'Select Product',
-          style: TextStyle(
-            color: isDarkMode ? Colors.white : Colors.black,
-          ),
-        ),
-        backgroundColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
-        content: SizedBox(
-          width: double.maxFinite,
-          height: 350,
-          child: ListView.builder(
-            itemCount: snapshot.docs.length,
-            itemBuilder: (context, index) {
-              var data = snapshot.docs[index].data() as Map<String, dynamic>;
-              final product = Product.fromMap(data, snapshot.docs[index].id);
-              return ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: isDarkMode
-                      ? Colors.blue.shade900
-                      : Colors.blue.shade100,
-                  child: Text(
-                    (data['stock'] ?? 0).toString(),
-                    style: TextStyle(
-                      color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                title: Text(
-                  data['name'] ?? '',
-                  style: TextStyle(
-                    color: isDarkMode ? Colors.white : Colors.black,
-                  ),
-                ),
-                subtitle: Text(
-                  'Price: $currencySymbol${data['price']} | Stock: ${data['stock']}',
-                  style: TextStyle(
-                    color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                  ),
-                ),
-                trailing: IconButton(
-                  icon: Icon(
-                    Icons.visibility,
-                    color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
-                  ),
-                  onPressed: () {
-                    Navigator.pop(context);
-                    _showProductDetails(product, currencySymbol, isDarkMode);
-                  },
-                ),
-                onTap: () {
-                  Navigator.pop(context);
-                  _showProductDetails(product, currencySymbol, isDarkMode);
-                },
-              );
-            },
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Close',
-              style: TextStyle(
-                color: isDarkMode ? Colors.white : Colors.black,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ==================== SCAN RESULT DIALOGS ====================
-  
+  // ==================== DIALOGS ====================
   void _showProductFoundDialog(Product product, String scanType) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final settingsProvider = Provider.of<SettingsProvider>(context, listen: false);
@@ -619,9 +536,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
     );
   }
 
-  // ==================== NAVIGATION METHODS ====================
-  
-  // ✅ Navigate to full Product Form Screen for adding
+  // ==================== NAVIGATION ====================
   void _showAddProductScreen() {
     Navigator.push(
       context,
@@ -633,13 +548,12 @@ class _InventoryScreenState extends State<InventoryScreen> {
     ).then((result) {
       if (result == true) {
         _showSnackBar('✅ Product added successfully!');
+        setState(() {});
       }
     });
   }
 
-  // ✅ Navigate to full Product Form Screen with pre-filled code
   void _showAddProductScreenWithCode(String code) {
-    // Create a product with the code pre-filled
     final product = Product(
       id: '',
       name: '',
@@ -648,8 +562,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
       stock: 0,
       minStock: 0,
       category: 'Uncategorized',
-      barcode: code.isNotEmpty ? code : '', // Detect if it's a barcode
-      qrCode: '', // Will be determined by the user
+      barcode: code.isNotEmpty ? code : '',
+      qrCode: '',
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
     );
@@ -665,11 +579,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
     ).then((result) {
       if (result == true) {
         _showSnackBar('✅ Product added successfully!');
+        setState(() {});
       }
     });
   }
 
-  // ✅ Navigate to full Product Form Screen for editing
   void _showEditProductScreen(Product product) {
     Navigator.push(
       context,
@@ -682,6 +596,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
     ).then((result) {
       if (result == true) {
         _showSnackBar('✅ Product updated successfully!');
+        setState(() {});
       }
     });
   }
@@ -689,7 +604,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
   // ==================== STATS SUMMARY ====================
   Widget _buildStatsSummary(bool isDarkMode) {
     return StreamBuilder<QuerySnapshot>(
-      stream: _productsStream,
+      stream: _firebaseService.products.snapshots(),
       builder: (context, snapshot) {
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
           return const SizedBox.shrink();
@@ -1045,142 +960,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
     );
   }
 
-  // ==================== ERROR STATE ====================
-  Widget _buildErrorState(String errorMessage, bool isDarkMode) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.error_outline,
-            size: 60,
-            color: isDarkMode ? Colors.red.shade400 : Colors.red.shade300,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Error loading products',
-            style: TextStyle(
-              fontSize: 18,
-              color: isDarkMode ? Colors.white : Colors.grey.shade600,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Text(
-              errorMessage,
-              style: TextStyle(
-                color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade500,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ),
-          const SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: _loadProducts,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Retry'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ==================== FILTER PRODUCTS ====================
-  List<Product> _filterProducts(List<Product> products) {
-    if (_searchQuery.isEmpty) return products;
-    
-    return products.where((product) {
-      return product.name.toLowerCase().contains(_searchQuery) ||
-          product.barcode.toLowerCase().contains(_searchQuery) ||
-          product.qrCode.toLowerCase().contains(_searchQuery) ||
-          product.category.toLowerCase().contains(_searchQuery) ||
-          product.price.toString().contains(_searchQuery);
-    }).toList();
-  }
-
-  // ==================== FILTER OPTIONS ====================
-  void _showFilterOptions() {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: isDarkMode ? Colors.grey.shade900 : Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Filter Products',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: isDarkMode ? Colors.white : Colors.black,
-              ),
-            ),
-            const SizedBox(height: 16),
-            ListTile(
-              leading: Icon(
-                Icons.inventory,
-                color: isDarkMode ? Colors.white : Colors.black,
-              ),
-              title: Text(
-                'All Products',
-                style: TextStyle(
-                  color: isDarkMode ? Colors.white : Colors.black,
-                ),
-              ),
-              onTap: () {
-                Navigator.pop(context);
-                setState(() => _searchQuery = '');
-              },
-            ),
-            ListTile(
-              leading: Icon(
-                Icons.warning,
-                color: isDarkMode ? Colors.orange.shade400 : Colors.orange,
-              ),
-              title: Text(
-                'Low Stock',
-                style: TextStyle(
-                  color: isDarkMode ? Colors.white : Colors.black,
-                ),
-              ),
-              onTap: () {
-                Navigator.pop(context);
-                _showSnackBar('Low stock filter coming soon!');
-              },
-            ),
-            ListTile(
-              leading: Icon(
-                Icons.error,
-                color: isDarkMode ? Colors.red.shade400 : Colors.red,
-              ),
-              title: Text(
-                'Out of Stock',
-                style: TextStyle(
-                  color: isDarkMode ? Colors.white : Colors.black,
-                ),
-              ),
-              onTap: () {
-                Navigator.pop(context);
-                _showSnackBar('Out of stock filter coming soon!');
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   // ==================== PRODUCT DETAILS ====================
   void _showProductDetails(Product product, String currencySymbol, bool isDarkMode) {
     showModalBottomSheet(
@@ -1370,10 +1149,24 @@ class _InventoryScreenState extends State<InventoryScreen> {
       try {
         await _firebaseService.deleteProduct(product.id);
         if (mounted) _showSnackBar('✅ Product deleted successfully!');
+        setState(() {});
       } catch (e) {
         if (mounted) _showSnackBar('❌ Error deleting product: $e', isError: true);
       }
     }
+  }
+
+  // ==================== FILTER PRODUCTS ====================
+  List<Product> _filterProducts(List<Product> products) {
+    if (_searchQuery.isEmpty) return products;
+    
+    return products.where((product) {
+      return product.name.toLowerCase().contains(_searchQuery) ||
+          product.barcode.toLowerCase().contains(_searchQuery) ||
+          product.qrCode.toLowerCase().contains(_searchQuery) ||
+          product.category.toLowerCase().contains(_searchQuery) ||
+          product.price.toString().contains(_searchQuery);
+    }).toList();
   }
 
   // ==================== SNACKBAR ====================

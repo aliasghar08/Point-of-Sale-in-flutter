@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
-import '../models/user.dart';
-import '../providers/auth_provider.dart';
-import '../providers/settings_provider.dart';
-import '../services/auth_service.dart';
-import '../widgets/role_guard.dart';
+import 'package:pos/providers/auth_provider.dart';
+import 'package:pos/providers/settings_provider.dart';
+import 'package:pos/services/auth_service.dart';
+import 'package:pos/widgets/role_guard.dart';
+import 'package:pos/models/user.dart';
 
 class UserManagementScreen extends StatelessWidget {
   const UserManagementScreen({super.key});
@@ -30,6 +30,7 @@ class _UserManagementContent extends StatefulWidget {
 class _UserManagementContentState extends State<_UserManagementContent> {
   final AuthService _authService = AuthService();
   bool _isLoading = true;
+  bool _hasPermission = false;
   String? _errorMessage;
 
   @override
@@ -43,6 +44,7 @@ class _UserManagementContentState extends State<_UserManagementContent> {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
+      _hasPermission = false;
     });
 
     try {
@@ -50,13 +52,12 @@ class _UserManagementContentState extends State<_UserManagementContent> {
       if (currentUser == null) {
         setState(() {
           _errorMessage = 'No user logged in';
-          _isLoading = false;  // ✅ Fixed: Set loading to false
+          _isLoading = false;
         });
         return;
       }
 
       print('🔍 Checking user: ${currentUser.uid}');
-      print('📧 Email: ${currentUser.email}');
 
       final doc = await FirebaseFirestore.instance
           .collection('users')
@@ -65,33 +66,29 @@ class _UserManagementContentState extends State<_UserManagementContent> {
 
       if (doc.exists) {
         final data = doc.data();
-        print('✅ User document exists');
-        print('📝 Role: ${data?['role']}');
-        print('📝 Name: ${data?['name']}');
-        print('📝 Is Active: ${data?['isActive']}');
+        final role = data?['role'] ?? '';
+        print('✅ User role: $role');
 
-        if (data?['role'] == 'owner') {
-          print('✅ User is OWNER - Has full access');
+        if (role == 'owner') {
           setState(() {
+            _hasPermission = true;
             _errorMessage = null;
             _isLoading = false;
           });
         } else {
-          print('⚠️ User is NOT owner. Role: ${data?['role']}');
           setState(() {
-            _errorMessage = 'You are not an owner. Role: ${data?['role']}';
-            _isLoading = false;  // ✅ Fixed: Set loading to false
+            _errorMessage = 'You need owner permissions to manage users. Your role: $role';
+            _isLoading = false;
           });
         }
       } else {
-        print('❌ User document does NOT exist!');
+        // If user document doesn't exist, create one with owner role
         await _createUserDocument(currentUser);
-        // ✅ _createUserDocument already sets _isLoading = false
       }
     } catch (e) {
-      print('❌ Error: $e');
+      print('❌ Error checking permissions: $e');
       setState(() {
-        _errorMessage = e.toString();
+        _errorMessage = 'Error checking permissions: $e';
         _isLoading = false;
       });
     }
@@ -119,6 +116,7 @@ class _UserManagementContentState extends State<_UserManagementContent> {
       print('✅ User document created with role: owner');
       
       setState(() {
+        _hasPermission = true;
         _errorMessage = null;
         _isLoading = false;
       });
@@ -146,8 +144,7 @@ class _UserManagementContentState extends State<_UserManagementContent> {
     final settingsProvider = Provider.of<SettingsProvider>(context);
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
-    return Scaffold(
-     
+    return Scaffold(      
       body: _isLoading
           ? Center(
               child: CircularProgressIndicator(
@@ -156,7 +153,56 @@ class _UserManagementContentState extends State<_UserManagementContent> {
             )
           : _errorMessage != null
               ? _buildErrorScreen(isDarkMode)
-              : _buildUserList(isDarkMode),
+              : _hasPermission
+                  ? _buildUserList(isDarkMode)
+                  : _buildPermissionDeniedScreen(isDarkMode),
+    );
+  }
+
+  // ========== PERMISSION DENIED SCREEN ==========
+  Widget _buildPermissionDeniedScreen(bool isDarkMode) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.lock_outline,
+              size: 80,
+              color: isDarkMode ? Colors.red.shade400 : Colors.red.shade300,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Access Denied',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: isDarkMode ? Colors.white : Colors.black,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'You need owner permissions to access this screen.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+              ),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: _checkUserPermissions,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -175,7 +221,7 @@ class _UserManagementContentState extends State<_UserManagementContent> {
             ),
             const SizedBox(height: 16),
             Text(
-              'Permission Error',
+              'Error',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
@@ -191,28 +237,11 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                 color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              'Try refreshing or contact support.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 12,
-                color: isDarkMode ? Colors.grey.shade500 : Colors.grey.shade400,
-              ),
-            ),
             const SizedBox(height: 24),
             ElevatedButton.icon(
               onPressed: _checkUserPermissions,
-              icon: Icon(
-                Icons.refresh,
-                color: isDarkMode ? Colors.white : Colors.white,
-              ),
-              label: Text(
-                'Retry',
-                style: TextStyle(
-                  color: isDarkMode ? Colors.white : Colors.white,
-                ),
-              ),
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
                 foregroundColor: Colors.white,
@@ -233,71 +262,70 @@ class _UserManagementContentState extends State<_UserManagementContent> {
           .snapshots()
           .handleError((error) {
             print('❌ Stream error: $error');
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    'Error loading users: $error',
+            // Don't show snackbar here - let the builder handle it
+          }),
+      builder: (context, snapshot) {
+        // ===== HANDLE ERROR =====
+        if (snapshot.hasError) {
+          print('❌ Stream has error: ${snapshot.error}');
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.error_outline,
+                    size: 60,
+                    color: isDarkMode ? Colors.red.shade400 : Colors.red.shade300,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Error loading users',
                     style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
                       color: isDarkMode ? Colors.white : Colors.black,
                     ),
                   ),
-                  backgroundColor: isDarkMode ? Colors.red.shade400 : Colors.red,
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
-            }
-          }),
-      builder: (context, snapshot) {
-        // ===== FIXED: Better error handling =====
-        if (snapshot.hasError) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.error_outline,
-                  size: 60,
-                  color: isDarkMode ? Colors.red.shade400 : Colors.red.shade300,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Error loading users',
-                  style: TextStyle(
-                    fontSize: 18,
-                    color: isDarkMode ? Colors.white : Colors.grey.shade600,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Text(
-                    snapshot.error.toString(),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Could not load user list. Please check your permissions.',
+                    textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 14,
-                      color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade500,
+                      color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
                     ),
-                    textAlign: TextAlign.center,
                   ),
-                ),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  onPressed: () {
-                    _checkUserPermissions();
-                    setState(() {});
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
-                    foregroundColor: Colors.white,
+                  const SizedBox(height: 16),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      setState(() {});
+                    },
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Retry'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+                      foregroundColor: Colors.white,
+                    ),
                   ),
-                  child: const Text('Retry'),
-                ),
-              ],
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: _checkUserPermissions,
+                    child: Text(
+                      'Check Permissions',
+                      style: TextStyle(
+                        color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           );
         }
 
-        // ===== FIXED: Check if data exists properly =====
+        // ===== LOADING =====
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Center(
             child: CircularProgressIndicator(
@@ -306,6 +334,7 @@ class _UserManagementContentState extends State<_UserManagementContent> {
           );
         }
 
+        // ===== EMPTY STATE =====
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
           return Center(
             child: Column(
@@ -338,12 +367,7 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                     _showAddUserDialog(context);
                   },
                   icon: const Icon(Icons.add),
-                  label: Text(
-                    'Add User',
-                    style: TextStyle(
-                      color: isDarkMode ? Colors.white : Colors.white,
-                    ),
-                  ),
+                  label: const Text('Add User'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
                     foregroundColor: Colors.white,
@@ -354,6 +378,7 @@ class _UserManagementContentState extends State<_UserManagementContent> {
           );
         }
 
+        // ===== USER LIST =====
         List<AppUser> users = snapshot.data!.docs.map((doc) {
           return AppUser.fromMap(
             doc.data() as Map<String, dynamic>,
