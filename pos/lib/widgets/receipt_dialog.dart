@@ -10,6 +10,12 @@ class ReceiptDialog extends StatelessWidget {
   final double totalProfit;
   final String selectedPaymentMethod;
   final String receiptNumber;
+  
+  // ✅ Customer Info
+  final String customerName;
+  final String customerPhone;
+  final String? customerEmail;
+  final bool isGuestCustomer;
 
   const ReceiptDialog({
     super.key,
@@ -18,6 +24,10 @@ class ReceiptDialog extends StatelessWidget {
     required this.totalProfit,
     required this.selectedPaymentMethod,
     required this.receiptNumber,
+    this.customerName = 'Guest Customer',
+    this.customerPhone = '',
+    this.customerEmail,
+    this.isGuestCustomer = true,
   });
 
   @override
@@ -63,37 +73,84 @@ class ReceiptDialog extends StatelessWidget {
                 fontSize: 12,
               ),
             ),
+            
+            // ✅ Customer Info Section
+            const SizedBox(height: 4),
+            if (!isGuestCustomer) ...[
+              Text(
+                'Customer: $customerName',
+                style: TextStyle(
+                  color: isDarkMode ? Colors.white : Colors.black,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              if (customerPhone.isNotEmpty)
+                Text(
+                  'Phone: $customerPhone',
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                    fontSize: 12,
+                  ),
+                ),
+              if (customerEmail != null && customerEmail!.isNotEmpty)
+                Text(
+                  'Email: $customerEmail',
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                    fontSize: 12,
+                  ),
+                ),
+            ] else
+              Text(
+                'Customer: Guest',
+                style: TextStyle(
+                  color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                  fontSize: 12,
+                ),
+              ),
+            
             const Divider(),
             const SizedBox(height: 8),
             
             // Items List
-            ...cartItems.map(
-              (item) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        '${item.name} × ${item.stock}',
+            if (cartItems.isEmpty)
+              Center(
+                child: Text(
+                  'No items in receipt',
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                  ),
+                ),
+              )
+            else
+              ...cartItems.map(
+                (item) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '${item.name} × ${item.stock}',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: isDarkMode ? Colors.white : Colors.black,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        '$currencySymbol${(item.price * item.stock).toStringAsFixed(2)}',
                         style: TextStyle(
+                          fontWeight: FontWeight.w500,
                           fontSize: 14,
                           color: isDarkMode ? Colors.white : Colors.black,
                         ),
                       ),
-                    ),
-                    Text(
-                      '$currencySymbol${(item.price * item.stock).toStringAsFixed(2)}',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w500,
-                        fontSize: 14,
-                        color: isDarkMode ? Colors.white : Colors.black,
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
             
             const Divider(),
             

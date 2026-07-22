@@ -10,7 +10,7 @@ class SettingsProvider extends ChangeNotifier {
   AppSettings get settings => _settings;
   bool get isLoading => _isLoading;
 
-  // Currency related getters (Theme removed)
+  // Currency related getters
   String get currencySymbol => _settings.currencySymbol;
   String get currencyCode => _settings.currencyCode;
   bool get showProfitInPOS => _settings.showProfitInPOS;
@@ -23,6 +23,11 @@ class SettingsProvider extends ChangeNotifier {
   bool get autoSyncData => _settings.autoSyncData;
   String get dateFormat => _settings.dateFormat;
   String get timeFormat => _settings.timeFormat;
+  
+  // ✅ Customer related getters
+  bool get enableCustomerLoyalty => _settings.enableCustomerLoyalty;
+  bool get requireCustomerInfo => _settings.requireCustomerInfo;
+  int get pointsPerCurrency => _settings.pointsPerCurrency;
 
   SettingsProvider() {
     loadSettings();
@@ -128,34 +133,53 @@ class SettingsProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-/// Initialize settings with location-based currency
-Future<void> initSettingsWithLocation() async {
-  _isLoading = true;
-  notifyListeners();
-
-  try {
-    final prefs = await SharedPreferences.getInstance();
-    final String? settingsJson = prefs.getString('app_settings');
-    
-    if (settingsJson != null) {
-      // Settings exist, load them
-      final Map<String, dynamic> data = json.decode(settingsJson);
-      _settings = AppSettings.fromMap(data);
-    } else {
-      // No settings found, create with location-based currency
-      _settings = await AppSettings.createWithLocationBasedCurrency();
-      await _saveSettings();
-      print('✅ Settings initialized with location-based currency');
-    }
-  } catch (e) {
-    print('Error loading settings: $e');
-    // Fallback to default
-    _settings = AppSettings();
-  } finally {
-    _isLoading = false;
+  // ✅ Customer Settings Methods
+  Future<void> toggleCustomerLoyalty() async {
+    _settings = _settings.copyWith(enableCustomerLoyalty: !_settings.enableCustomerLoyalty);
+    await _saveSettings();
     notifyListeners();
   }
-}
+
+  Future<void> toggleRequireCustomerInfo() async {
+    _settings = _settings.copyWith(requireCustomerInfo: !_settings.requireCustomerInfo);
+    await _saveSettings();
+    notifyListeners();
+  }
+
+  Future<void> updatePointsPerCurrency(int points) async {
+    _settings = _settings.copyWith(pointsPerCurrency: points);
+    await _saveSettings();
+    notifyListeners();
+  }
+
+  /// Initialize settings with location-based currency
+  Future<void> initSettingsWithLocation() async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final String? settingsJson = prefs.getString('app_settings');
+      
+      if (settingsJson != null) {
+        // Settings exist, load them
+        final Map<String, dynamic> data = json.decode(settingsJson);
+        _settings = AppSettings.fromMap(data);
+      } else {
+        // No settings found, create with location-based currency
+        _settings = await AppSettings.createWithLocationBasedCurrency();
+        await _saveSettings();
+        print('✅ Settings initialized with location-based currency');
+      }
+    } catch (e) {
+      print('Error loading settings: $e');
+      // Fallback to default
+      _settings = AppSettings();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
 
   // Reset to default settings
   Future<void> resetToDefault() async {

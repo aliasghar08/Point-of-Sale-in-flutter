@@ -12,6 +12,14 @@ class Sale {
   final DateTime saleDate;
   final String paymentMethod;
   final String receiptNumber;
+  
+  // ✅ Customer Info (Embedded)
+  final String customerId;
+  final String customerName;
+  final String customerPhone;
+  final String? customerEmail;
+  final String? customerAddress;
+  final bool isGuestCustomer;
 
   Sale({
     required this.id,
@@ -25,6 +33,12 @@ class Sale {
     required this.saleDate,
     required this.paymentMethod,
     required this.receiptNumber,
+    this.customerId = 'guest',
+    this.customerName = 'Guest Customer',
+    this.customerPhone = '',
+    this.customerEmail,
+    this.customerAddress,
+    this.isGuestCustomer = true,
   });
 
   Map<String, dynamic> toMap() {
@@ -40,6 +54,13 @@ class Sale {
       'saleDate': saleDate,
       'paymentMethod': paymentMethod,
       'receiptNumber': receiptNumber,
+      // ✅ Customer Fields
+      'customerId': customerId,
+      'customerName': customerName,
+      'customerPhone': customerPhone,
+      'customerEmail': customerEmail,
+      'customerAddress': customerAddress,
+      'isGuestCustomer': isGuestCustomer,
     };
   }
 
@@ -56,6 +77,86 @@ class Sale {
       saleDate: (map['saleDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
       paymentMethod: map['paymentMethod'] ?? 'Cash',
       receiptNumber: map['receiptNumber'] ?? '',
+      // ✅ Customer Fields
+      customerId: map['customerId'] ?? 'guest',
+      customerName: map['customerName'] ?? 'Guest Customer',
+      customerPhone: map['customerPhone'] ?? '',
+      customerEmail: map['customerEmail'],
+      customerAddress: map['customerAddress'],
+      isGuestCustomer: map['isGuestCustomer'] ?? true,
     );
+  }
+
+  // ========== COPY WITH ==========
+  Sale copyWith({
+    String? id,
+    String? productId,
+    String? productName,
+    int? quantity,
+    double? price,
+    double? costPrice,
+    double? total,
+    double? profit,
+    DateTime? saleDate,
+    String? paymentMethod,
+    String? receiptNumber,
+    String? customerId,
+    String? customerName,
+    String? customerPhone,
+    String? customerEmail,
+    String? customerAddress,
+    bool? isGuestCustomer,
+  }) {
+    return Sale(
+      id: id ?? this.id,
+      productId: productId ?? this.productId,
+      productName: productName ?? this.productName,
+      quantity: quantity ?? this.quantity,
+      price: price ?? this.price,
+      costPrice: costPrice ?? this.costPrice,
+      total: total ?? this.total,
+      profit: profit ?? this.profit,
+      saleDate: saleDate ?? this.saleDate,
+      paymentMethod: paymentMethod ?? this.paymentMethod,
+      receiptNumber: receiptNumber ?? this.receiptNumber,
+      customerId: customerId ?? this.customerId,
+      customerName: customerName ?? this.customerName,
+      customerPhone: customerPhone ?? this.customerPhone,
+      customerEmail: customerEmail ?? this.customerEmail,
+      customerAddress: customerAddress ?? this.customerAddress,
+      isGuestCustomer: isGuestCustomer ?? this.isGuestCustomer,
+    );
+  }
+
+  // ========== HELPER GETTERS ==========
+  
+  // Get customer display name
+  String get customerDisplayName {
+    if (customerName.isNotEmpty && customerName != 'Guest Customer') {
+      return customerName;
+    }
+    if (customerPhone.isNotEmpty) {
+      return customerPhone;
+    }
+    return 'Guest Customer';
+  }
+
+  // Check if sale has valid customer
+  bool get hasValidCustomer => customerId != 'guest' && customerId.isNotEmpty;
+  
+  // Get customer contact info
+  String get customerContact {
+    if (customerPhone.isNotEmpty) return customerPhone;
+    if (customerEmail != null && customerEmail!.isNotEmpty) return customerEmail!;
+    return 'No contact info';
+  }
+
+  // Get formatted customer info for receipt
+  String get customerInfoForReceipt {
+    if (isGuestCustomer) return 'Guest Customer';
+    String info = customerName;
+    if (customerPhone.isNotEmpty) info += ' | $customerPhone';
+    if (customerEmail != null && customerEmail!.isNotEmpty) info += ' | ${customerEmail!}';
+    return info;
   }
 }

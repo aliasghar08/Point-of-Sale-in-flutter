@@ -16,6 +16,11 @@ class AppSettings {
   final bool enableOfflineMode;
   final bool autoSyncData;
   final bool autoDetectCurrency;
+  
+  // ✅ Customer related settings
+  final bool enableCustomerLoyalty;
+  final bool requireCustomerInfo;
+  final int pointsPerCurrency;
 
   AppSettings({
     this.currencySymbol = '₹',
@@ -31,6 +36,10 @@ class AppSettings {
     this.enableOfflineMode = false,
     this.autoSyncData = true,
     this.autoDetectCurrency = true,
+    // ✅ Customer settings defaults
+    this.enableCustomerLoyalty = true,
+    this.requireCustomerInfo = false,
+    this.pointsPerCurrency = 1,
   });
 
   Map<String, dynamic> toMap() {
@@ -48,6 +57,10 @@ class AppSettings {
       'enableOfflineMode': enableOfflineMode,
       'autoSyncData': autoSyncData,
       'autoDetectCurrency': autoDetectCurrency,
+      // ✅ Customer settings
+      'enableCustomerLoyalty': enableCustomerLoyalty,
+      'requireCustomerInfo': requireCustomerInfo,
+      'pointsPerCurrency': pointsPerCurrency,
     };
   }
 
@@ -66,6 +79,10 @@ class AppSettings {
       enableOfflineMode: map['enableOfflineMode'] ?? false,
       autoSyncData: map['autoSyncData'] ?? true,
       autoDetectCurrency: map['autoDetectCurrency'] ?? true,
+      // ✅ Customer settings
+      enableCustomerLoyalty: map['enableCustomerLoyalty'] ?? true,
+      requireCustomerInfo: map['requireCustomerInfo'] ?? false,
+      pointsPerCurrency: map['pointsPerCurrency'] ?? 1,
     );
   }
 
@@ -83,6 +100,10 @@ class AppSettings {
     bool? enableOfflineMode,
     bool? autoSyncData,
     bool? autoDetectCurrency,
+    // ✅ Customer settings
+    bool? enableCustomerLoyalty,
+    bool? requireCustomerInfo,
+    int? pointsPerCurrency,
   }) {
     return AppSettings(
       currencySymbol: currencySymbol ?? this.currencySymbol,
@@ -98,6 +119,10 @@ class AppSettings {
       enableOfflineMode: enableOfflineMode ?? this.enableOfflineMode,
       autoSyncData: autoSyncData ?? this.autoSyncData,
       autoDetectCurrency: autoDetectCurrency ?? this.autoDetectCurrency,
+      // ✅ Customer settings
+      enableCustomerLoyalty: enableCustomerLoyalty ?? this.enableCustomerLoyalty,
+      requireCustomerInfo: requireCustomerInfo ?? this.requireCustomerInfo,
+      pointsPerCurrency: pointsPerCurrency ?? this.pointsPerCurrency,
     );
   }
 
@@ -341,12 +366,12 @@ class AppSettings {
         }
       }
 
-      // Default to India (INR) if detection fails
-      print('⚠️ Using default currency: ₹ (INR)');
-      return {'symbol': '₹', 'code': 'INR'};
+      // Default to Pakistan (PKR) if detection fails
+      print('⚠️ Using default currency: ₨ (PKR)');
+      return {'symbol': '₨', 'code': 'PKR'};
     } catch (e) {
       print('❌ Currency detection error: $e');
-      return {'symbol': '₹', 'code': 'INR'};
+      return {'symbol': '₨', 'code': 'PKR'};
     }
   }
 
@@ -356,12 +381,16 @@ class AppSettings {
     return AppSettings(
       currencySymbol: currency['symbol']!,
       currencyCode: currency['code']!,
-      autoDetectCurrency: true, // Enable auto-detect by default
+      autoDetectCurrency: true,
+      // ✅ Customer settings with defaults
+      enableCustomerLoyalty: true,
+      requireCustomerInfo: false,
+      pointsPerCurrency: 1,
     );
   }
 
-  // Get default currency (fallback to India)
+  // Get default currency (fallback to Pakistan)
   static Map<String, String> getDefaultCurrency() {
-    return {'symbol': '₹', 'code': 'INR'};
+    return {'symbol': '₨', 'code': 'PKR'};
   }
 }

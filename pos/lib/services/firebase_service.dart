@@ -575,6 +575,306 @@ class FirebaseService {
     }
   }
 
+  // ✅ getAllSales - Get all sales from business (for small to medium datasets)
+  Future<QuerySnapshot> getAllSales() async {
+    try {
+      if (!isAuthenticated) {
+        throw Exception('User not authenticated');
+      }
+
+      final businessId = await getCurrentBusinessId();
+      if (businessId == null) {
+        throw Exception('Business not found');
+      }
+
+      final salesRef = _firestore
+          .collection('businesses')
+          .doc(businessId)
+          .collection('sales');
+
+      return await salesRef
+          .orderBy('saleDate', descending: true)
+          .get();
+    } catch (e) {
+      throw Exception('Failed to get sales: $e');
+    }
+  }
+
+  // ✅ getSalesWithFilters - Get sales with server-side filtering (for large datasets)
+  Future<QuerySnapshot> getSalesWithFilters({
+    DateTime? startDate,
+    DateTime? endDate,
+    String? searchQuery,
+    int limit = 100,
+  }) async {
+    try {
+      if (!isAuthenticated) {
+        throw Exception('User not authenticated');
+      }
+
+      final businessId = await getCurrentBusinessId();
+      if (businessId == null) {
+        throw Exception('Business not found');
+      }
+
+      final salesRef = _firestore
+          .collection('businesses')
+          .doc(businessId)
+          .collection('sales');
+
+      Query query = salesRef;
+
+      // Apply date filters
+      if (startDate != null) {
+        query = query.where('saleDate', isGreaterThanOrEqualTo: startDate);
+      }
+      if (endDate != null) {
+        query = query.where('saleDate', isLessThanOrEqualTo: endDate);
+      }
+
+      // Order by date
+      query = query.orderBy('saleDate', descending: true);
+
+      // Apply limit
+      if (limit > 0) {
+        query = query.limit(limit);
+      }
+
+      return await query.get();
+    } catch (e) {
+      throw Exception('Failed to get filtered sales: $e');
+    }
+  }
+
+  // ✅ getSalesByDateRange - Get sales for a specific date range
+  Future<QuerySnapshot> getSalesByDateRange({
+    required DateTime startDate,
+    required DateTime endDate,
+    int limit = 100,
+  }) async {
+    try {
+      if (!isAuthenticated) {
+        throw Exception('User not authenticated');
+      }
+
+      final businessId = await getCurrentBusinessId();
+      if (businessId == null) {
+        throw Exception('Business not found');
+      }
+
+      final salesRef = _firestore
+          .collection('businesses')
+          .doc(businessId)
+          .collection('sales');
+
+      return await salesRef
+          .where('saleDate', isGreaterThanOrEqualTo: startDate)
+          .where('saleDate', isLessThanOrEqualTo: endDate)
+          .orderBy('saleDate', descending: true)
+          .limit(limit)
+          .get();
+    } catch (e) {
+      throw Exception('Failed to get sales by date range: $e');
+    }
+  }
+
+  // ✅ getTodaySales - Get today's sales only
+  Future<QuerySnapshot> getTodaySales() async {
+    try {
+      final now = DateTime.now();
+      final startOfDay = DateTime(now.year, now.month, now.day);
+      final endOfDay = DateTime(now.year, now.month, now.day, 23, 59, 59);
+      return await getSalesByDateRange(
+        startDate: startOfDay,
+        endDate: endOfDay,
+        limit: 500,
+      );
+    } catch (e) {
+      throw Exception('Failed to get today\'s sales: $e');
+    }
+  }
+
+  // ✅ getWeekSales - Get this week's sales
+  Future<QuerySnapshot> getWeekSales() async {
+    try {
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final weekStart = today.subtract(Duration(days: now.weekday - 1));
+      final weekEnd = today.add(Duration(days: 7 - now.weekday));
+      final endOfDay = DateTime(weekEnd.year, weekEnd.month, weekEnd.day, 23, 59, 59);
+      
+      return await getSalesByDateRange(
+        startDate: weekStart,
+        endDate: endOfDay,
+        limit: 500,
+      );
+    } catch (e) {
+      throw Exception('Failed to get week sales: $e');
+    }
+  }
+
+  // ✅ getMonthSales - Get this month's sales
+  Future<QuerySnapshot> getMonthSales() async {
+    try {
+      final now = DateTime.now();
+      final monthStart = DateTime(now.year, now.month, 1);
+      final monthEnd = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
+      
+      return await getSalesByDateRange(
+        startDate: monthStart,
+        endDate: monthEnd,
+        limit: 500,
+      );
+    } catch (e) {
+      throw Exception('Failed to get month sales: $e');
+    }
+  }
+
+  // ==================== CUSTOMERS ====================
+
+  // ✅ Get all customers from sales (unique customers)
+  Future<List<Map<String, dynamic>>> getCustomers() async {
+    try {
+      if (!isAuthenticated) {
+        throw Exception('User not authenticated');
+      }
+
+      final businessId = await getCurrentBusinessId();
+      if (businessId == null) {
+        throw Exception('Business not found');
+      }
+
+      final salesSnapshot = await _firestore
+          .collection('businesses')
+          .doc(businessId)
+          .collection('sales')
+          .get();
+
+      final Map<String, Map<String, dynamic>> customerMap = {};
+
+      for (var doc in salesSnapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        final customerId = data['customerId'] ?? 'guest';
+        final isGuest = data['isGuestCustomer'] ?? true;
+
+        if (isGuest || customerId == 'guest' || customerId.isEmpty) continue;
+
+        if (customerMap.containsKey(customerId)) {
+          final existing = customerMap[customerId]!;
+          existing['totalSpent'] = (existing['totalSpent'] ?? 0.0) + (data['total'] ?? 0.0);
+          existing['totalOrders'] = (existing['totalOrders'] ?? 0) + 1;
+          existing['lastPurchaseDate'] = data['saleDate'];
+        } else {
+          customerMap[customerId] = {
+            'id': customerId,
+            'name': data['customerName'] ?? 'Unknown Customer',
+            'email': data['customerEmail'] ?? '',
+            'phone': data['customerPhone'] ?? '',
+            'address': data['customerAddress'] ?? '',
+            'totalSpent': data['total'] ?? 0.0,
+            'totalOrders': 1,
+            'lastPurchaseDate': data['saleDate'],
+            'createdAt': data['saleDate'],
+            'isActive': true,
+          };
+        }
+      }
+
+      return customerMap.values.toList();
+    } catch (e) {
+      throw Exception('Failed to get customers: $e');
+    }
+  }
+
+  // ✅ Get a single customer by ID
+  Future<Map<String, dynamic>?> getCustomerById(String customerId) async {
+    try {
+      if (!isAuthenticated) {
+        throw Exception('User not authenticated');
+      }
+
+      final businessId = await getCurrentBusinessId();
+      if (businessId == null) {
+        throw Exception('Business not found');
+      }
+
+      final salesSnapshot = await _firestore
+          .collection('businesses')
+          .doc(businessId)
+          .collection('sales')
+          .where('customerId', isEqualTo: customerId)
+          .orderBy('saleDate', descending: true)
+          .get();
+
+      if (salesSnapshot.docs.isEmpty) return null;
+
+      final firstSale = salesSnapshot.docs.first.data() as Map<String, dynamic>;
+      double totalSpent = 0;
+
+      for (var doc in salesSnapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        totalSpent += (data['total'] ?? 0.0).toDouble();
+      }
+
+      return {
+        'id': customerId,
+        'name': firstSale['customerName'] ?? 'Unknown Customer',
+        'email': firstSale['customerEmail'] ?? '',
+        'phone': firstSale['customerPhone'] ?? '',
+        'address': firstSale['customerAddress'] ?? '',
+        'totalSpent': totalSpent,
+        'totalOrders': salesSnapshot.docs.length,
+        'lastPurchaseDate': firstSale['saleDate'],
+        'createdAt': firstSale['saleDate'],
+        'isActive': true,
+      };
+    } catch (e) {
+      throw Exception('Failed to get customer: $e');
+    }
+  }
+
+  // ✅ Search customers by name, phone, or email
+  Future<List<Map<String, dynamic>>> searchCustomers(String query) async {
+    try {
+      if (query.isEmpty) return [];
+      
+      final allCustomers = await getCustomers();
+      final searchTerm = query.toLowerCase().trim();
+      
+      return allCustomers.where((customer) {
+        return customer['name'].toLowerCase().contains(searchTerm) ||
+            customer['phone'].contains(searchTerm) ||
+            customer['email'].toLowerCase().contains(searchTerm);
+      }).toList();
+    } catch (e) {
+      throw Exception('Failed to search customers: $e');
+    }
+  }
+
+  // ✅ Get sales for a specific customer
+  Future<QuerySnapshot> getCustomerSales(String customerId) async {
+    try {
+      if (!isAuthenticated) {
+        throw Exception('User not authenticated');
+      }
+
+      final businessId = await getCurrentBusinessId();
+      if (businessId == null) {
+        throw Exception('Business not found');
+      }
+
+      return await _firestore
+          .collection('businesses')
+          .doc(businessId)
+          .collection('sales')
+          .where('customerId', isEqualTo: customerId)
+          .orderBy('saleDate', descending: true)
+          .get();
+    } catch (e) {
+      throw Exception('Failed to get customer sales: $e');
+    }
+  }
+
   // ==================== BUSINESS METHODS ====================
 
   // ✅ Create a business and link the current user
@@ -645,165 +945,6 @@ class FirebaseService {
       return null;
     }
   }
-
-
-// Get all sales from business
-// Add these methods to the SALES section in FirebaseService
-
-// ✅ getAllSales - Get all sales from business (for small to medium datasets)
-Future<QuerySnapshot> getAllSales() async {
-  try {
-    if (!isAuthenticated) {
-      throw Exception('User not authenticated');
-    }
-
-    final businessId = await getCurrentBusinessId();
-    if (businessId == null) {
-      throw Exception('Business not found');
-    }
-
-    final salesRef = _firestore
-        .collection('businesses')
-        .doc(businessId)
-        .collection('sales');
-
-    return await salesRef
-        .orderBy('saleDate', descending: true)
-        .get();
-  } catch (e) {
-    throw Exception('Failed to get sales: $e');
-  }
-}
-
-// ✅ getSalesWithFilters - Get sales with server-side filtering (for large datasets)
-Future<QuerySnapshot> getSalesWithFilters({
-  DateTime? startDate,
-  DateTime? endDate,
-  String? searchQuery,
-  int limit = 100,
-}) async {
-  try {
-    if (!isAuthenticated) {
-      throw Exception('User not authenticated');
-    }
-
-    final businessId = await getCurrentBusinessId();
-    if (businessId == null) {
-      throw Exception('Business not found');
-    }
-
-    final salesRef = _firestore
-        .collection('businesses')
-        .doc(businessId)
-        .collection('sales');
-
-    Query query = salesRef;
-
-    // Apply date filters
-    if (startDate != null) {
-      query = query.where('saleDate', isGreaterThanOrEqualTo: startDate);
-    }
-    if (endDate != null) {
-      query = query.where('saleDate', isLessThanOrEqualTo: endDate);
-    }
-
-    // Order by date
-    query = query.orderBy('saleDate', descending: true);
-
-    // Apply limit
-    if (limit > 0) {
-      query = query.limit(limit);
-    }
-
-    return await query.get();
-  } catch (e) {
-    throw Exception('Failed to get filtered sales: $e');
-  }
-}
-
-// ✅ getSalesByDateRange - Get sales for a specific date range
-Future<QuerySnapshot> getSalesByDateRange({
-  required DateTime startDate,
-  required DateTime endDate,
-  int limit = 100,
-}) async {
-  try {
-    if (!isAuthenticated) {
-      throw Exception('User not authenticated');
-    }
-
-    final businessId = await getCurrentBusinessId();
-    if (businessId == null) {
-      throw Exception('Business not found');
-    }
-
-    final salesRef = _firestore
-        .collection('businesses')
-        .doc(businessId)
-        .collection('sales');
-
-    return await salesRef
-        .where('saleDate', isGreaterThanOrEqualTo: startDate)
-        .where('saleDate', isLessThanOrEqualTo: endDate)
-        .orderBy('saleDate', descending: true)
-        .limit(limit)
-        .get();
-  } catch (e) {
-    throw Exception('Failed to get sales by date range: $e');
-  }
-}
-
-// ✅ getTodaySales - Get today's sales only
-Future<QuerySnapshot> getTodaySales() async {
-  try {
-    final now = DateTime.now();
-    final startOfDay = DateTime(now.year, now.month, now.day);
-    final endOfDay = DateTime(now.year, now.month, now.day, 23, 59, 59);
-    return await getSalesByDateRange(
-      startDate: startOfDay,
-      endDate: endOfDay,
-      limit: 500,
-    );
-  } catch (e) {
-    throw Exception('Failed to get today\'s sales: $e');
-  }
-}
-
-// ✅ getWeekSales - Get this week's sales
-Future<QuerySnapshot> getWeekSales() async {
-  try {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final weekStart = today.subtract(Duration(days: now.weekday - 1));
-    final weekEnd = today.add(Duration(days: 7 - now.weekday));
-    final endOfDay = DateTime(weekEnd.year, weekEnd.month, weekEnd.day, 23, 59, 59);
-    
-    return await getSalesByDateRange(
-      startDate: weekStart,
-      endDate: endOfDay,
-      limit: 500,
-    );
-  } catch (e) {
-    throw Exception('Failed to get week sales: $e');
-  }
-}
-
-// ✅ getMonthSales - Get this month's sales
-Future<QuerySnapshot> getMonthSales() async {
-  try {
-    final now = DateTime.now();
-    final monthStart = DateTime(now.year, now.month, 1);
-    final monthEnd = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
-    
-    return await getSalesByDateRange(
-      startDate: monthStart,
-      endDate: monthEnd,
-      limit: 500,
-    );
-  } catch (e) {
-    throw Exception('Failed to get month sales: $e');
-  }
-}
 
   // ✅ Get Firestore instance for batch operations
   FirebaseFirestore get firestore => _firestore;

@@ -4,8 +4,6 @@ import 'package:pos/widgets/barcode_scanner.dart';
 import 'package:pos/widgets/qr_scanner.dart';
 import 'package:pos/widgets/voice_input.dart';
 import 'package:pos/models/product.dart';
-import 'package:pos/models/sale.dart';
-import 'package:intl/intl.dart';
 import 'package:pos/services/firebase_service.dart';
 import 'package:pos/providers/settings_provider.dart';
 import 'package:provider/provider.dart';
@@ -30,7 +28,14 @@ class _HomeScreenState extends State<HomeScreen> {
   double _totalProfit = 0.0;
   bool _isLoading = false;
   String _selectedPaymentMethod = 'Cash';
-  bool _useAutocomplete = true;
+
+  // ✅ Customer Info for checkout
+  String _customerId = 'guest';
+  String _customerName = 'Guest Customer';
+  String _customerPhone = '';
+  String? _customerEmail;
+  String? _customerAddress;
+  bool _isGuestCustomer = true;
 
   final List<String> _paymentMethods = [
     'Cash',
@@ -90,116 +95,16 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       child: Column(
         children: [
-          // Search Mode Toggle
-          Row(
-            children: [
-              Expanded(
-                child: ToggleButtons(
-                  isSelected: [_useAutocomplete, !_useAutocomplete],
-                  onPressed: (index) {
-                    setState(() {
-                      _useAutocomplete = index == 0;
-                      _searchController.clear();
-                      _searchFocusNode.unfocus();
-                    });
-                  },
-                  borderRadius: BorderRadius.circular(8),
-                  selectedColor: isDarkMode
-                      ? Colors.white
-                      : Colors.blue.shade700,
-                  fillColor: isDarkMode
-                      ? Colors.blue.shade900.withOpacity(0.3)
-                      : Colors.blue.shade50,
-                  selectedBorderColor: isDarkMode
-                      ? Colors.blue.shade400
-                      : Colors.blue.shade700,
-                  borderColor: isDarkMode
-                      ? Colors.grey.shade700
-                      : Colors.grey.shade300,
-                  children: const [
-                    Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      child: Text('Smart Search'),
-                    ),
-                    Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      child: Text('Manual Search'),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-
           // Search Input
           Row(
             children: [
               Expanded(
-                child: _useAutocomplete
-                    ? ProductAutocomplete(
-                        onProductSelected: (productName) {
-                          _searchProduct(productName);
-                        },
-                        hintText: 'Search product by name...',
-                      )
-                    : TextField(
-                        controller: _searchController,
-                        focusNode: _searchFocusNode,
-                        style: TextStyle(
-                          color: isDarkMode ? Colors.white : Colors.black,
-                        ),
-                        decoration: InputDecoration(
-                          hintText: 'Search by barcode or QR code',
-                          hintStyle: TextStyle(
-                            color: isDarkMode
-                                ? Colors.grey.shade400
-                                : Colors.grey.shade600,
-                          ),
-                          prefixIcon: Icon(
-                            Icons.search,
-                            color: isDarkMode
-                                ? Colors.grey.shade400
-                                : Colors.grey.shade600,
-                          ),
-                          suffixIcon: _searchController.text.isNotEmpty
-                              ? IconButton(
-                                  icon: Icon(
-                                    Icons.clear,
-                                    color: isDarkMode
-                                        ? Colors.grey.shade400
-                                        : Colors.grey.shade600,
-                                  ),
-                                  onPressed: () {
-                                    _searchController.clear();
-                                    _searchFocusNode.unfocus();
-                                  },
-                                )
-                              : null,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none,
-                          ),
-                          filled: true,
-                          fillColor: isDarkMode
-                              ? Colors.grey.shade800
-                              : Colors.grey.shade50,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                          ),
-                        ),
-                        onSubmitted: (value) {
-                          if (value.isNotEmpty) {
-                            _searchProduct(value);
-                          }
-                        },
-                      ),
+                child: ProductAutocomplete(
+                  onProductSelected: (productName) {
+                    _searchProduct(productName);
+                  },
+                  hintText: 'Search product by name...',
+                ),
               ),
               const SizedBox(width: 8),
               // QR Scanner Button
@@ -266,57 +171,54 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
           ),
-
-          // Category Quick Filters (only for Smart Search)
-          if (_useAutocomplete) ...[
-            const SizedBox(height: 8),
-            SizedBox(
-              height: 36,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                children: [
-                  _buildCategoryChip('All', null, isDarkMode),
-                  ...ProductReference.getCategories().map(
-                    (category) =>
-                        _buildCategoryChip(category, category, isDarkMode),
-                  ),
-                ],
-              ),
+          const SizedBox(height: 8),
+          // Category Quick Filters
+          SizedBox(
+            height: 36,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              children: [
+                _buildCategoryChip('All', null, isDarkMode),
+                ...ProductReference.getCategories().map(
+                  (category) =>
+                      _buildCategoryChip(category, category, isDarkMode),
+                ),
+              ],
             ),
-          ],
+          ),
         ],
       ),
     );
   }
 
   Widget _buildCategoryChip(String label, String? category, bool isDarkMode) {
-  return Padding(
-    padding: const EdgeInsets.only(right: 8),
-    child: FilterChip(
-      label: Text(
-        label,
-        style: TextStyle(
-          fontSize: 12,
-          color: isDarkMode ? Colors.white : Colors.black,
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: FilterChip(
+        label: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            color: isDarkMode ? Colors.white : Colors.black,
+          ),
+        ),
+        selected: false,
+        onSelected: (selected) {
+          // Category filtering can be implemented here
+        },
+        backgroundColor: isDarkMode
+            ? Colors.grey.shade800
+            : Colors.grey.shade100,
+        selectedColor: isDarkMode ? Colors.blue.shade900 : Colors.blue.shade100,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(
+            color: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade300,
+          ),
         ),
       ),
-      selected: false,
-      onSelected: (selected) {
-        // Category filtering can be implemented here
-      },
-      backgroundColor: isDarkMode
-          ? Colors.grey.shade800
-          : Colors.grey.shade100,
-      selectedColor: isDarkMode ? Colors.blue.shade900 : Colors.blue.shade100,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-        side: BorderSide(
-          color: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade300,
-        ),
-      ),
-    ),
-  );
-}
+    );
+  }
 
   // ==================== CART LIST ====================
   Widget _buildCartList(String currencySymbol, bool isDarkMode) {
@@ -694,16 +596,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
       if (results[0].docs.isNotEmpty) {
         _addProductToCart(results[0].docs.first);
-        _searchController.clear();
-        _searchFocusNode.unfocus();
         if (mounted) setState(() => _isLoading = false);
         return;
       }
 
       if (results[1].docs.isNotEmpty) {
         _addProductToCart(results[1].docs.first);
-        _searchController.clear();
-        _searchFocusNode.unfocus();
         if (mounted) setState(() => _isLoading = false);
         return;
       }
@@ -1064,6 +962,109 @@ class _HomeScreenState extends State<HomeScreen> {
     _totalProfit = _cartItems.fold(0.0, (sum, item) => sum + ((item.price - item.costPrice) * item.stock));
   }
 
+  // ==================== SHOW CUSTOMER DIALOG ====================
+  Future<void> _showCustomerDialog() async {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
+    // For now, show a simple dialog to enter customer name and phone
+    // Later, you can replace this with a full customer search/selection
+    final nameController = TextEditingController(text: _customerName);
+    final phoneController = TextEditingController(text: _customerPhone);
+    final emailController = TextEditingController(text: _customerEmail ?? '');
+    
+    return showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          'Customer Info',
+          style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+        ),
+        backgroundColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+              decoration: InputDecoration(
+                labelText: 'Customer Name',
+                labelStyle: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                border: const OutlineInputBorder(),
+                prefixIcon: const Icon(Icons.person),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: phoneController,
+              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+              decoration: InputDecoration(
+                labelText: 'Phone Number',
+                labelStyle: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                border: const OutlineInputBorder(),
+                prefixIcon: const Icon(Icons.phone),
+              ),
+              keyboardType: TextInputType.phone,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: emailController,
+              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+              decoration: InputDecoration(
+                labelText: 'Email (optional)',
+                labelStyle: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                border: const OutlineInputBorder(),
+                prefixIcon: const Icon(Icons.email),
+              ),
+              keyboardType: TextInputType.emailAddress,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              // Set as guest
+              setState(() {
+                _customerId = 'guest';
+                _customerName = 'Guest Customer';
+                _customerPhone = '';
+                _customerEmail = null;
+                _isGuestCustomer = true;
+              });
+              Navigator.pop(context);
+              _showSnackBar('Set as Guest Customer');
+            },
+            child: Text(
+              'Guest',
+              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              setState(() {
+                _customerId = 'customer_${DateTime.now().millisecondsSinceEpoch}';
+                _customerName = nameController.text.trim().isNotEmpty 
+                    ? nameController.text.trim() 
+                    : 'Guest Customer';
+                _customerPhone = phoneController.text.trim();
+                _customerEmail = emailController.text.trim().isNotEmpty 
+                    ? emailController.text.trim() 
+                    : null;
+                _isGuestCustomer = _customerName == 'Guest Customer';
+              });
+              Navigator.pop(context);
+              _showSnackBar('Customer set: ${_customerName}');
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Set Customer'),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ==================== CHECKOUT PROCESS ====================
   void _processCheckout() async {
     if (_cartItems.isEmpty) return;
@@ -1071,13 +1072,21 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // 1. Get product IDs for stock check
+      // 1. Show customer dialog first
+      await _showCustomerDialog();
+      
+      // If still guest, continue
+      if (_isGuestCustomer && _customerName == 'Guest Customer') {
+        // Using guest customer
+      }
+
+      // 2. Get product IDs for stock check
       final productIds = _cartItems.map((item) => item.id).toList();
       
-      // 2. Fetch all products at once using FirebaseService
+      // 3. Fetch all products at once using FirebaseService
       final productDocs = await _firebaseService.getProductsByIds(productIds);
       
-      // 3. Verify stock availability
+      // 4. Verify stock availability
       for (var item in _cartItems) {
         final doc = productDocs[item.id];
         if (doc == null || !doc.exists) {
@@ -1098,21 +1107,21 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       }
 
-      // 4. Show confirmation dialog
+      // 5. Show confirmation dialog
       final confirm = await _showConfirmationDialog();
       if (!confirm) {
         setState(() => _isLoading = false);
         return;
       }
 
-      // 5. SAVE RECEIPT DATA BEFORE CLEARING CART
+      // 6. SAVE RECEIPT DATA BEFORE CLEARING CART
       final receiptNumber = 'RCP-${DateTime.now().millisecondsSinceEpoch}';
       final receiptCartItems = List<Product>.from(_cartItems);
       final receiptTotalAmount = _totalAmount;
       final receiptTotalProfit = _totalProfit;
       final receiptPaymentMethod = _selectedPaymentMethod;
 
-      // 6. Prepare sales data
+      // 7. Prepare sales data with customer info
       final salesData = _cartItems.map((item) {
         return {
           'productId': item.id,
@@ -1125,38 +1134,50 @@ class _HomeScreenState extends State<HomeScreen> {
           'saleDate': DateTime.now(),
           'paymentMethod': _selectedPaymentMethod,
           'receiptNumber': receiptNumber,
+          // ✅ Customer Fields
+          'customerId': _customerId,
+          'customerName': _customerName,
+          'customerPhone': _customerPhone,
+          'customerEmail': _customerEmail,
+          'customerAddress': _customerAddress,
+          'isGuestCustomer': _isGuestCustomer,
         };
       }).toList();
 
-      // 7. Prepare stock updates (negative values for deduction)
+      // 8. Prepare stock updates (negative values for deduction)
       final stockUpdates = <String, int>{};
       for (var item in _cartItems) {
         stockUpdates[item.id] = -item.stock;
       }
 
-      // 8. Execute batch operations using FirebaseService
+      // 9. Execute batch operations using FirebaseService
       await Future.wait([
         _firebaseService.addMultipleSales(salesData),
         _firebaseService.updateMultipleProductsStock(stockUpdates),
       ]);
 
-      // 9. Clear cart
+      // 10. Clear cart
       setState(() {
         _cartItems.clear();
         _updateTotals();
         _isLoading = false;
       });
 
-      // 10. Show snackbar
+      // 11. Show snackbar
       _showSnackBar('✅ Sale completed! Receipt #$receiptNumber');
 
-      // 11. Show receipt with saved data (NOT the cleared cart)
+      // 12. Show receipt with saved data
       _showReceiptDialog(
         cartItems: receiptCartItems,
         totalAmount: receiptTotalAmount,
         totalProfit: receiptTotalProfit,
         paymentMethod: receiptPaymentMethod,
         receiptNumber: receiptNumber,
+        // ✅ Pass customer info to receipt
+        customerName: _customerName,
+        customerPhone: _customerPhone,
+        customerEmail: _customerEmail,
+        isGuestCustomer: _isGuestCustomer,
       );
       
     } catch (e) {
@@ -1173,6 +1194,10 @@ class _HomeScreenState extends State<HomeScreen> {
     required double totalProfit,
     required String paymentMethod,
     required String receiptNumber,
+    String customerName = 'Guest Customer',
+    String customerPhone = '',
+    String? customerEmail,
+    bool isGuestCustomer = true,
   }) {
     showDialog(
       context: context,
@@ -1182,6 +1207,10 @@ class _HomeScreenState extends State<HomeScreen> {
         totalProfit: totalProfit,
         selectedPaymentMethod: paymentMethod,
         receiptNumber: receiptNumber,
+        customerName: customerName,
+        customerPhone: customerPhone,
+        customerEmail: customerEmail,
+        isGuestCustomer: isGuestCustomer,
       ),
     );
   }
@@ -1313,7 +1342,6 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       builder: (context) => VoiceInput(
         onVoiceRecognized: (text) {
-          _searchController.text = text;
           _searchProduct(text);
         },
       ),

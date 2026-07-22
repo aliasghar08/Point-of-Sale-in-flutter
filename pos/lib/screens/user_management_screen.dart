@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:pos/providers/auth_provider.dart';
+import 'package:intl/intl.dart';
 import 'package:pos/providers/settings_provider.dart';
 import 'package:pos/services/auth_service.dart';
 import 'package:pos/widgets/role_guard.dart';
@@ -57,83 +58,24 @@ class _UserManagementContentState extends State<_UserManagementContent> {
         return;
       }
 
-      print('🔍 Checking user: ${currentUser.uid}');
-
-      final doc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(currentUser.uid)
-          .get();
-
-      if (doc.exists) {
-        final data = doc.data();
-        final role = data?['role'] ?? '';
-        print('✅ User role: $role');
-
-        if (role == 'owner') {
-          setState(() {
-            _hasPermission = true;
-            _errorMessage = null;
-            _isLoading = false;
-          });
-        } else {
-          setState(() {
-            _errorMessage = 'You need owner permissions to manage users. Your role: $role';
-            _isLoading = false;
-          });
-        }
+      final appUser = await _authService.getCurrentUserData();
+      
+      if (appUser != null && appUser.role == 'owner') {
+        setState(() {
+          _hasPermission = true;
+          _errorMessage = null;
+          _isLoading = false;
+        });
       } else {
-        // If user document doesn't exist, create one with owner role
-        await _createUserDocument(currentUser);
+        setState(() {
+          _errorMessage = 'You need owner permissions to manage users. Your role: ${appUser?.role ?? 'unknown'}';
+          _isLoading = false;
+        });
       }
     } catch (e) {
       print('❌ Error checking permissions: $e');
       setState(() {
         _errorMessage = 'Error checking permissions: $e';
-        _isLoading = false;
-      });
-    }
-  }
-
-  // ========== CREATE USER DOCUMENT IF MISSING ==========
-  Future<void> _createUserDocument(firebase_auth.User user) async {
-    try {
-      print('📝 Creating user document...');
-      
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .set({
-        'id': user.uid,
-        'email': user.email ?? '',
-        'name': user.displayName ?? 'User',
-        'role': 'owner',
-        'phone': '',
-        'storeName': 'My Store',
-        'createdAt': FieldValue.serverTimestamp(),
-        'isActive': true,
-      });
-      
-      print('✅ User document created with role: owner');
-      
-      setState(() {
-        _hasPermission = true;
-        _errorMessage = null;
-        _isLoading = false;
-      });
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ User document created successfully!'),
-            backgroundColor: Colors.green,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    } catch (e) {
-      print('❌ Error creating user document: $e');
-      setState(() {
-        _errorMessage = 'Failed to create user document: $e';
         _isLoading = false;
       });
     }
@@ -255,19 +197,11 @@ class _UserManagementContentState extends State<_UserManagementContent> {
 
   // ========== USER LIST ==========
   Widget _buildUserList(bool isDarkMode) {
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('users')
-          .orderBy('createdAt', descending: true)
-          .snapshots()
-          .handleError((error) {
-            print('❌ Stream error: $error');
-            // Don't show snackbar here - let the builder handle it
-          }),
+    return FutureBuilder<List<AppUser>>(
+      future: _authService.getAllUsers(),
       builder: (context, snapshot) {
-        // ===== HANDLE ERROR =====
         if (snapshot.hasError) {
-          print('❌ Stream has error: ${snapshot.error}');
+          print('❌ Error loading users: ${snapshot.error}');
           return Center(
             child: Padding(
               padding: const EdgeInsets.all(24.0),
@@ -309,23 +243,12 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                       foregroundColor: Colors.white,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  TextButton(
-                    onPressed: _checkUserPermissions,
-                    child: Text(
-                      'Check Permissions',
-                      style: TextStyle(
-                        color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
-                      ),
-                    ),
-                  ),
                 ],
               ),
             ),
           );
         }
 
-        // ===== LOADING =====
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Center(
             child: CircularProgressIndicator(
@@ -334,8 +257,7 @@ class _UserManagementContentState extends State<_UserManagementContent> {
           );
         }
 
-        // ===== EMPTY STATE =====
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -378,20 +300,17 @@ class _UserManagementContentState extends State<_UserManagementContent> {
           );
         }
 
-        // ===== USER LIST =====
-        List<AppUser> users = snapshot.data!.docs.map((doc) {
-          return AppUser.fromMap(
-            doc.data() as Map<String, dynamic>,
-            doc.id,
-          );
-        }).toList();
-
+        final users = snapshot.data!;
         return ListView.builder(
           padding: const EdgeInsets.all(16),
           itemCount: users.length,
           itemBuilder: (context, index) {
             final user = users[index];
-            return _buildUserCard(context, user, isDarkMode);
+            return InkWell(
+              onTap: () => _showUserDetailsDialog(context, user, isDarkMode),
+              borderRadius: BorderRadius.circular(12),
+              child: _buildUserCard(context, user, isDarkMode),
+            );
           },
         );
       },
@@ -402,6 +321,8 @@ class _UserManagementContentState extends State<_UserManagementContent> {
   Widget _buildUserCard(BuildContext context, AppUser user, bool isDarkMode) {
     final authProvider = Provider.of<AuthProvider>(context);
     final isCurrentUser = authProvider.currentUser?.id == user.id;
+
+    final initial = user.name.isNotEmpty ? user.name.substring(0, 1).toUpperCase() : 'U';
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -418,7 +339,7 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                   ? (isDarkMode ? Colors.green.shade900 : Colors.green.shade100)
                   : (isDarkMode ? Colors.red.shade900 : Colors.red.shade100),
               child: Text(
-                user.name.substring(0, 1).toUpperCase(),
+                initial,
                 style: TextStyle(
                   color: user.isActive
                       ? (isDarkMode ? Colors.green.shade400 : Colors.green)
@@ -520,6 +441,38 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                             ),
                           ),
                         ),
+                      if (user.businessId != null && user.businessId!.isNotEmpty)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isDarkMode
+                                ? Colors.purple.shade900.withOpacity(0.5)
+                                : Colors.purple.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.business,
+                                size: 10,
+                                color: isDarkMode ? Colors.purple.shade400 : Colors.purple,
+                              ),
+                              const SizedBox(width: 2),
+                              Text(
+                                'Business',
+                                style: TextStyle(
+                                  color: isDarkMode ? Colors.purple.shade400 : Colors.purple,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                     ],
                   ),
                 ],
@@ -613,6 +566,211 @@ class _UserManagementContentState extends State<_UserManagementContent> {
     );
   }
 
+  // ========== USER DETAILS DIALOG ==========
+  void _showUserDetailsDialog(BuildContext context, AppUser user, bool isDarkMode) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            CircleAvatar(
+              backgroundColor: user.isActive
+                  ? (isDarkMode ? Colors.green.shade900 : Colors.green.shade100)
+                  : (isDarkMode ? Colors.red.shade900 : Colors.red.shade100),
+              radius: 24,
+              child: Text(
+                user.name.isNotEmpty ? user.name.substring(0, 1).toUpperCase() : 'U',
+                style: TextStyle(
+                  color: user.isActive
+                      ? (isDarkMode ? Colors.green.shade400 : Colors.green)
+                      : (isDarkMode ? Colors.red.shade400 : Colors.red),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 20,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    user.name,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: isDarkMode ? Colors.white : Colors.black,
+                    ),
+                  ),
+                  Text(
+                    user.roleDisplay,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: user.isActive
+                          ? (isDarkMode ? Colors.green.shade400 : Colors.green)
+                          : (isDarkMode ? Colors.red.shade400 : Colors.red),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              icon: Icon(
+                Icons.close,
+                color: isDarkMode ? Colors.white : Colors.black,
+              ),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ],
+        ),
+        backgroundColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildDetailItem(
+                icon: Icons.email,
+                label: 'Email',
+                value: user.email,
+                isDarkMode: isDarkMode,
+              ),
+              _buildDetailItem(
+                icon: Icons.phone,
+                label: 'Phone',
+                value: user.phone.isEmpty ? 'Not provided' : user.phone,
+                isDarkMode: isDarkMode,
+              ),
+              _buildDetailItem(
+                icon: Icons.business,
+                label: 'Business ID',
+                value: user.businessId?.isEmpty ?? true ? 'Not assigned' : user.businessId!,
+                isDarkMode: isDarkMode,
+              ),
+              _buildDetailItem(
+                icon: Icons.calendar_today,
+                label: 'Joined',
+                value: DateFormat('dd MMM yyyy, hh:mm a').format(user.createdAt),
+                isDarkMode: isDarkMode,
+              ),
+              _buildDetailItem(
+                icon: Icons.person,
+                label: 'User ID',
+                value: user.id,
+                isDarkMode: isDarkMode,
+                isCode: true,
+              ),
+              _buildDetailItem(
+                icon: user.isActive ? Icons.check_circle : Icons.block,
+                label: 'Status',
+                value: user.isActive ? 'Active' : 'Inactive',
+                isDarkMode: isDarkMode,
+                valueColor: user.isActive
+                    ? (isDarkMode ? Colors.green.shade400 : Colors.green)
+                    : (isDarkMode ? Colors.red.shade400 : Colors.red),
+              ),
+              _buildDetailItem(
+                icon: Icons.security,
+                label: 'Permissions',
+                value: _getPermissionsList(user),
+                isDarkMode: isDarkMode,
+                isMultiline: true,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Close',
+              style: TextStyle(
+                color: isDarkMode ? Colors.white : Colors.black,
+              ),
+            ),
+          ),
+          if (user.role != 'owner')
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.pop(context);
+                _showEditUserDialog(context, user);
+              },
+              icon: const Icon(Icons.edit),
+              label: const Text('Edit Role'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+                foregroundColor: Colors.white,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // ========== DETAIL ITEM ==========
+  Widget _buildDetailItem({
+    required IconData icon,
+    required String label,
+    required String value,
+    required bool isDarkMode,
+    Color? valueColor,
+    bool isCode = false,
+    bool isMultiline = false,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            icon,
+            size: 20,
+            color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: isMultiline ? 13 : 14,
+                    fontWeight: isMultiline ? FontWeight.normal : FontWeight.w500,
+                    color: valueColor ?? (isDarkMode ? Colors.white : Colors.black),
+                    fontFamily: isCode ? 'monospace' : null,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ========== GET PERMISSIONS LIST ==========
+  String _getPermissionsList(AppUser user) {
+    List<String> permissions = [];
+    
+    if (user.canProcessSales) permissions.add('Process Sales');
+    if (user.canManageInventory) permissions.add('Manage Inventory');
+    if (user.canViewReports) permissions.add('View Reports');
+    if (user.canManageUsers) permissions.add('Manage Users');
+    
+    return permissions.isEmpty ? 'No permissions' : permissions.join('\n• ');
+  }
+
   Color _getRoleColor(String role, bool isDarkMode) {
     switch (role) {
       case 'owner':
@@ -634,6 +792,7 @@ class _UserManagementContentState extends State<_UserManagementContent> {
     final _emailController = TextEditingController();
     final _passwordController = TextEditingController();
     final _phoneController = TextEditingController();
+    final _storeNameController = TextEditingController();
     String _selectedRole = 'worker';
 
     showDialog(
@@ -744,6 +903,28 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                   keyboardType: TextInputType.phone,
                 ),
                 const SizedBox(height: 12),
+                TextFormField(
+                  controller: _storeNameController,
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.white : Colors.black,
+                  ),
+                  decoration: InputDecoration(
+                    labelText: 'Store Name *',
+                    labelStyle: TextStyle(
+                      color: isDarkMode ? Colors.white : Colors.black,
+                    ),
+                    border: const OutlineInputBorder(),
+                    fillColor: isDarkMode ? Colors.grey.shade700 : Colors.white,
+                    filled: true,
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter store name';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
                   value: _selectedRole,
                   decoration: const InputDecoration(
@@ -792,7 +973,7 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                     name: _nameController.text.trim(),
                     role: _selectedRole,
                     phone: _phoneController.text.trim(),
-                    storeName: '',
+                    storeName: _storeNameController.text.trim(),
                   );
                   
                   Navigator.pop(context);
@@ -815,7 +996,7 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text(
-                          'Error: $e',
+                          'Error: ${e.toString().replaceFirst('Exception: ', '')}',
                           style: TextStyle(
                             color: isDarkMode ? Colors.white : Colors.black,
                           ),
@@ -934,7 +1115,7 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(
-                        'Error: $e',
+                        'Error: ${e.toString().replaceFirst('Exception: ', '')}',
                         style: TextStyle(
                           color: isDarkMode ? Colors.white : Colors.black,
                         ),
@@ -1017,7 +1198,7 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(
-                        'Error: $e',
+                        'Error: ${e.toString().replaceFirst('Exception: ', '')}',
                         style: TextStyle(
                           color: isDarkMode ? Colors.white : Colors.black,
                         ),
@@ -1037,9 +1218,6 @@ class _UserManagementContentState extends State<_UserManagementContent> {
             ),
             child: Text(
               user.isActive ? 'Deactivate' : 'Activate',
-              style: TextStyle(
-                color: isDarkMode ? Colors.white : Colors.white,
-              ),
             ),
           ),
         ],
@@ -1081,10 +1259,21 @@ class _UserManagementContentState extends State<_UserManagementContent> {
           ElevatedButton(
             onPressed: () async {
               try {
+                final currentUser = await _authService.getCurrentUserData();
+                if (currentUser?.businessId != null) {
+                  await FirebaseFirestore.instance
+                      .collection('businesses')
+                      .doc(currentUser!.businessId)
+                      .collection('users')
+                      .doc(user.id)
+                      .delete();
+                }
+                
                 await FirebaseFirestore.instance
-                    .collection('users')
+                    .collection('userBusinessLookup')
                     .doc(user.id)
                     .delete();
+                    
                 Navigator.pop(context);
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -1105,7 +1294,7 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(
-                        'Error: $e',
+                        'Error: ${e.toString().replaceFirst('Exception: ', '')}',
                         style: TextStyle(
                           color: isDarkMode ? Colors.white : Colors.black,
                         ),

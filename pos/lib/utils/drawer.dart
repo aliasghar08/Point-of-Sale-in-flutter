@@ -3,6 +3,7 @@ import 'package:pos/models/user.dart';
 import 'package:pos/screens/reports_screen.dart';
 import 'package:pos/screens/sales_history_screen.dart';
 import 'package:pos/screens/settings_screen.dart';
+import 'package:pos/screens/crm_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:pos/providers/auth_provider.dart';
 import 'package:pos/providers/settings_provider.dart';
@@ -60,6 +61,25 @@ class AppDrawer extends StatelessWidget {
                   onTap: () => _navigateTo(context, 0),
                 ),
 
+                // ===== CRM =====
+                _buildDrawerItem(
+                  context,
+                  icon: Icons.people,
+                  title: 'CRM',
+                  isDarkMode: isDarkMode,
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const CrmScreen(),
+                      ),
+                    );
+                  },
+                ),
+
+                const Divider(),
+
                 // ===== INVENTORY =====
                 if (user.canManageInventory)
                   _buildDrawerItem(
@@ -75,7 +95,7 @@ class AppDrawer extends StatelessWidget {
                 if (user.canManageUsers)
                   _buildDrawerItem(
                     context,
-                    icon: Icons.people,
+                    icon: Icons.admin_panel_settings,
                     title: 'User Management',
                     isSelected: currentIndex == 2,
                     isDarkMode: isDarkMode,
@@ -340,14 +360,11 @@ class AppDrawer extends StatelessWidget {
     Navigator.pop(context);
 
     // Then navigate using the callback
-    // The parent widget (DashboardScreen) will handle the navigation
     onItemSelected(index);
   }
 
   void _navigateToSettings(BuildContext context) {
-    // Close drawer
     Navigator.pop(context);
-    // Navigate to settings
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const SettingsScreen()),
@@ -393,9 +410,7 @@ class AppDrawer extends StatelessWidget {
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: isDarkMode
-                  ? Colors.red.shade400
-                  : Colors.red.shade700,
+              backgroundColor: isDarkMode ? Colors.red.shade400 : Colors.red.shade700,
               foregroundColor: Colors.white,
             ),
             child: const Text('Logout'),
@@ -406,8 +421,7 @@ class AppDrawer extends StatelessWidget {
   }
 
   void _showSalesHistory(BuildContext context, bool isDarkMode) {
-
-      Navigator.push(
+    Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => const SalesHistoryScreen(),
@@ -422,8 +436,6 @@ class AppDrawer extends StatelessWidget {
         builder: (context) => const ReportsScreen(),
       ),
     );
-
-  
   }
 
   void _showHelp(BuildContext context, bool isDarkMode) {

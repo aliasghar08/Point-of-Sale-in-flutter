@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
-import '../providers/settings_provider.dart';
-import '../services/firebase_service.dart';
+import 'package:pos/providers/settings_provider.dart';
+import 'package:pos/services/firebase_service.dart';
 
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key});
@@ -14,7 +14,7 @@ class ReportsScreen extends StatefulWidget {
 
 class _ReportsScreenState extends State<ReportsScreen> {
   final FirebaseService _firebaseService = FirebaseService();
-  String _selectedPeriod = 'Today';
+  String _selectedPeriod = 'All'; // Default to All
   DateTime _startDate = DateTime.now();
   DateTime _endDate = DateTime.now();
   bool _isLoading = true;
@@ -26,8 +26,17 @@ class _ReportsScreenState extends State<ReportsScreen> {
   int _totalTransactions = 0;
   double _averageSale = 0;
   
+  // ✅ Customer Statistics
+  int _totalCustomers = 0;
+  int _guestCustomers = 0;
+  int _registeredCustomers = 0;
+  double _averageCustomerSpend = 0;
+  
   // Top products
   List<Map<String, dynamic>> _topProducts = [];
+  
+  // ✅ Top customers
+  List<Map<String, dynamic>> _topCustomers = [];
   
   // Payment method breakdown
   Map<String, double> _paymentBreakdown = {};
@@ -36,6 +45,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
   List<Map<String, dynamic>> _dailySales = [];
 
   final List<String> _periodOptions = [
+    'All',
     'Today',
     'Week',
     'Month',
@@ -52,60 +62,77 @@ class _ReportsScreenState extends State<ReportsScreen> {
   Future<void> _loadReports() async {
     setState(() => _isLoading = true);
     try {
-      await _fetchSalesData();
-      await _fetchTopProducts();
-      await _fetchPaymentBreakdown();
-      await _fetchDailySales();
-      _calculateStatistics();
+      QuerySnapshot snapshot;
+      
+      // Fetch sales based on selected period
+      if (_selectedPeriod == 'All') {
+        // Get all sales from business
+        snapshot = await _firebaseService.getAllSales();
+      } else {
+        // Get the date range
+        final startDate = _getStartDate();
+        final endDate = _getEndDate();
+
+        // Fetch sales in date range using FirebaseService
+        snapshot = await _firebaseService.getSalesByDateRange(
+          startDate: startDate,
+          endDate: endDate,
+          limit: 1000,
+        );
+      }
+
+      // Process the data
+      _processSalesData(snapshot.docs);
+      
       setState(() => _isLoading = false);
     } catch (e) {
       setState(() => _isLoading = false);
-      _showSnackBar('Error loading reports: $e', isError: true);
+      _showSnackBar('Error loading reports: ${e.toString().replaceFirst('Exception: ', '')}', isError: true);
+      print('❌ Reports error: $e');
     }
   }
 
-  Future<void> _fetchSalesData() async {
-    DateTime startDate = _getStartDate();
-    DateTime endDate = _getEndDate();
-
-    QuerySnapshot snapshot = await _firebaseService.sales
-        .where('saleDate', isGreaterThanOrEqualTo: startDate)
-        .where('saleDate', isLessThanOrEqualTo: endDate)
-        .get();
-
+  void _processSalesData(List<QueryDocumentSnapshot> docs) {
+    // Reset stats
     _totalSales = 0;
     _totalProfit = 0;
     _totalItems = 0;
-    _totalTransactions = snapshot.docs.length;
-
-    for (var doc in snapshot.docs) {
-      var data = doc.data() as Map<String, dynamic>;
-      _totalSales += (data['total'] ?? 0).toDouble();
-      _totalProfit += (data['profit'] ?? 0).toDouble();
-      _totalItems += (data['quantity'] ?? 0).toInt() as int;
-    }
-
-    _averageSale = _totalTransactions > 0 ? _totalSales / _totalTransactions : 0;
-  }
-
-  Future<void> _fetchTopProducts() async {
-    DateTime startDate = _getStartDate();
-    DateTime endDate = _getEndDate();
-
-    QuerySnapshot snapshot = await _firebaseService.sales
-        .where('saleDate', isGreaterThanOrEqualTo: startDate)
-        .where('saleDate', isLessThanOrEqualTo: endDate)
-        .get();
-
+    _totalTransactions = docs.length;
+    
+    // ✅ Reset customer stats
+    _totalCustomers = 0;
+    _guestCustomers = 0;
+    _registeredCustomers = 0;
+    _averageCustomerSpend = 0;
+    
+    // Maps for processing
     Map<String, Map<String, dynamic>> productMap = {};
+    Map<String, double> paymentMap = {};
+    Map<String, double> dailyMap = {};
+    
+    // ✅ Customer tracking
+    Map<String, Map<String, dynamic>> customerMap = {};
 
-    for (var doc in snapshot.docs) {
+    for (var doc in docs) {
       var data = doc.data() as Map<String, dynamic>;
+      
+      // Sales totals
+      double total = (data['total'] ?? 0).toDouble();
+      double profit = (data['profit'] ?? 0).toDouble();
+      int quantity = (data['quantity'] ?? 0).toInt();
+      
+      _totalSales += total;
+      _totalProfit += profit;
+      _totalItems += quantity;
+
+      // Payment breakdown
+      String method = data['paymentMethod'] ?? 'Cash';
+      paymentMap[method] = (paymentMap[method] ?? 0) + total;
+
+      // Top products
       String productId = data['productId'] ?? '';
       String productName = data['productName'] ?? 'Unknown';
-      int quantity = (data['quantity'] ?? 0).toInt();
-      double total = (data['total'] ?? 0).toDouble();
-
+      
       if (productMap.containsKey(productId)) {
         productMap[productId]!['quantity'] += quantity;
         productMap[productId]!['total'] += total;
@@ -116,53 +143,56 @@ class _ReportsScreenState extends State<ReportsScreen> {
           'total': total,
         };
       }
+
+      // Daily sales
+      DateTime date = (data['saleDate'] as Timestamp).toDate();
+      String dateKey = DateFormat('yyyy-MM-dd').format(date);
+      dailyMap[dateKey] = (dailyMap[dateKey] ?? 0) + total;
+
+      // ✅ Customer tracking
+      String customerId = data['customerId'] ?? 'guest';
+      String customerName = data['customerName'] ?? 'Guest Customer';
+      bool isGuest = data['isGuestCustomer'] ?? true;
+      
+      if (isGuest) {
+        _guestCustomers++;
+      } else {
+        _registeredCustomers++;
+      }
+      
+      if (customerMap.containsKey(customerId)) {
+        customerMap[customerId]!['totalSpent'] += total;
+        customerMap[customerId]!['orders'] += 1;
+      } else {
+        _totalCustomers++;
+        customerMap[customerId] = {
+          'name': customerName,
+          'id': customerId,
+          'totalSpent': total,
+          'orders': 1,
+          'isGuest': isGuest,
+        };
+      }
     }
 
+    // Calculate average
+    _averageSale = _totalTransactions > 0 ? _totalSales / _totalTransactions : 0;
+    _averageCustomerSpend = _totalCustomers > 0 ? _totalSales / _totalCustomers : 0;
+
+    // Process top products
     _topProducts = productMap.values.toList();
     _topProducts.sort((a, b) => b['quantity'].compareTo(a['quantity']));
     _topProducts = _topProducts.take(10).toList();
-  }
 
-  Future<void> _fetchPaymentBreakdown() async {
-    DateTime startDate = _getStartDate();
-    DateTime endDate = _getEndDate();
+    // ✅ Process top customers
+    _topCustomers = customerMap.values.toList();
+    _topCustomers.sort((a, b) => b['totalSpent'].compareTo(a['totalSpent']));
+    _topCustomers = _topCustomers.take(10).toList();
 
-    QuerySnapshot snapshot = await _firebaseService.sales
-        .where('saleDate', isGreaterThanOrEqualTo: startDate)
-        .where('saleDate', isLessThanOrEqualTo: endDate)
-        .get();
+    // Process payment breakdown
+    _paymentBreakdown = paymentMap;
 
-    _paymentBreakdown = {};
-
-    for (var doc in snapshot.docs) {
-      var data = doc.data() as Map<String, dynamic>;
-      String method = data['paymentMethod'] ?? 'Cash';
-      double total = (data['total'] ?? 0).toDouble();
-
-      _paymentBreakdown[method] = (_paymentBreakdown[method] ?? 0) + total;
-    }
-  }
-
-  Future<void> _fetchDailySales() async {
-    DateTime startDate = _getStartDate();
-    DateTime endDate = _getEndDate();
-
-    QuerySnapshot snapshot = await _firebaseService.sales
-        .where('saleDate', isGreaterThanOrEqualTo: startDate)
-        .where('saleDate', isLessThanOrEqualTo: endDate)
-        .get();
-
-    Map<String, double> dailyMap = {};
-
-    for (var doc in snapshot.docs) {
-      var data = doc.data() as Map<String, dynamic>;
-      DateTime date = (data['saleDate'] as Timestamp).toDate();
-      String dateKey = DateFormat('yyyy-MM-dd').format(date);
-      double total = (data['total'] ?? 0).toDouble();
-
-      dailyMap[dateKey] = (dailyMap[dateKey] ?? 0) + total;
-    }
-
+    // Process daily sales
     _dailySales = dailyMap.entries.map((entry) {
       return {
         'date': entry.key,
@@ -170,10 +200,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
       };
     }).toList();
     _dailySales.sort((a, b) => a['date'].compareTo(b['date']));
-  }
-
-  void _calculateStatistics() {
-    // Already calculated in fetchSalesData
   }
 
   DateTime _getStartDate() {
@@ -213,11 +239,18 @@ class _ReportsScreenState extends State<ReportsScreen> {
   }
 
   void _showSnackBar(String message, {bool isError = false}) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
-        backgroundColor: isError ? Colors.red.shade700 : Colors.green.shade700,
+        content: Text(
+          message,
+          style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+        ),
+        backgroundColor: isError
+            ? (isDarkMode ? Colors.red.shade400 : Colors.red.shade700)
+            : (isDarkMode ? Colors.green.shade400 : Colors.green.shade700),
         behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );
   }
@@ -259,13 +292,22 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   const SizedBox(height: 16),
                   _buildSummaryCards(currencySymbol, isDarkMode),
                   const SizedBox(height: 16),
-                  _buildSalesChart(currencySymbol, isDarkMode),
+                  _buildCustomerSummary(currencySymbol, isDarkMode),
                   const SizedBox(height: 16),
-                  _buildPaymentBreakdown(currencySymbol, isDarkMode),
+                  if (_dailySales.isNotEmpty && _selectedPeriod != 'All')
+                    _buildSalesChart(currencySymbol, isDarkMode),
                   const SizedBox(height: 16),
-                  _buildTopProducts(currencySymbol, isDarkMode),
+                  if (_paymentBreakdown.isNotEmpty)
+                    _buildPaymentBreakdown(currencySymbol, isDarkMode),
                   const SizedBox(height: 16),
-                  _buildDetailedStats(currencySymbol, isDarkMode),
+                  if (_topProducts.isNotEmpty)
+                    _buildTopProducts(currencySymbol, isDarkMode),
+                  const SizedBox(height: 16),
+                  if (_topCustomers.isNotEmpty)
+                    _buildTopCustomers(currencySymbol, isDarkMode),
+                  const SizedBox(height: 16),
+                  if (_totalTransactions > 0)
+                    _buildDetailedStats(currencySymbol, isDarkMode),
                 ],
               ),
             ),
@@ -345,6 +387,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
   }
 
   Future<void> _selectCustomDateRange() async {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
     DateTimeRange? picked = await showDateRangePicker(
       context: context,
       firstDate: DateTime(2020),
@@ -358,7 +402,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
           data: Theme.of(context).copyWith(
             colorScheme: ColorScheme.fromSeed(
               seedColor: Colors.blue,
-              brightness: Theme.of(context).brightness,
+              brightness: isDarkMode ? Brightness.dark : Brightness.light,
             ),
           ),
           child: child!,
@@ -453,6 +497,147 @@ class _ReportsScreenState extends State<ReportsScreen> {
     );
   }
 
+  // ✅ Customer Summary Section
+  Widget _buildCustomerSummary(String currencySymbol, bool isDarkMode) {
+    if (_totalCustomers == 0 && _guestCustomers == 0) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDarkMode ? Colors.grey.shade800 : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: isDarkMode
+                ? Colors.black.withOpacity(0.3)
+                : Colors.grey.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 5,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.people,
+                color: isDarkMode ? Colors.teal.shade400 : Colors.teal.shade700,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Customer Insights',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: isDarkMode ? Colors.white : Colors.black,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: _buildCustomerStat(
+                  label: 'Total Customers',
+                  value: _totalCustomers.toString(),
+                  icon: Icons.people_outline,
+                  color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+                  isDarkMode: isDarkMode,
+                ),
+              ),
+              Expanded(
+                child: _buildCustomerStat(
+                  label: 'Registered',
+                  value: _registeredCustomers.toString(),
+                  icon: Icons.person,
+                  color: isDarkMode ? Colors.green.shade400 : Colors.green.shade700,
+                  isDarkMode: isDarkMode,
+                ),
+              ),
+              Expanded(
+                child: _buildCustomerStat(
+                  label: 'Guest',
+                  value: _guestCustomers.toString(),
+                  icon: Icons.person_outline,
+                  color: isDarkMode ? Colors.orange.shade400 : Colors.orange.shade700,
+                  isDarkMode: isDarkMode,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: _buildCustomerStat(
+                  label: 'Avg. Spend',
+                  value: '$currencySymbol${_averageCustomerSpend.toStringAsFixed(2)}',
+                  icon: Icons.trending_up,
+                  color: isDarkMode ? Colors.purple.shade400 : Colors.purple.shade700,
+                  isDarkMode: isDarkMode,
+                ),
+              ),
+              Expanded(
+                child: _buildCustomerStat(
+                  label: 'Avg. Orders',
+                  value: _totalTransactions > 0 && _totalCustomers > 0
+                      ? (_totalTransactions / _totalCustomers).toStringAsFixed(1)
+                      : '0',
+                  icon: Icons.shopping_cart_outlined,
+                  color: isDarkMode ? Colors.cyan.shade400 : Colors.cyan.shade700,
+                  isDarkMode: isDarkMode,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCustomerStat({
+    required String label,
+    required String value,
+    required IconData icon,
+    required Color color,
+    required bool isDarkMode,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(8),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 16, color: color),
+              const SizedBox(width: 4),
+              Text(
+                value,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: isDarkMode ? Colors.white : Colors.black,
+                ),
+              ),
+            ],
+          ),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildSalesChart(String currencySymbol, bool isDarkMode) {
     if (_dailySales.isEmpty) {
       return const SizedBox.shrink();
@@ -461,6 +646,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
     double maxSales = _dailySales.fold(0.0, (max, item) {
       return item['sales'] > max ? item['sales'] : max;
     });
+
+    // If max is 0, set to 1 to avoid division by zero
+    if (maxSales == 0) maxSales = 1;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -528,7 +716,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: _dailySales.map((item) {
-                      double height = maxSales > 0 ? (item['sales'] / maxSales) * 100 : 0;
+                      double height = (item['sales'] / maxSales) * 100;
                       return Expanded(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.end,
@@ -795,6 +983,146 @@ class _ReportsScreenState extends State<ReportsScreen> {
     );
   }
 
+  // ✅ Top Customers Section
+  Widget _buildTopCustomers(String currencySymbol, bool isDarkMode) {
+    if (_topCustomers.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDarkMode ? Colors.grey.shade800 : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: isDarkMode
+                ? Colors.black.withOpacity(0.3)
+                : Colors.grey.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 5,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.people,
+                color: isDarkMode ? Colors.teal.shade400 : Colors.teal.shade700,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Top Customers',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: isDarkMode ? Colors.white : Colors.black,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _topCustomers.length,
+            itemBuilder: (context, index) {
+              var customer = _topCustomers[index];
+              final isGuest = customer['isGuest'] ?? true;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: isGuest
+                            ? (isDarkMode ? Colors.grey.shade700 : Colors.grey.shade300)
+                            : (isDarkMode ? Colors.blue.shade900 : Colors.blue.shade100),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Center(
+                        child: Text(
+                          '${index + 1}',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: isGuest
+                                ? (isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600)
+                                : (isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            customer['name'] ?? 'Guest Customer',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w500,
+                              color: isDarkMode ? Colors.white : Colors.black,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Row(
+                            children: [
+                              Text(
+                                '${customer['orders']} orders',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                '$currencySymbol${customer['totalSpent'].toStringAsFixed(2)}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: isDarkMode ? Colors.green.shade400 : Colors.green.shade700,
+                                ),
+                              ),
+                              if (isGuest) ...[
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade300,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    'Guest',
+                                    style: TextStyle(
+                                      fontSize: 8,
+                                      color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildDetailedStats(String currencySymbol, bool isDarkMode) {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -846,7 +1174,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
             'Period',
             _selectedPeriod == 'Custom'
                 ? '${DateFormat('dd/MM/yyyy').format(_startDate)} - ${DateFormat('dd/MM/yyyy').format(_endDate)}'
-                : _selectedPeriod,
+                : _selectedPeriod == 'All'
+                    ? 'All Time'
+                    : _selectedPeriod,
             isDarkMode,
           ),
         ],

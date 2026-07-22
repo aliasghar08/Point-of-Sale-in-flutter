@@ -60,7 +60,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
             snapshot = await _firebaseService.getSalesByDateRange(
               startDate: _startDate!,
               endDate: _endDate!,
-              limit: 500, // Optional: limit results
+              limit: 500,
             );
           } else {
             snapshot = await _firebaseService.getAllSales();
@@ -82,7 +82,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     }
   }
 
-  // ✅ Apply search filter only (date filter is now done on server)
+  // ✅ Apply search filter only (now includes customer name and phone)
   void _applySearchFilter() {
     if (_searchQuery.isEmpty) {
       _filteredSales = _allSales;
@@ -96,16 +96,23 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
       String receiptNumber = (data['receiptNumber'] ?? '').toLowerCase();
       String paymentMethod = (data['paymentMethod'] ?? '').toLowerCase();
       
+      // ✅ Customer search fields
+      String customerName = (data['customerName'] ?? '').toLowerCase();
+      String customerPhone = (data['customerPhone'] ?? '').toLowerCase();
+      String customerEmail = (data['customerEmail'] ?? '').toLowerCase();
+      
       return productName.contains(query) ||
           receiptNumber.contains(query) ||
-          paymentMethod.contains(query);
+          paymentMethod.contains(query) ||
+          customerName.contains(query) ||
+          customerPhone.contains(query) ||
+          customerEmail.contains(query);
     }).toList();
   }
 
   // ✅ Handle filter change
   void _onFilterChanged(String newFilter) async {
     if (newFilter == 'Custom') {
-      // Show date picker for custom range
       final result = await _showDateRangePicker();
       if (result != null) {
         setState(() {
@@ -149,7 +156,6 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     );
 
     if (picked != null) {
-      // Set end date to end of day
       final endDate = DateTime(
         picked.end.year,
         picked.end.month,
@@ -225,7 +231,6 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     );
   }
 
-  // ✅ Show selected custom date range
   Widget _buildCustomDateRangeBadge(bool isDarkMode) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -333,7 +338,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
           color: isDarkMode ? Colors.white : Colors.black,
         ),
         decoration: InputDecoration(
-          hintText: 'Search by product, receipt, or payment...',
+          hintText: 'Search by product, customer, receipt, or payment...',
           hintStyle: TextStyle(
             color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
           ),
@@ -466,6 +471,11 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
         var data = _filteredSales[index].data() as Map<String, dynamic>;
         DateTime saleDate = (data['saleDate'] as Timestamp).toDate();
         
+        // ✅ Customer info
+        final customerName = data['customerName'] ?? 'Guest Customer';
+        final customerPhone = data['customerPhone'] ?? '';
+        final isGuestCustomer = data['isGuestCustomer'] ?? true;
+        
         return Card(
           elevation: 2,
           margin: const EdgeInsets.only(bottom: 12),
@@ -478,6 +488,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Product Name Row
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -515,39 +526,90 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 4),
+                // ✅ Customer Info Row
                 Row(
                   children: [
                     Icon(
-                      Icons.receipt_long,
+                      Icons.person,
                       size: 14,
                       color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
                     ),
                     const SizedBox(width: 4),
-                    Text(
-                      'Receipt: ${data['receiptNumber'] ?? 'N/A'}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                    Expanded(
+                      child: Text(
+                        isGuestCustomer ? 'Guest Customer' : customerName,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: isDarkMode ? Colors.white : Colors.black,
+                        ),
                       ),
                     ),
-                    const SizedBox(width: 16),
-                    Icon(
-                      Icons.calendar_today,
-                      size: 14,
-                      color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      DateFormat('dd/MM/yyyy HH:mm').format(saleDate),
-                      style: TextStyle(
-                        fontSize: 12,
+                    if (customerPhone.isNotEmpty) ...[
+                      const SizedBox(width: 8),
+                      Icon(
+                        Icons.phone,
+                        size: 12,
                         color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
                       ),
+                      const SizedBox(width: 4),
+                      Text(
+                        customerPhone,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 4),
+                // Receipt and Date Row
+                Wrap(
+                  spacing: 16,
+                  runSpacing: 4,
+                  children: [
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.receipt_long,
+                          size: 14,
+                          color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Receipt: ${data['receiptNumber'] ?? 'N/A'}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.calendar_today,
+                          size: 14,
+                          color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          DateFormat('dd/MM/yyyy HH:mm').format(saleDate),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
                 const Divider(),
+                // Quantity, Price, Total, Profit Row
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [

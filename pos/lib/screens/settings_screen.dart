@@ -26,6 +26,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: Icon(
+            Icons.arrow_back_ios,
+            color: Colors.white,
+            size: 20,
+          ),
+          onPressed: () => Navigator.pop(context),
+          tooltip: 'Back',
+        ),
         title: Text(
           'Settings',
           style: TextStyle(
@@ -65,6 +74,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   _buildInventorySection(settingsProvider, settings, isDarkMode),
                   const SizedBox(height: 16),
                   _buildPOSSection(settingsProvider, settings, isDarkMode),
+                  const SizedBox(height: 16),
+                  _buildCustomerSection(settingsProvider, settings, isDarkMode), // ✅ Added
                   const SizedBox(height: 16),
                   _buildNotificationSection(settingsProvider, settings, isDarkMode),
                   const SizedBox(height: 16),
@@ -726,6 +737,138 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onChanged: (_) => provider.toggleAutoPrint(),
               activeColor: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
               contentPadding: EdgeInsets.zero,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ==================== CUSTOMER SECTION ====================
+  Widget _buildCustomerSection(SettingsProvider provider, AppSettings settings, bool isDarkMode) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      color: isDarkMode ? Colors.grey.shade800 : Colors.white,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.people,
+                  color: isDarkMode ? Colors.teal.shade400 : Colors.teal.shade700,
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'Customer Settings',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: isDarkMode ? Colors.white : Colors.black,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            SwitchListTile(
+              title: Text(
+                'Enable Loyalty Points',
+                style: TextStyle(
+                  color: isDarkMode ? Colors.white : Colors.black,
+                ),
+              ),
+              subtitle: Text(
+                'Give loyalty points to customers on each purchase',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                ),
+              ),
+              value: settings.enableCustomerLoyalty,
+              onChanged: (_) => provider.toggleCustomerLoyalty(),
+              activeColor: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+              contentPadding: EdgeInsets.zero,
+            ),
+            SwitchListTile(
+              title: Text(
+                'Require Customer Info',
+                style: TextStyle(
+                  color: isDarkMode ? Colors.white : Colors.black,
+                ),
+              ),
+              subtitle: Text(
+                'Require customer info during checkout',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                ),
+              ),
+              value: settings.requireCustomerInfo,
+              onChanged: (_) => provider.toggleRequireCustomerInfo(),
+              activeColor: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+              contentPadding: EdgeInsets.zero,
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Points per Currency',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade700,
+                    ),
+                  ),
+                ),
+                Container(
+                  width: 100,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: isDarkMode ? Colors.grey.shade600 : Colors.grey.shade300,
+                    ),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: DropdownButton<int>(
+                    value: settings.pointsPerCurrency,
+                    isExpanded: true,
+                    underline: const SizedBox(),
+                    dropdownColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
+                    style: TextStyle(
+                      color: isDarkMode ? Colors.white : Colors.black,
+                    ),
+                    items: [1, 2, 3, 5, 10].map((value) {
+                      return DropdownMenuItem(
+                        value: value,
+                        child: Text(
+                          value.toString(),
+                          style: TextStyle(
+                            color: isDarkMode ? Colors.white : Colors.black,
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      if (value != null) {
+                        provider.updatePointsPerCurrency(value);
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Points earned per currency unit spent',
+              style: TextStyle(
+                fontSize: 10,
+                color: isDarkMode ? Colors.grey.shade500 : Colors.grey.shade400,
+              ),
             ),
           ],
         ),
