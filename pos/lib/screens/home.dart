@@ -708,13 +708,9 @@ class _HomeScreenState extends State<HomeScreen> {
         return;
       }
 
+      // Search by name using FirebaseService
       try {
-        QuerySnapshot nameResult = await _firebaseService.products
-            .where('name', isGreaterThanOrEqualTo: query)
-            .where('name', isLessThanOrEqualTo: query + '\uf8ff')
-            .limit(20)
-            .get();
-
+        final nameResult = await _firebaseService.getProductByName(query);
         if (nameResult.docs.isNotEmpty) {
           _showProductSelection(nameResult);
           if (mounted) setState(() => _isLoading = false);
@@ -1002,7 +998,8 @@ class _HomeScreenState extends State<HomeScreen> {
         barcode: barcode.isNotEmpty ? barcode : '',
       );
 
-      final docRef = await _firebaseService.products.add(product.toMap());
+      // Use FirebaseService to add product
+      final docRef = await _firebaseService.addProduct(product.toMap());
       final newProduct = product.copyWith(id: docRef.id);
 
       if (mounted) {
@@ -1067,98 +1064,126 @@ class _HomeScreenState extends State<HomeScreen> {
     _totalProfit = _cartItems.fold(0.0, (sum, item) => sum + ((item.price - item.costPrice) * item.stock));
   }
 
+  // ==================== CHECKOUT PROCESS ====================
   void _processCheckout() async {
     if (_cartItems.isEmpty) return;
-
-    final stockChecks = _cartItems.map((item) async {
-      try {
-        DocumentSnapshot doc = await _firebaseService.products
-            .doc(item.id)
-            .get();
-        if (doc.exists) {
-          var data = doc.data() as Map<String, dynamic>;
-          int availableStock = (data['stock'] ?? 0).toInt();
-          return {'item': item, 'available': availableStock};
-        }
-        return {'item': item, 'available': 0};
-      } catch (e) {
-        return {'item': item, 'available': -1};
-      }
-    }).toList();
-
-    final results = await Future.wait(stockChecks);
-    
-    for (var result in results) {
-      final item = result['item'] as Product;
-      final available = result['available'] as int;
-      if (available < item.stock) {
-        _showSnackBar(
-          'Insufficient stock for ${item.name}. Available: $available',
-        );
-        return;
-      }
-      if (available == -1) {
-        _showSnackBar('Error checking stock for ${item.name}');
-        return;
-      }
-    }
-
-    bool confirm = await _showConfirmationDialog();
-    if (!confirm) return;
 
     setState(() => _isLoading = true);
 
     try {
-      String receiptNumber = 'RCP-${DateTime.now().millisecondsSinceEpoch}';
+      // 1. Get product IDs for stock check
+      final productIds = _cartItems.map((item) => item.id).toList();
+      
+      // 2. Fetch all products at once using FirebaseService
+      final productDocs = await _firebaseService.getProductsByIds(productIds);
+      
+      // 3. Verify stock availability
+      for (var item in _cartItems) {
+        final doc = productDocs[item.id];
+        if (doc == null || !doc.exists) {
+          _showSnackBar('❌ Product "${item.name}" not found in inventory');
+          setState(() => _isLoading = false);
+          return;
+        }
+        
+        final data = doc.data() as Map<String, dynamic>;
+        final availableStock = (data['stock'] ?? 0).toInt();
+        
+        if (availableStock < item.stock) {
+          _showSnackBar(
+            '❌ Insufficient stock for ${item.name}. Available: $availableStock'
+          );
+          setState(() => _isLoading = false);
+          return;
+        }
+      }
 
-      final sales = _cartItems.map((item) {
-        return Sale(
-          id: '',
-          productId: item.id,
-          productName: item.name,
-          quantity: item.stock,
-          price: item.price,
-          costPrice: item.costPrice,
-          total: item.price * item.stock,
-          profit: (item.price - item.costPrice) * item.stock,
-          saleDate: DateTime.now(),
-          paymentMethod: _selectedPaymentMethod,
-          receiptNumber: receiptNumber,
-        );
+      // 4. Show confirmation dialog
+      final confirm = await _showConfirmationDialog();
+      if (!confirm) {
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      // 5. SAVE RECEIPT DATA BEFORE CLEARING CART
+      final receiptNumber = 'RCP-${DateTime.now().millisecondsSinceEpoch}';
+      final receiptCartItems = List<Product>.from(_cartItems);
+      final receiptTotalAmount = _totalAmount;
+      final receiptTotalProfit = _totalProfit;
+      final receiptPaymentMethod = _selectedPaymentMethod;
+
+      // 6. Prepare sales data
+      final salesData = _cartItems.map((item) {
+        return {
+          'productId': item.id,
+          'productName': item.name,
+          'quantity': item.stock,
+          'price': item.price,
+          'costPrice': item.costPrice,
+          'total': item.price * item.stock,
+          'profit': (item.price - item.costPrice) * item.stock,
+          'saleDate': DateTime.now(),
+          'paymentMethod': _selectedPaymentMethod,
+          'receiptNumber': receiptNumber,
+        };
       }).toList();
 
-      final batch = _firebaseService.firestore.batch();
-      
-      for (var sale in sales) {
-        final saleRef = _firebaseService.sales.doc();
-        batch.set(saleRef, sale.toMap());
-      }
-      
+      // 7. Prepare stock updates (negative values for deduction)
+      final stockUpdates = <String, int>{};
       for (var item in _cartItems) {
-        final productRef = _firebaseService.products.doc(item.id);
-        batch.update(productRef, {
-          'stock': FieldValue.increment(-item.stock),
-          'updatedAt': DateTime.now(),
-        });
+        stockUpdates[item.id] = -item.stock;
       }
-      
-      await batch.commit();
 
+      // 8. Execute batch operations using FirebaseService
+      await Future.wait([
+        _firebaseService.addMultipleSales(salesData),
+        _firebaseService.updateMultipleProductsStock(stockUpdates),
+      ]);
+
+      // 9. Clear cart
       setState(() {
         _cartItems.clear();
         _updateTotals();
+        _isLoading = false;
       });
 
+      // 10. Show snackbar
       _showSnackBar('✅ Sale completed! Receipt #$receiptNumber');
-      _showReceiptDialog(receiptNumber: receiptNumber);
+
+      // 11. Show receipt with saved data (NOT the cleared cart)
+      _showReceiptDialog(
+        cartItems: receiptCartItems,
+        totalAmount: receiptTotalAmount,
+        totalProfit: receiptTotalProfit,
+        paymentMethod: receiptPaymentMethod,
+        receiptNumber: receiptNumber,
+      );
+      
     } catch (e) {
       _showSnackBar('❌ Checkout failed: $e');
       debugPrint('Checkout error: $e');
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      setState(() => _isLoading = false);
     }
+  }
+
+  // ==================== RECEIPT DIALOG ====================
+  void _showReceiptDialog({
+    required List<Product> cartItems,
+    required double totalAmount,
+    required double totalProfit,
+    required String paymentMethod,
+    required String receiptNumber,
+  }) {
+    showDialog(
+      context: context,
+      builder: (context) => ReceiptDialog(
+        cartItems: cartItems,
+        totalAmount: totalAmount,
+        totalProfit: totalProfit,
+        selectedPaymentMethod: paymentMethod,
+        receiptNumber: receiptNumber,
+      ),
+    );
   }
 
   void _showProductSelection(QuerySnapshot snapshot) {
@@ -1295,19 +1320,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _showReceiptDialog({String? receiptNumber}) {
-    showDialog(
-      context: context,
-      builder: (context) => ReceiptDialog(
-        cartItems: _cartItems,
-        totalAmount: _totalAmount,
-        totalProfit: _totalProfit,
-        selectedPaymentMethod: _selectedPaymentMethod,
-        receiptNumber: receiptNumber ?? 'N/A',
-      ),
-    );
-  }
-
   void _showSalesHistory() {
     final settingsProvider = Provider.of<SettingsProvider>(
       context,
@@ -1341,10 +1353,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             Expanded(
               child: StreamBuilder<QuerySnapshot>(
-                stream: _firebaseService.sales
-                    .orderBy('saleDate', descending: true)
-                    .limit(50)
-                    .snapshots(),
+                stream: _firebaseService.getSalesStreamForBusiness(),
                 builder: (context, snapshot) {
                   if (snapshot.hasError) {
                     return Center(

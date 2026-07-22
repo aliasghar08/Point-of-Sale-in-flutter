@@ -14,13 +14,17 @@ class SalesHistoryScreen extends StatefulWidget {
 
 class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
   final FirebaseService _firebaseService = FirebaseService();
-  String _filterType = 'All'; // All, Today, Week, Month
+  String _filterType = 'All'; // All, Today, Week, Month, Custom
   String _searchQuery = '';
   bool _isLoading = true;
   List<QueryDocumentSnapshot> _allSales = [];
   List<QueryDocumentSnapshot> _filteredSales = [];
 
-  final List<String> _filterOptions = ['All', 'Today', 'Week', 'Month'];
+  // For custom date range
+  DateTime? _startDate;
+  DateTime? _endDate;
+
+  final List<String> _filterOptions = ['All', 'Today', 'Week', 'Month', 'Custom'];
   final TextEditingController _searchController = TextEditingController();
 
   @override
@@ -35,15 +39,41 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     super.dispose();
   }
 
+  // ✅ Load sales based on filter type
   Future<void> _loadSales() async {
     setState(() => _isLoading = true);
     try {
-      final snapshot = await _firebaseService.sales
-          .orderBy('saleDate', descending: true)
-          .get();
+      QuerySnapshot snapshot;
+      
+      switch (_filterType) {
+        case 'Today':
+          snapshot = await _firebaseService.getTodaySales();
+          break;
+        case 'Week':
+          snapshot = await _firebaseService.getWeekSales();
+          break;
+        case 'Month':
+          snapshot = await _firebaseService.getMonthSales();
+          break;
+        case 'Custom':
+          if (_startDate != null && _endDate != null) {
+            snapshot = await _firebaseService.getSalesByDateRange(
+              startDate: _startDate!,
+              endDate: _endDate!,
+              limit: 500, // Optional: limit results
+            );
+          } else {
+            snapshot = await _firebaseService.getAllSales();
+          }
+          break;
+        default:
+          snapshot = await _firebaseService.getAllSales();
+          break;
+      }
+      
       setState(() {
         _allSales = snapshot.docs;
-        _applyFilters();
+        _applySearchFilter();
         _isLoading = false;
       });
     } catch (e) {
@@ -52,56 +82,106 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     }
   }
 
-  void _applyFilters() {
-    DateTime now = DateTime.now();
-    DateTime today = DateTime(now.year, now.month, now.day);
-    DateTime weekStart = today.subtract(Duration(days: now.weekday - 1));
-    DateTime monthStart = DateTime(now.year, now.month, 1);
+  // ✅ Apply search filter only (date filter is now done on server)
+  void _applySearchFilter() {
+    if (_searchQuery.isEmpty) {
+      _filteredSales = _allSales;
+      return;
+    }
 
+    String query = _searchQuery.toLowerCase();
     _filteredSales = _allSales.where((doc) {
       var data = doc.data() as Map<String, dynamic>;
-      DateTime saleDate = (data['saleDate'] as Timestamp).toDate();
-
-      // Apply date filter
-      bool dateMatch = true;
-      switch (_filterType) {
-        case 'Today':
-          dateMatch = saleDate.isAfter(today) || saleDate.isAtSameMomentAs(today);
-          break;
-        case 'Week':
-          dateMatch = saleDate.isAfter(weekStart) || saleDate.isAtSameMomentAs(weekStart);
-          break;
-        case 'Month':
-          dateMatch = saleDate.isAfter(monthStart) || saleDate.isAtSameMomentAs(monthStart);
-          break;
-        default:
-          dateMatch = true;
-      }
-
-      if (!dateMatch) return false;
-
-      // Apply search filter
-      if (_searchQuery.isNotEmpty) {
-        String query = _searchQuery.toLowerCase();
-        String productName = (data['productName'] ?? '').toLowerCase();
-        String receiptNumber = (data['receiptNumber'] ?? '').toLowerCase();
-        String paymentMethod = (data['paymentMethod'] ?? '').toLowerCase();
-        
-        return productName.contains(query) ||
-            receiptNumber.contains(query) ||
-            paymentMethod.contains(query);
-      }
-
-      return true;
+      String productName = (data['productName'] ?? '').toLowerCase();
+      String receiptNumber = (data['receiptNumber'] ?? '').toLowerCase();
+      String paymentMethod = (data['paymentMethod'] ?? '').toLowerCase();
+      
+      return productName.contains(query) ||
+          receiptNumber.contains(query) ||
+          paymentMethod.contains(query);
     }).toList();
   }
 
+  // ✅ Handle filter change
+  void _onFilterChanged(String newFilter) async {
+    if (newFilter == 'Custom') {
+      // Show date picker for custom range
+      final result = await _showDateRangePicker();
+      if (result != null) {
+        setState(() {
+          _startDate = result.$1;
+          _endDate = result.$2;
+          _filterType = newFilter;
+        });
+        _loadSales();
+      }
+    } else if (_filterType != newFilter) {
+      setState(() {
+        _filterType = newFilter;
+      });
+      _loadSales();
+    }
+  }
+
+  // ✅ Show date range picker
+  Future<(DateTime, DateTime)?> _showDateRangePicker() async {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
+    final DateTimeRange? picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+      initialDateRange: DateTimeRange(
+        start: DateTime.now().subtract(const Duration(days: 30)),
+        end: DateTime.now(),
+      ),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: Colors.blue,
+              brightness: isDarkMode ? Brightness.dark : Brightness.light,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      // Set end date to end of day
+      final endDate = DateTime(
+        picked.end.year,
+        picked.end.month,
+        picked.end.day,
+        23, 59, 59,
+      );
+      return (picked.start, endDate);
+    }
+    return null;
+  }
+
+  // ✅ Handle search change
+  void _onSearchChanged(String value) {
+    setState(() {
+      _searchQuery = value.toLowerCase().trim();
+      _applySearchFilter();
+    });
+  }
+
   void _showSnackBar(String message, {bool isError = false}) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
-        backgroundColor: isError ? Colors.red.shade700 : Colors.green.shade700,
+        content: Text(
+          message,
+          style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+        ),
+        backgroundColor: isError
+            ? (isDarkMode ? Colors.red.shade400 : Colors.red.shade700)
+            : (isDarkMode ? Colors.green.shade400 : Colors.green.shade700),
         behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );
   }
@@ -129,6 +209,8 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
       body: Column(
         children: [
           _buildFilterBar(isDarkMode),
+          if (_filterType == 'Custom' && _startDate != null && _endDate != null)
+            _buildCustomDateRangeBadge(isDarkMode),
           _buildSearchBar(isDarkMode),
           _buildSummaryStats(isDarkMode, currencySymbol),
           Expanded(
@@ -143,15 +225,59 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     );
   }
 
+  // ✅ Show selected custom date range
+  Widget _buildCustomDateRangeBadge(bool isDarkMode) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      color: isDarkMode ? Colors.blue.shade900 : Colors.blue.shade50,
+      child: Row(
+        children: [
+          Icon(
+            Icons.date_range,
+            size: 16,
+            color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            '${DateFormat('dd/MM/yyyy').format(_startDate!)} - ${DateFormat('dd/MM/yyyy').format(_endDate!)}',
+            style: TextStyle(
+              color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const Spacer(),
+          GestureDetector(
+            onTap: () {
+              setState(() {
+                _startDate = null;
+                _endDate = null;
+                _filterType = 'All';
+              });
+              _loadSales();
+            },
+            child: Icon(
+              Icons.close,
+              size: 16,
+              color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildFilterBar(bool isDarkMode) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       color: isDarkMode ? Colors.grey.shade900 : Colors.grey.shade50,
       child: Row(
         children: [
-          const Text(
+          Text(
             'Filter:',
-            style: TextStyle(fontWeight: FontWeight.bold),
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: isDarkMode ? Colors.white : Colors.black,
+            ),
           ),
           const SizedBox(width: 8),
           Expanded(
@@ -165,12 +291,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                     child: FilterChip(
                       label: Text(filter),
                       selected: isSelected,
-                      onSelected: (_) {
-                        setState(() {
-                          _filterType = filter;
-                          _applyFilters();
-                        });
-                      },
+                      onSelected: (_) => _onFilterChanged(filter),
                       backgroundColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
                       selectedColor: isDarkMode ? Colors.blue.shade800 : Colors.blue.shade100,
                       checkmarkColor: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
@@ -230,7 +351,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                     setState(() {
                       _searchQuery = '';
                       _searchController.clear();
-                      _applyFilters();
+                      _applySearchFilter();
                     });
                   },
                 )
@@ -245,12 +366,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
               : Colors.grey.shade50,
           contentPadding: const EdgeInsets.symmetric(horizontal: 16),
         ),
-        onChanged: (value) {
-          setState(() {
-            _searchQuery = value.toLowerCase().trim();
-            _applyFilters();
-          });
-        },
+        onChanged: _onSearchChanged,
       ),
     );
   }
@@ -266,7 +382,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
       var data = doc.data() as Map<String, dynamic>;
       totalSales += (data['total'] ?? 0).toDouble();
       totalProfit += (data['profit'] ?? 0).toDouble();
-      totalItems += (data['quantity'] ?? 0).toInt() as int;
+      totalItems += (data['quantity'] ?? 0) as int;
     }
 
     return Container(
@@ -521,7 +637,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                 setState(() {
                   _searchQuery = '';
                   _searchController.clear();
-                  _applyFilters();
+                  _applySearchFilter();
                 });
               },
               icon: const Icon(Icons.clear),
