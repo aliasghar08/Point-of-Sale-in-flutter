@@ -23,37 +23,18 @@ class _ProductAutocompleteState extends State<ProductAutocomplete> {
   List<String> _suggestions = [];
   bool _showSuggestions = false;
   bool _isLoading = false;
-  bool _isSelecting = false;
 
   @override
   void initState() {
     super.initState();
-    _focusNode.addListener(_onFocusChanged);
-    
-    // Debug: Print available categories to verify data
     print('📦 Available categories: ${ProductReference.getCategories()}');
   }
 
   @override
   void dispose() {
-    _focusNode.removeListener(_onFocusChanged);
     _controller.dispose();
     _focusNode.dispose();
     super.dispose();
-  }
-
-  void _onFocusChanged() {
-    // Only show suggestions when focused and there are suggestions
-    if (_focusNode.hasFocus && _suggestions.isNotEmpty && !_isSelecting) {
-      setState(() => _showSuggestions = true);
-    } else if (!_focusNode.hasFocus && !_isSelecting) {
-      // Delay hiding to allow tap on suggestion
-      Future.delayed(const Duration(milliseconds: 300), () {
-        if (mounted && !_isSelecting) {
-          setState(() => _showSuggestions = false);
-        }
-      });
-    }
   }
 
   void _searchProducts(String query) {
@@ -78,11 +59,12 @@ class _ProductAutocompleteState extends State<ProductAutocomplete> {
       );
       
       print('📊 Found ${results.length} results for "$query"');
-      print('📋 Results: $results');
+      if (results.isNotEmpty) {
+        print('📋 First 3 results: ${results.take(3).toList()}');
+      }
       
       setState(() {
         _suggestions = results;
-        // ✅ Force show suggestions if there are results
         _showSuggestions = results.isNotEmpty;
         _isLoading = false;
       });
@@ -93,7 +75,6 @@ class _ProductAutocompleteState extends State<ProductAutocomplete> {
   }
 
   void _selectProduct(String product) {
-    _isSelecting = true;
     _controller.text = product;
     setState(() {
       _showSuggestions = false;
@@ -101,12 +82,6 @@ class _ProductAutocompleteState extends State<ProductAutocomplete> {
     });
     _focusNode.unfocus();
     widget.onProductSelected(product);
-    
-    Future.delayed(const Duration(milliseconds: 300), () {
-      if (mounted) {
-        _isSelecting = false;
-      }
-    });
   }
 
   @override
@@ -136,10 +111,17 @@ class _ProductAutocompleteState extends State<ProductAutocomplete> {
             ),
           ),
         
+        // Search field
         TextField(
           controller: _controller,
           focusNode: _focusNode,
           onChanged: _searchProducts,
+          onTap: () {
+            // Show suggestions when tapping if there are any
+            if (_suggestions.isNotEmpty) {
+              setState(() => _showSuggestions = true);
+            }
+          },
           decoration: InputDecoration(
             hintText: widget.hintText,
             prefixIcon: Icon(
@@ -179,6 +161,7 @@ class _ProductAutocompleteState extends State<ProductAutocomplete> {
           },
         ),
         
+        // Loading indicator
         if (_isLoading)
           const Padding(
             padding: EdgeInsets.all(8.0),
@@ -191,38 +174,56 @@ class _ProductAutocompleteState extends State<ProductAutocomplete> {
             ),
           ),
         
-        // ✅ Suggestions dropdown - wrapped in Material to fix ListTile error
+        // ✅ Suggestions dropdown - shown as overlay
         if (_showSuggestions && _suggestions.isNotEmpty)
-          Material(
-            elevation: 4,
-            borderRadius: BorderRadius.circular(12),
-            color: isDarkMode ? Colors.grey.shade800 : Colors.white,
-            child: Container(
-              margin: const EdgeInsets.only(top: 4),
-              constraints: const BoxConstraints(maxHeight: 300),
-              decoration: BoxDecoration(
-                color: isDarkMode ? Colors.grey.shade800 : Colors.white,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: _suggestions.length,
-                itemBuilder: (context, index) {
-                  final product = _suggestions[index];
-                  final isLast = index == _suggestions.length - 1;
+          Container(
+            margin: const EdgeInsets.only(top: 4),
+            constraints: const BoxConstraints(maxHeight: 250),
+            decoration: BoxDecoration(
+              color: isDarkMode ? Colors.grey.shade800 : Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.15),
+                  blurRadius: 10,
+                  spreadRadius: 2,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: _suggestions.length,
+              itemBuilder: (context, index) {
+                final product = _suggestions[index];
+                final isLast = index == _suggestions.length - 1;
 
-                  return Column(
-                    children: [
-                      ListTile(
-                        leading: CircleAvatar(
+                return InkWell(
+                  onTap: () => _selectProduct(product),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: isDarkMode 
+                          ? (index % 2 == 0 ? Colors.grey.shade800 : Colors.grey.shade800)
+                          : (index % 2 == 0 ? Colors.white : Colors.grey.shade50),
+                      borderRadius: isLast 
+                          ? const BorderRadius.only(
+                              bottomLeft: Radius.circular(12),
+                              bottomRight: Radius.circular(12),
+                            )
+                          : BorderRadius.zero,
+                    ),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
                           backgroundColor: isDarkMode 
                               ? Colors.blue.shade900 
                               : Colors.blue.shade100,
-                          radius: 18,
+                          radius: 16,
                           child: Text(
                             product.substring(0, 1).toUpperCase(),
                             style: TextStyle(
-                              fontSize: 14,
+                              fontSize: 12,
                               fontWeight: FontWeight.bold,
                               color: isDarkMode 
                                   ? Colors.blue.shade400 
@@ -230,68 +231,73 @@ class _ProductAutocompleteState extends State<ProductAutocomplete> {
                             ),
                           ),
                         ),
-                        title: Text(
-                          product,
-                          style: TextStyle(
-                            color: isDarkMode ? Colors.white : Colors.black,
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                product,
+                                style: TextStyle(
+                                  color: isDarkMode ? Colors.white : Colors.black,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              Text(
+                                'Tap to add to cart',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        subtitle: Text(
-                          'Tap to add',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                          ),
-                        ),
-                        trailing: Icon(
+                        Icon(
                           Icons.add_circle_outline,
-                          size: 24,
-                          color: isDarkMode ? Colors.green.shade400 : Colors.green,
+                          size: 22,
+                          color: isDarkMode ? Colors.green.shade400 : Colors.green.shade700,
                         ),
-                        onTap: () => _selectProduct(product),
-                      ),
-                      if (!isLast)
-                        Divider(
-                          color: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade200,
-                          height: 1,
-                        ),
-                    ],
-                  );
-                },
-              ),
+                      ],
+                    ),
+                  ),
+                );
+              },
             ),
           ),
         
-        // Show if no results found
+        // No results message
         if (_controller.text.isNotEmpty && !_isLoading && _suggestions.isEmpty && _showSuggestions)
-          Material(
-            elevation: 2,
-            borderRadius: BorderRadius.circular(12),
-            color: isDarkMode ? Colors.grey.shade800 : Colors.white,
-            child: Container(
-              margin: const EdgeInsets.only(top: 4),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: isDarkMode ? Colors.grey.shade800 : Colors.white,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.info_outline,
-                    color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'No products found. Try a different search term.',
-                      style: TextStyle(
-                        color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                      ),
+          Container(
+            margin: const EdgeInsets.only(top: 4),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: isDarkMode ? Colors.grey.shade800 : Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 8,
+                  spreadRadius: 2,
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.info_outline,
+                  color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'No products found. Try a different search term.',
+                    style: TextStyle(
+                      color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
       ],

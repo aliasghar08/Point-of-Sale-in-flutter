@@ -7,6 +7,8 @@ import 'package:provider/provider.dart';
 import 'package:pos/models/product.dart';
 import 'package:pos/services/firebase_service.dart';
 import 'package:pos/providers/settings_provider.dart';
+import 'package:pos/models/product_reference.dart';
+import 'package:pos/utils/field_info.dart';
 
 class ProductFormScreen extends StatefulWidget {
   final Product? product;
@@ -60,45 +62,11 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   bool _isDigital = false;
   bool _hasVariants = false;
 
-  // ===== DROPDOWN OPTIONS =====
-  final List<String> _categories = [
-    'Electronics',
-    'Clothing',
-    'Food & Beverages',
-    'Books',
-    'Beauty & Health',
-    'Home & Kitchen',
-    'Sports & Outdoors',
-    'Toys & Games',
-    'Automotive',
-    'Furniture',
-    'Jewelry',
-    'Shoes',
-    'Accessories',
-    'Uncategorized',
-  ];
-
-  final List<String> _subCategories = [
-    'Smartphones',
-    'Laptops',
-    'Tablets',
-    'Accessories',
-    'T-Shirts',
-    'Jeans',
-    'Dresses',
-    'Snacks',
-    'Beverages',
-    'Frozen Foods',
-    'Skincare',
-    'Makeup',
-    'Furniture',
-    'Home Decor',
-    'Kitchenware',
-    'Toys',
-    'Games',
-    'Uncategorized',
-  ];
-
+  // ===== DROPDOWN OPTIONS (from ProductReference) =====
+  late List<String> _categories;
+  List<String> _subCategories = [];
+  
+  // ===== TAX CLASSES =====
   final List<String> _taxClasses = [
     'Standard (18%)',
     'Reduced (5%)',
@@ -106,6 +74,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     'Exempt',
   ];
 
+  // ===== UNITS =====
   final List<String> _units = [
     'pcs (Pieces)',
     'kg (Kilograms)',
@@ -125,9 +94,17 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
 
   final List<String> _weightUnits = ['kg', 'g', 'lbs', 'oz'];
 
+  // ===== SEARCH STATE =====
+  List<String> _productSuggestions = [];
+  final TextEditingController _searchController = TextEditingController();
+  bool _showSuggestions = false;
+
   @override
   void initState() {
     super.initState();
+    // Get categories from ProductReference
+    _categories = ProductReference.getCategories();
+    
     if (widget.isEditing && widget.product != null) {
       _populateFields();
     }
@@ -166,6 +143,11 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     _isDigital = p.isDigital;
     _hasVariants = p.hasVariants;
     _imageUrl = p.imageUrl;
+    
+    // Load subcategories for the selected category
+    if (_selectedCategory != null) {
+      _subCategories = ProductReference.getSubCategories(_selectedCategory!);
+    }
   }
 
   @override
@@ -188,7 +170,55 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     _supplierSkuController.dispose();
     _reorderPointController.dispose();
     _reorderQuantityController.dispose();
+    _searchController.dispose();
     super.dispose();
+  }
+
+  void _updateSubCategories() {
+    setState(() {
+      if (_selectedCategory != null) {
+        _subCategories = ProductReference.getSubCategories(_selectedCategory!);
+      } else {
+        _subCategories = [];
+      }
+      _selectedSubCategory = null;
+    });
+  }
+
+  void _searchProducts(String query) {
+    if (query.isEmpty) {
+      setState(() {
+        _productSuggestions = [];
+        _showSuggestions = false;
+      });
+      return;
+    }
+
+    final suggestions = ProductReference.searchProducts(
+      query: query,
+      category: _selectedCategory,
+      limit: 15,
+    );
+
+    setState(() {
+      _productSuggestions = suggestions;
+      _showSuggestions = true;
+    });
+  }
+
+  void _selectProductSuggestion(String productName) {
+    setState(() {
+      _nameController.text = productName;
+      _productSuggestions = [];
+      _showSuggestions = false;
+      
+      // Try to auto-fill category from product reference
+      final category = ProductReference.findCategoryForProduct(productName);
+      if (category != null && category != _selectedCategory) {
+        _selectedCategory = category;
+        _updateSubCategories();
+      }
+    });
   }
 
   Future<void> _pickImage(ImageSource source) async {
@@ -247,70 +277,82 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            ListTile(
-              leading: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: isDarkMode ? Colors.blue.shade900 : Colors.blue.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(Icons.photo_library, color: isDarkMode ? Colors.blue.shade400 : Colors.blue),
-              ),
-              title: const Text('Choose from Gallery'),
-              subtitle: Text(
-                'Select from your device',
-                style: TextStyle(
-                  fontSize: 12, 
-                  color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                ),
-              ),
-              onTap: () {
-                Navigator.pop(context);
-                _pickImage(ImageSource.gallery);
-              },
-            ),
-            ListTile(
-              leading: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: isDarkMode ? Colors.green.shade900 : Colors.green.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(Icons.camera_alt, color: isDarkMode ? Colors.green.shade400 : Colors.green),
-              ),
-              title: const Text('Take Photo'),
-              subtitle: Text(
-                'Capture with camera',
-                style: TextStyle(
-                  fontSize: 12, 
-                  color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                ),
-              ),
-              onTap: () {
-                Navigator.pop(context);
-                _pickImage(ImageSource.camera);
-              },
-            ),
-            if (_imageFile != null)
-              ListTile(
+            Material(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(12),
+              child: ListTile(
                 leading: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: isDarkMode ? Colors.red.shade900 : Colors.red.shade50,
+                    color: isDarkMode ? Colors.blue.shade900 : Colors.blue.shade50,
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Icon(Icons.delete, color: isDarkMode ? Colors.red.shade400 : Colors.red),
+                  child: Icon(Icons.photo_library, color: isDarkMode ? Colors.blue.shade400 : Colors.blue),
                 ),
-                title: const Text(
-                  'Remove Image',
-                  style: TextStyle(color: Colors.red),
+                title: const Text('Choose from Gallery'),
+                subtitle: Text(
+                  'Select from your device',
+                  style: TextStyle(
+                    fontSize: 12, 
+                    color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                  ),
                 ),
                 onTap: () {
                   Navigator.pop(context);
-                  setState(() {
-                    _imageFile = null;
-                  });
+                  _pickImage(ImageSource.gallery);
                 },
+              ),
+            ),
+            Material(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(12),
+              child: ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: isDarkMode ? Colors.green.shade900 : Colors.green.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(Icons.camera_alt, color: isDarkMode ? Colors.green.shade400 : Colors.green),
+                ),
+                title: const Text('Take Photo'),
+                subtitle: Text(
+                  'Capture with camera',
+                  style: TextStyle(
+                    fontSize: 12, 
+                    color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                  ),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickImage(ImageSource.camera);
+                },
+              ),
+            ),
+            if (_imageFile != null)
+              Material(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(12),
+                child: ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: isDarkMode ? Colors.red.shade900 : Colors.red.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(Icons.delete, color: isDarkMode ? Colors.red.shade400 : Colors.red),
+                  ),
+                  title: const Text(
+                    'Remove Image',
+                    style: TextStyle(color: Colors.red),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    setState(() {
+                      _imageFile = null;
+                    });
+                  },
+                ),
               ),
             const SizedBox(height: 8),
           ],
@@ -672,6 +714,8 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                     ),
                   ),
                 ),
+                const Spacer(),
+                const InfoIconWidget(info: FieldInfo.productImage),
               ],
             ),
             const SizedBox(height: 12),
@@ -837,90 +881,192 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   Widget _buildBasicInfoFields(bool isDarkMode) {
     return Column(
       children: [
-        TextFormField(
-          controller: _nameController,
-          decoration: InputDecoration(
-            labelText: 'Product Name *',
-            hintText: 'Enter the product name',
-            prefixIcon: Icon(
-              Icons.production_quantity_limits,
-              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+        // Product Name with Autocomplete
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _nameController,
+                    onChanged: _searchProducts,
+                    onTap: () {
+                      if (_nameController.text.isNotEmpty) {
+                        _searchProducts(_nameController.text);
+                      }
+                    },
+                    decoration: InputDecoration(
+                      labelText: 'Product Name *',
+                      hintText: 'Enter the product name',
+                      prefixIcon: Icon(
+                        Icons.production_quantity_limits,
+                        color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                      ),
+                      suffixIcon: _nameController.text.isNotEmpty
+                          ? IconButton(
+                              icon: Icon(Icons.clear, 
+                                color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _nameController.clear();
+                                  _productSuggestions = [];
+                                  _showSuggestions = false;
+                                });
+                              },
+                            )
+                          : null,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      filled: true,
+                      fillColor: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
+                    ),
+                    style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter product name';
+                      }
+                      if (value.length < 3) {
+                        return 'Name must be at least 3 characters';
+                      }
+                      return null;
+                    },
+                  ),
+                ),
+                const InfoIconWidget(info: FieldInfo.productName),
+              ],
             ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
-            ),
-            filled: true,
-            fillColor: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
-          ),
-          style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Please enter product name';
-            }
-            if (value.length < 3) {
-              return 'Name must be at least 3 characters';
-            }
-            return null;
-          },
+            // Suggestions Dropdown
+            if (_showSuggestions && _productSuggestions.isNotEmpty)
+              Container(
+                margin: const EdgeInsets.only(top: 4),
+                decoration: BoxDecoration(
+                  color: isDarkMode ? Colors.grey.shade800 : Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: isDarkMode
+                          ? Colors.black.withOpacity(0.3)
+                          : Colors.grey.withOpacity(0.2),
+                      spreadRadius: 1,
+                      blurRadius: 8,
+                    ),
+                  ],
+                ),
+                constraints: const BoxConstraints(maxHeight: 200),
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: _productSuggestions.length,
+                  itemBuilder: (context, index) {
+                    final suggestion = _productSuggestions[index];
+                    return Material(
+                      color: Colors.transparent,
+                      child: ListTile(
+                        leading: Icon(
+                          Icons.search,
+                          color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                          size: 16,
+                        ),
+                        title: Text(
+                          suggestion,
+                          style: TextStyle(
+                            color: isDarkMode ? Colors.white : Colors.black,
+                            fontSize: 14,
+                          ),
+                        ),
+                        onTap: () => _selectProductSuggestion(suggestion),
+                      ),
+                    );
+                  },
+                ),
+              ),
+          ],
         ),
         const SizedBox(height: 12),
-        TextFormField(
-          controller: _descriptionController,
-          maxLines: 3,
-          decoration: InputDecoration(
-            labelText: 'Description',
-            hintText: 'Enter product description',
-            prefixIcon: Icon(
-              Icons.description,
-              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _descriptionController,
+                maxLines: 3,
+                decoration: InputDecoration(
+                  labelText: 'Description',
+                  hintText: 'Enter product description',
+                  prefixIcon: Icon(
+                    Icons.description,
+                    color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  filled: true,
+                  fillColor: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
+                ),
+                style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+              ),
             ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
-            ),
-            filled: true,
-            fillColor: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
-          ),
-          style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+            const InfoIconWidget(info: FieldInfo.descriptionField),
+          ],
         ),
         const SizedBox(height: 12),
-        TextFormField(
-          controller: _brandController,
-          decoration: InputDecoration(
-            labelText: 'Brand',
-            hintText: 'Enter brand name',
-            prefixIcon: Icon(
-              Icons.branding_watermark,
-              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _brandController,
+                decoration: InputDecoration(
+                  labelText: 'Brand',
+                  hintText: 'Enter brand name',
+                  prefixIcon: Icon(
+                    Icons.branding_watermark,
+                    color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  filled: true,
+                  fillColor: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
+                ),
+                style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+              ),
             ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
-            ),
-            filled: true,
-            fillColor: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
-          ),
-          style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+            const InfoIconWidget(info: FieldInfo.brand),
+          ],
         ),
         const SizedBox(height: 12),
-        TextFormField(
-          controller: _skuController,
-          decoration: InputDecoration(
-            labelText: 'SKU',
-            hintText: 'Enter SKU code',
-            prefixIcon: Icon(
-              Icons.code,
-              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _skuController,
+                decoration: InputDecoration(
+                  labelText: 'SKU',
+                  hintText: 'Enter SKU code',
+                  prefixIcon: Icon(
+                    Icons.code,
+                    color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  filled: true,
+                  fillColor: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
+                ),
+                style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+              ),
             ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
-            ),
-            filled: true,
-            fillColor: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
-          ),
-          style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+            const InfoIconWidget(info: FieldInfo.sku),
+          ],
         ),
       ],
     );
@@ -929,286 +1075,366 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   Widget _buildPricingStockFields(String currencySymbol, bool isDarkMode) {
     return Column(
       children: [
-        TextFormField(
-          controller: _priceController,
-          decoration: InputDecoration(
-            labelText: 'Selling Price *',
-            hintText: '0.00',
-            prefixIcon: Icon(
-              Icons.attach_money,
-              color: isDarkMode ? Colors.green.shade400 : Colors.green.shade700,
-            ),
-            prefixText: '$currencySymbol ',
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
-            ),
-            filled: true,
-            fillColor: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
-          ),
-          keyboardType: TextInputType.number,
-          style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
-          inputFormatters: [
-            FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
-          ],
-          validator: (value) {
-            if (value == null || value.isEmpty) return 'Required';
-            if (double.tryParse(value) == null) return 'Invalid number';
-            if (double.parse(value) < 0) return 'Price must be positive';
-            return null;
-          },
-        ),
-        const SizedBox(height: 12),
-        TextFormField(
-          controller: _costController,
-          decoration: InputDecoration(
-            labelText: 'Cost Price *',
-            hintText: '0.00',
-            prefixIcon: Icon(
-              Icons.currency_exchange,
-              color: isDarkMode ? Colors.orange.shade400 : Colors.orange.shade700,
-            ),
-            prefixText: '$currencySymbol ',
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
-            ),
-            filled: true,
-            fillColor: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
-          ),
-          keyboardType: TextInputType.number,
-          style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
-          inputFormatters: [
-            FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
-          ],
-          validator: (value) {
-            if (value == null || value.isEmpty) return 'Required';
-            if (double.tryParse(value) == null) return 'Invalid number';
-            if (double.parse(value) < 0) return 'Cost must be positive';
-            return null;
-          },
-        ),
-        const SizedBox(height: 12),
-        TextFormField(
-          controller: _salePriceController,
-          decoration: InputDecoration(
-            labelText: 'Sale Price',
-            hintText: '0.00 (Optional)',
-            prefixIcon: Icon(
-              Icons.local_offer,
-              color: isDarkMode ? Colors.purple.shade400 : Colors.purple.shade700,
-            ),
-            prefixText: '$currencySymbol ',
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
-            ),
-            filled: true,
-            fillColor: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
-          ),
-          keyboardType: TextInputType.number,
-          style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
-          inputFormatters: [
-            FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
-          ],
-        ),
-        const SizedBox(height: 12),
-        TextFormField(
-          controller: _wholesalePriceController,
-          decoration: InputDecoration(
-            labelText: 'Wholesale Price',
-            hintText: '0.00 (Optional)',
-            prefixIcon: Icon(
-              Icons.shopping_bag,
-              color: isDarkMode ? Colors.teal.shade400 : Colors.teal.shade700,
-            ),
-            prefixText: '$currencySymbol ',
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
-            ),
-            filled: true,
-            fillColor: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
-          ),
-          keyboardType: TextInputType.number,
-          style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
-          inputFormatters: [
-            FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
-          ],
-        ),
-        const SizedBox(height: 12),
-        TextFormField(
-          controller: _stockController,
-          decoration: InputDecoration(
-            labelText: 'Stock Quantity *',
-            hintText: '0',
-            prefixIcon: Icon(
-              Icons.inventory,
-              color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
-            ),
-            filled: true,
-            fillColor: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
-          ),
-          keyboardType: TextInputType.number,
-          style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          validator: (value) {
-            if (value == null || value.isEmpty) return 'Required';
-            if (int.tryParse(value) == null) return 'Invalid number';
-            if (int.parse(value) < 0) return 'Stock cannot be negative';
-            return null;
-          },
-        ),
-        const SizedBox(height: 12),
-        TextFormField(
-          controller: _minStockController,
-          decoration: InputDecoration(
-            labelText: 'Min Stock Alert *',
-            hintText: '10',
-            prefixIcon: Icon(
-              Icons.warning,
-              color: isDarkMode ? Colors.red.shade400 : Colors.red.shade700,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
-            ),
-            filled: true,
-            fillColor: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
-          ),
-          keyboardType: TextInputType.number,
-          style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          validator: (value) {
-            if (value == null || value.isEmpty) return 'Required';
-            if (int.tryParse(value) == null) return 'Invalid number';
-            if (int.parse(value) < 0) return 'Min stock must be positive';
-            return null;
-          },
-        ),
-        const SizedBox(height: 12),
-        TextFormField(
-          controller: _maxStockController,
-          decoration: InputDecoration(
-            labelText: 'Max Stock',
-            hintText: '0 (Optional)',
-            prefixIcon: Icon(
-              Icons.inventory_2,
-              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
-            ),
-            filled: true,
-            fillColor: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
-          ),
-          keyboardType: TextInputType.number,
-          style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-        ),
-        const SizedBox(height: 12),
-        Container(
-          decoration: BoxDecoration(
-            border: Border.all(
-              color: isDarkMode ? Colors.grey.shade600 : Colors.grey.shade300,
-            ),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: DropdownButtonFormField<String>(
-            value: _selectedUnit,
-            decoration: const InputDecoration(
-              labelText: 'Unit *',
-              border: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(horizontal: 12),
-            ),
-            dropdownColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
-            style: TextStyle(
-              color: isDarkMode ? Colors.white : Colors.black,
-            ),
-            items: _units.map((unit) {
-              return DropdownMenuItem(value: unit, child: Text(unit));
-            }).toList(),
-            onChanged: (value) {
-              setState(() {
-                _selectedUnit = value;
-              });
-            },
-            validator: (value) {
-              if (value == null || value.isEmpty) {
-                return 'Please select a unit';
-              }
-              return null;
-            },
-            hint: Text(
-              'Select unit',
-              style: TextStyle(
-                color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _priceController,
+                decoration: InputDecoration(
+                  labelText: 'Selling Price *',
+                  hintText: '0.00',
+                  prefixIcon: Icon(
+                    Icons.attach_money,
+                    color: isDarkMode ? Colors.green.shade400 : Colors.green.shade700,
+                  ),
+                  prefixText: '$currencySymbol ',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  filled: true,
+                  fillColor: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
+                ),
+                keyboardType: TextInputType.number,
+                style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+                ],
+                validator: (value) {
+                  if (value == null || value.isEmpty) return 'Required';
+                  if (double.tryParse(value) == null) return 'Invalid number';
+                  if (double.parse(value) < 0) return 'Price must be positive';
+                  return null;
+                },
               ),
             ),
-          ),
-        ),
-        const SizedBox(height: 12),
-        TextFormField(
-          controller: _weightController,
-          decoration: InputDecoration(
-            labelText: 'Weight',
-            hintText: '0.00 (Optional)',
-            prefixIcon: Icon(
-              Icons.fitness_center,
-              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
-            ),
-            filled: true,
-            fillColor: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
-          ),
-          keyboardType: TextInputType.number,
-          style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
-          inputFormatters: [
-            FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+            const InfoIconWidget(info: FieldInfo.sellingPrice),
           ],
         ),
         const SizedBox(height: 12),
-        Container(
-          decoration: BoxDecoration(
-            border: Border.all(
-              color: isDarkMode ? Colors.grey.shade600 : Colors.grey.shade300,
-            ),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: DropdownButtonFormField<String>(
-            value: _selectedWeightUnit,
-            decoration: const InputDecoration(
-              labelText: 'Weight Unit',
-              border: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(horizontal: 12),
-            ),
-            dropdownColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
-            style: TextStyle(
-              color: isDarkMode ? Colors.white : Colors.black,
-            ),
-            items: _weightUnits.map((unit) {
-              return DropdownMenuItem(value: unit, child: Text(unit));
-            }).toList(),
-            onChanged: (value) {
-              setState(() {
-                _selectedWeightUnit = value;
-              });
-            },
-            hint: Text(
-              'Select unit',
-              style: TextStyle(
-                color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _costController,
+                decoration: InputDecoration(
+                  labelText: 'Cost Price *',
+                  hintText: '0.00',
+                  prefixIcon: Icon(
+                    Icons.currency_exchange,
+                    color: isDarkMode ? Colors.orange.shade400 : Colors.orange.shade700,
+                  ),
+                  prefixText: '$currencySymbol ',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  filled: true,
+                  fillColor: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
+                ),
+                keyboardType: TextInputType.number,
+                style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+                ],
+                validator: (value) {
+                  if (value == null || value.isEmpty) return 'Required';
+                  if (double.tryParse(value) == null) return 'Invalid number';
+                  if (double.parse(value) < 0) return 'Cost must be positive';
+                  return null;
+                },
               ),
             ),
-          ),
+            const InfoIconWidget(info: FieldInfo.costPrice),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _salePriceController,
+                decoration: InputDecoration(
+                  labelText: 'Sale Price',
+                  hintText: '0.00 (Optional)',
+                  prefixIcon: Icon(
+                    Icons.local_offer,
+                    color: isDarkMode ? Colors.purple.shade400 : Colors.purple.shade700,
+                  ),
+                  prefixText: '$currencySymbol ',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  filled: true,
+                  fillColor: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
+                ),
+                keyboardType: TextInputType.number,
+                style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+                ],
+              ),
+            ),
+            const InfoIconWidget(info: FieldInfo.salePrice),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _wholesalePriceController,
+                decoration: InputDecoration(
+                  labelText: 'Wholesale Price',
+                  hintText: '0.00 (Optional)',
+                  prefixIcon: Icon(
+                    Icons.shopping_bag,
+                    color: isDarkMode ? Colors.teal.shade400 : Colors.teal.shade700,
+                  ),
+                  prefixText: '$currencySymbol ',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  filled: true,
+                  fillColor: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
+                ),
+                keyboardType: TextInputType.number,
+                style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+                ],
+              ),
+            ),
+            const InfoIconWidget(info: FieldInfo.wholesalePrice),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _stockController,
+                decoration: InputDecoration(
+                  labelText: 'Stock Quantity *',
+                  hintText: '0',
+                  prefixIcon: Icon(
+                    Icons.inventory,
+                    color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  filled: true,
+                  fillColor: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
+                ),
+                keyboardType: TextInputType.number,
+                style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                validator: (value) {
+                  if (value == null || value.isEmpty) return 'Required';
+                  if (int.tryParse(value) == null) return 'Invalid number';
+                  if (int.parse(value) < 0) return 'Stock cannot be negative';
+                  return null;
+                },
+              ),
+            ),
+            const InfoIconWidget(info: FieldInfo.stockQuantity),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _minStockController,
+                decoration: InputDecoration(
+                  labelText: 'Min Stock Alert *',
+                  hintText: '10',
+                  prefixIcon: Icon(
+                    Icons.warning,
+                    color: isDarkMode ? Colors.red.shade400 : Colors.red.shade700,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  filled: true,
+                  fillColor: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
+                ),
+                keyboardType: TextInputType.number,
+                style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                validator: (value) {
+                  if (value == null || value.isEmpty) return 'Required';
+                  if (int.tryParse(value) == null) return 'Invalid number';
+                  if (int.parse(value) < 0) return 'Min stock must be positive';
+                  return null;
+                },
+              ),
+            ),
+            const InfoIconWidget(info: FieldInfo.minStockAlert),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _maxStockController,
+                decoration: InputDecoration(
+                  labelText: 'Max Stock',
+                  hintText: '0 (Optional)',
+                  prefixIcon: Icon(
+                    Icons.inventory_2,
+                    color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  filled: true,
+                  fillColor: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
+                ),
+                keyboardType: TextInputType.number,
+                style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              ),
+            ),
+            const InfoIconWidget(info: FieldInfo.maxStock),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: isDarkMode ? Colors.grey.shade600 : Colors.grey.shade300,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: DropdownButtonFormField<String>(
+                  value: _selectedUnit,
+                  decoration: const InputDecoration(
+                    labelText: 'Unit *',
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.symmetric(horizontal: 12),
+                  ),
+                  dropdownColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.white : Colors.black,
+                  ),
+                  items: _units.map((unit) {
+                    return DropdownMenuItem(value: unit, child: Text(unit));
+                  }).toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedUnit = value;
+                    });
+                  },
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please select a unit';
+                    }
+                    return null;
+                  },
+                  hint: Text(
+                    'Select unit',
+                    style: TextStyle(
+                      color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const InfoIconWidget(info: FieldInfo.unit),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _weightController,
+                decoration: InputDecoration(
+                  labelText: 'Weight',
+                  hintText: '0.00 (Optional)',
+                  prefixIcon: Icon(
+                    Icons.fitness_center,
+                    color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  filled: true,
+                  fillColor: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
+                ),
+                keyboardType: TextInputType.number,
+                style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+                ],
+              ),
+            ),
+            const InfoIconWidget(info: FieldInfo.weight),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: isDarkMode ? Colors.grey.shade600 : Colors.grey.shade300,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: DropdownButtonFormField<String>(
+                  value: _selectedWeightUnit,
+                  decoration: const InputDecoration(
+                    labelText: 'Weight Unit',
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.symmetric(horizontal: 12),
+                  ),
+                  dropdownColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.white : Colors.black,
+                  ),
+                  items: _weightUnits.map((unit) {
+                    return DropdownMenuItem(value: unit, child: Text(unit));
+                  }).toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedWeightUnit = value;
+                    });
+                  },
+                  hint: Text(
+                    'Select unit',
+                    style: TextStyle(
+                      color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const InfoIconWidget(info: FieldInfo.weightUnit),
+          ],
         ),
       ],
     );
@@ -1217,28 +1443,52 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   Widget _buildDateFields(bool isDarkMode) {
     return Column(
       children: [
-        _buildDatePicker(
-          label: 'Manufacture Date',
-          date: _manufactureDate,
-          icon: Icons.factory,
-          onTap: () => _selectDate(context, 'manufacture'),
-          isDarkMode: isDarkMode,
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: _buildDatePicker(
+                label: 'Manufacture Date',
+                date: _manufactureDate,
+                icon: Icons.factory,
+                onTap: () => _selectDate(context, 'manufacture'),
+                isDarkMode: isDarkMode,
+              ),
+            ),
+            const InfoIconWidget(info: FieldInfo.manufactureDate),
+          ],
         ),
         const SizedBox(height: 12),
-        _buildDatePicker(
-          label: 'Expiry Date',
-          date: _expiryDate,
-          icon: Icons.warning_amber,
-          onTap: () => _selectDate(context, 'expiry'),
-          isDarkMode: isDarkMode,
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: _buildDatePicker(
+                label: 'Expiry Date',
+                date: _expiryDate,
+                icon: Icons.warning_amber,
+                onTap: () => _selectDate(context, 'expiry'),
+                isDarkMode: isDarkMode,
+              ),
+            ),
+            const InfoIconWidget(info: FieldInfo.expiryDate),
+          ],
         ),
         const SizedBox(height: 12),
-        _buildDatePicker(
-          label: 'Best Before Date',
-          date: _bestBeforeDate,
-          icon: Icons.calendar_today,
-          onTap: () => _selectDate(context, 'bestBefore'),
-          isDarkMode: isDarkMode,
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: _buildDatePicker(
+                label: 'Best Before Date',
+                date: _bestBeforeDate,
+                icon: Icons.calendar_today,
+                onTap: () => _selectDate(context, 'bestBefore'),
+                isDarkMode: isDarkMode,
+              ),
+            ),
+            const InfoIconWidget(info: FieldInfo.bestBeforeDate),
+          ],
         ),
       ],
     );
@@ -1297,201 +1547,258 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   Widget _buildAdditionalFields(bool isDarkMode) {
     return Column(
       children: [
-        TextFormField(
-          controller: _barcodeController,
-          decoration: InputDecoration(
-            labelText: 'Barcode',
-            hintText: 'Enter barcode',
-            prefixIcon: Icon(
-              Icons.barcode_reader,
-              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
-            ),
-            filled: true,
-            fillColor: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
-          ),
-          style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
-        ),
-        const SizedBox(height: 12),
-        TextFormField(
-          controller: _qrCodeController,
-          decoration: InputDecoration(
-            labelText: 'QR Code',
-            hintText: 'Enter QR code',
-            prefixIcon: Icon(
-              Icons.qr_code,
-              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
-            ),
-            filled: true,
-            fillColor: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
-          ),
-          style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
-        ),
-        const SizedBox(height: 12),
-        Container(
-          decoration: BoxDecoration(
-            border: Border.all(
-              color: isDarkMode ? Colors.grey.shade600 : Colors.grey.shade300,
-            ),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: DropdownButtonFormField<String>(
-            value: _selectedCategory,
-            decoration: const InputDecoration(
-              labelText: 'Category *',
-              border: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(horizontal: 12),
-            ),
-            dropdownColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
-            style: TextStyle(
-              color: isDarkMode ? Colors.white : Colors.black,
-            ),
-            items: [
-              const DropdownMenuItem(
-                value: null,
-                child: Text('Select category...'),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _barcodeController,
+                decoration: InputDecoration(
+                  labelText: 'Barcode',
+                  hintText: 'Enter barcode',
+                  prefixIcon: Icon(
+                    Icons.barcode_reader,
+                    color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  filled: true,
+                  fillColor: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
+                ),
+                style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
               ),
-              ..._categories.map((category) {
-                return DropdownMenuItem(
-                  value: category,
-                  child: Text(category),
-                );
-              }),
-            ],
-            onChanged: (value) {
-              setState(() {
-                _selectedCategory = value;
-              });
-            },
-            validator: (value) {
-              if (value == null || value.isEmpty) {
-                return 'Please select a category';
-              }
-              return null;
-            },
-          ),
+            ),
+            const InfoIconWidget(info: FieldInfo.barcode),
+          ],
         ),
         const SizedBox(height: 12),
-        Container(
-          decoration: BoxDecoration(
-            border: Border.all(
-              color: isDarkMode ? Colors.grey.shade600 : Colors.grey.shade300,
-            ),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: DropdownButtonFormField<String>(
-            value: _selectedSubCategory,
-            decoration: const InputDecoration(
-              labelText: 'Sub Category',
-              border: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(horizontal: 12),
-            ),
-            dropdownColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
-            style: TextStyle(
-              color: isDarkMode ? Colors.white : Colors.black,
-            ),
-            items: [
-              const DropdownMenuItem(
-                value: null,
-                child: Text('Select sub category...'),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _qrCodeController,
+                decoration: InputDecoration(
+                  labelText: 'QR Code',
+                  hintText: 'Enter QR code',
+                  prefixIcon: Icon(
+                    Icons.qr_code,
+                    color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  filled: true,
+                  fillColor: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
+                ),
+                style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
               ),
-              ..._subCategories.map((subCat) {
-                return DropdownMenuItem(
-                  value: subCat,
-                  child: Text(subCat),
-                );
-              }),
-            ],
-            onChanged: (value) {
-              setState(() {
-                _selectedSubCategory = value;
-              });
-            },
-          ),
+            ),
+            const InfoIconWidget(info: FieldInfo.qrCode),
+          ],
         ),
         const SizedBox(height: 12),
-        Container(
-          decoration: BoxDecoration(
-            border: Border.all(
-              color: isDarkMode ? Colors.grey.shade600 : Colors.grey.shade300,
-            ),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: DropdownButtonFormField<String>(
-            value: _selectedTaxClass,
-            decoration: const InputDecoration(
-              labelText: 'Tax Class',
-              border: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(horizontal: 12),
-            ),
-            dropdownColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
-            style: TextStyle(
-              color: isDarkMode ? Colors.white : Colors.black,
-            ),
-            items: [
-              const DropdownMenuItem(
-                value: null,
-                child: Text('Select tax class...'),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: isDarkMode ? Colors.grey.shade600 : Colors.grey.shade300,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: DropdownButtonFormField<String>(
+                  value: _selectedCategory,
+                  decoration: const InputDecoration(
+                    labelText: 'Category *',
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.symmetric(horizontal: 12),
+                  ),
+                  dropdownColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.white : Colors.black,
+                  ),
+                  items: [
+                    const DropdownMenuItem(
+                      value: null,
+                      child: Text('Select category...'),
+                    ),
+                    ..._categories.map((category) {
+                      return DropdownMenuItem(
+                        value: category,
+                        child: Text(category),
+                      );
+                    }),
+                  ],
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedCategory = value;
+                      _updateSubCategories();
+                    });
+                  },
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please select a category';
+                    }
+                    return null;
+                  },
+                ),
               ),
-              ..._taxClasses.map((tax) {
-                return DropdownMenuItem(value: tax, child: Text(tax));
-              }),
-            ],
-            onChanged: (value) {
-              setState(() {
-                _selectedTaxClass = value;
-              });
-            },
-          ),
+            ),
+            const InfoIconWidget(info: FieldInfo.category),
+          ],
         ),
         const SizedBox(height: 12),
-        TextFormField(
-          controller: _reorderPointController,
-          decoration: InputDecoration(
-            labelText: 'Reorder Point',
-            hintText: '0 (Optional)',
-            prefixIcon: Icon(
-              Icons.notifications_active,
-              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: isDarkMode ? Colors.grey.shade600 : Colors.grey.shade300,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: DropdownButtonFormField<String>(
+                  value: _selectedSubCategory,
+                  decoration: const InputDecoration(
+                    labelText: 'Sub Category',
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.symmetric(horizontal: 12),
+                  ),
+                  dropdownColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.white : Colors.black,
+                  ),
+                  items: [
+                    const DropdownMenuItem(
+                      value: null,
+                      child: Text('Select sub category...'),
+                    ),
+                    ..._subCategories.map((subCat) {
+                      return DropdownMenuItem(
+                        value: subCat,
+                        child: Text(subCat),
+                      );
+                    }),
+                  ],
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedSubCategory = value;
+                    });
+                  },
+                ),
+              ),
             ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
-            ),
-            filled: true,
-            fillColor: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
-          ),
-          keyboardType: TextInputType.number,
-          style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            const InfoIconWidget(info: FieldInfo.subCategory),
+          ],
         ),
         const SizedBox(height: 12),
-        TextFormField(
-          controller: _reorderQuantityController,
-          decoration: InputDecoration(
-            labelText: 'Reorder Quantity',
-            hintText: '0 (Optional)',
-            prefixIcon: Icon(
-              Icons.shopping_cart,
-              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: isDarkMode ? Colors.grey.shade600 : Colors.grey.shade300,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: DropdownButtonFormField<String>(
+                  value: _selectedTaxClass,
+                  decoration: const InputDecoration(
+                    labelText: 'Tax Class',
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.symmetric(horizontal: 12),
+                  ),
+                  dropdownColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.white : Colors.black,
+                  ),
+                  items: [
+                    const DropdownMenuItem(
+                      value: null,
+                      child: Text('Select tax class...'),
+                    ),
+                    ..._taxClasses.map((tax) {
+                      return DropdownMenuItem(value: tax, child: Text(tax));
+                    }),
+                  ],
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedTaxClass = value;
+                    });
+                  },
+                ),
+              ),
             ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
+            const InfoIconWidget(info: FieldInfo.taxClass),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _reorderPointController,
+                decoration: InputDecoration(
+                  labelText: 'Reorder Point',
+                  hintText: '0 (Optional)',
+                  prefixIcon: Icon(
+                    Icons.notifications_active,
+                    color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  filled: true,
+                  fillColor: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
+                ),
+                keyboardType: TextInputType.number,
+                style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              ),
             ),
-            filled: true,
-            fillColor: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
-          ),
-          keyboardType: TextInputType.number,
-          style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            const InfoIconWidget(info: FieldInfo.reorderPoint),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _reorderQuantityController,
+                decoration: InputDecoration(
+                  labelText: 'Reorder Quantity',
+                  hintText: '0 (Optional)',
+                  prefixIcon: Icon(
+                    Icons.shopping_cart,
+                    color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  filled: true,
+                  fillColor: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
+                ),
+                keyboardType: TextInputType.number,
+                style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              ),
+            ),
+            const InfoIconWidget(info: FieldInfo.reorderQuantity),
+          ],
         ),
       ],
     );
@@ -1500,42 +1807,58 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   Widget _buildSupplierFields(bool isDarkMode) {
     return Column(
       children: [
-        TextFormField(
-          controller: _supplierNameController,
-          decoration: InputDecoration(
-            labelText: 'Supplier Name',
-            hintText: 'Enter supplier name',
-            prefixIcon: Icon(
-              Icons.business,
-              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _supplierNameController,
+                decoration: InputDecoration(
+                  labelText: 'Supplier Name',
+                  hintText: 'Enter supplier name',
+                  prefixIcon: Icon(
+                    Icons.business,
+                    color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  filled: true,
+                  fillColor: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
+                ),
+                style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+              ),
             ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
-            ),
-            filled: true,
-            fillColor: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
-          ),
-          style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+            const InfoIconWidget(info: FieldInfo.supplierName),
+          ],
         ),
         const SizedBox(height: 12),
-        TextFormField(
-          controller: _supplierSkuController,
-          decoration: InputDecoration(
-            labelText: 'Supplier SKU',
-            hintText: 'Enter supplier SKU',
-            prefixIcon: Icon(
-              Icons.code,
-              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _supplierSkuController,
+                decoration: InputDecoration(
+                  labelText: 'Supplier SKU',
+                  hintText: 'Enter supplier SKU',
+                  prefixIcon: Icon(
+                    Icons.code,
+                    color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  filled: true,
+                  fillColor: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
+                ),
+                style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+              ),
             ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
-            ),
-            filled: true,
-            fillColor: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
-          ),
-          style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+            const InfoIconWidget(info: FieldInfo.supplierSku),
+          ],
         ),
       ],
     );
@@ -1544,116 +1867,128 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   Widget _buildStatusSection(bool isDarkMode) {
     return Column(
       children: [
-        SwitchListTile(
-          title: Text(
-            'Product Active',
-            style: TextStyle(
-              fontWeight: FontWeight.w500,
-              color: isDarkMode ? Colors.white : Colors.black,
+        Material(
+          color: Colors.transparent,
+          child: SwitchListTile(
+            title: Text(
+              'Product Active',
+              style: TextStyle(
+                fontWeight: FontWeight.w500,
+                color: isDarkMode ? Colors.white : Colors.black,
+              ),
             ),
-          ),
-          subtitle: Text(
-            _isActive
-                ? 'Product is visible and available for sale'
-                : 'Product is hidden and not available for sale',
-            style: TextStyle(
-              fontSize: 12,
-              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+            subtitle: Text(
+              _isActive
+                  ? 'Product is visible and available for sale'
+                  : 'Product is hidden and not available for sale',
+              style: TextStyle(
+                fontSize: 12,
+                color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+              ),
             ),
+            value: _isActive,
+            onChanged: (value) {
+              setState(() {
+                _isActive = value;
+              });
+            },
+            activeColor: isDarkMode ? Colors.green.shade400 : Colors.green,
+            inactiveThumbColor: isDarkMode ? Colors.grey.shade400 : Colors.grey,
+            contentPadding: EdgeInsets.zero,
           ),
-          value: _isActive,
-          onChanged: (value) {
-            setState(() {
-              _isActive = value;
-            });
-          },
-          activeColor: isDarkMode ? Colors.green.shade400 : Colors.green,
-          inactiveThumbColor: isDarkMode ? Colors.grey.shade400 : Colors.grey,
-          contentPadding: EdgeInsets.zero,
         ),
         const Divider(height: 1),
-        SwitchListTile(
-          title: Text(
-            'Featured Product',
-            style: TextStyle(
-              fontWeight: FontWeight.w500,
-              color: isDarkMode ? Colors.white : Colors.black,
+        Material(
+          color: Colors.transparent,
+          child: SwitchListTile(
+            title: Text(
+              'Featured Product',
+              style: TextStyle(
+                fontWeight: FontWeight.w500,
+                color: isDarkMode ? Colors.white : Colors.black,
+              ),
             ),
-          ),
-          subtitle: Text(
-            _isFeatured
-                ? 'Product appears in featured section'
-                : 'Product not featured',
-            style: TextStyle(
-              fontSize: 12,
-              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+            subtitle: Text(
+              _isFeatured
+                  ? 'Product appears in featured section'
+                  : 'Product not featured',
+              style: TextStyle(
+                fontSize: 12,
+                color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+              ),
             ),
+            value: _isFeatured,
+            onChanged: (value) {
+              setState(() {
+                _isFeatured = value;
+              });
+            },
+            activeColor: isDarkMode ? Colors.orange.shade400 : Colors.orange,
+            inactiveThumbColor: isDarkMode ? Colors.grey.shade400 : Colors.grey,
+            contentPadding: EdgeInsets.zero,
           ),
-          value: _isFeatured,
-          onChanged: (value) {
-            setState(() {
-              _isFeatured = value;
-            });
-          },
-          activeColor: isDarkMode ? Colors.orange.shade400 : Colors.orange,
-          inactiveThumbColor: isDarkMode ? Colors.grey.shade400 : Colors.grey,
-          contentPadding: EdgeInsets.zero,
         ),
         const Divider(height: 1),
-        SwitchListTile(
-          title: Text(
-            'Digital Product',
-            style: TextStyle(
-              fontWeight: FontWeight.w500,
-              color: isDarkMode ? Colors.white : Colors.black,
+        Material(
+          color: Colors.transparent,
+          child: SwitchListTile(
+            title: Text(
+              'Digital Product',
+              style: TextStyle(
+                fontWeight: FontWeight.w500,
+                color: isDarkMode ? Colors.white : Colors.black,
+              ),
             ),
-          ),
-          subtitle: Text(
-            _isDigital
-                ? 'Product is digital (no shipping required)'
-                : 'Product is physical (requires shipping)',
-            style: TextStyle(
-              fontSize: 12,
-              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+            subtitle: Text(
+              _isDigital
+                  ? 'Product is digital (no shipping required)'
+                  : 'Product is physical (requires shipping)',
+              style: TextStyle(
+                fontSize: 12,
+                color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+              ),
             ),
+            value: _isDigital,
+            onChanged: (value) {
+              setState(() {
+                _isDigital = value;
+              });
+            },
+            activeColor: isDarkMode ? Colors.purple.shade400 : Colors.purple,
+            inactiveThumbColor: isDarkMode ? Colors.grey.shade400 : Colors.grey,
+            contentPadding: EdgeInsets.zero,
           ),
-          value: _isDigital,
-          onChanged: (value) {
-            setState(() {
-              _isDigital = value;
-            });
-          },
-          activeColor: isDarkMode ? Colors.purple.shade400 : Colors.purple,
-          inactiveThumbColor: isDarkMode ? Colors.grey.shade400 : Colors.grey,
-          contentPadding: EdgeInsets.zero,
         ),
         const Divider(height: 1),
-        SwitchListTile(
-          title: Text(
-            'Has Variants',
-            style: TextStyle(
-              fontWeight: FontWeight.w500,
-              color: isDarkMode ? Colors.white : Colors.black,
+        Material(
+          color: Colors.transparent,
+          child: SwitchListTile(
+            title: Text(
+              'Has Variants',
+              style: TextStyle(
+                fontWeight: FontWeight.w500,
+                color: isDarkMode ? Colors.white : Colors.black,
+              ),
             ),
-          ),
-          subtitle: Text(
-            _hasVariants
-                ? 'Product has multiple variants (size, color, etc.)'
-                : 'Product is a single item without variants',
-            style: TextStyle(
-              fontSize: 12,
-              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+            subtitle: Text(
+              _hasVariants
+                  ? 'Product has multiple variants (size, color, etc.)'
+                  : 'Product is a single item without variants',
+              style: TextStyle(
+                fontSize: 12,
+                color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+              ),
             ),
+            value: _hasVariants,
+            onChanged: (value) {
+              setState(() {
+                _hasVariants = value;
+              });
+            },
+            activeColor: isDarkMode ? Colors.blue.shade400 : Colors.blue,
+            inactiveThumbColor: isDarkMode ? Colors.grey.shade400 : Colors.grey,
+            contentPadding: EdgeInsets.zero,
           ),
-          value: _hasVariants,
-          onChanged: (value) {
-            setState(() {
-              _hasVariants = value;
-            });
-          },
-          activeColor: isDarkMode ? Colors.blue.shade400 : Colors.blue,
-          inactiveThumbColor: isDarkMode ? Colors.grey.shade400 : Colors.grey,
-          contentPadding: EdgeInsets.zero,
         ),
       ],
     );

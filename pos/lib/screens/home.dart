@@ -290,37 +290,33 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildCategoryChip(String label, String? category, bool isDarkMode) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(20),
-        child: FilterChip(
-          label: Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              color: isDarkMode ? Colors.white : Colors.black,
-            ),
-          ),
-          selected: false,
-          onSelected: (selected) {
-            // Category filtering can be implemented here
-          },
-          backgroundColor: isDarkMode
-              ? Colors.grey.shade800
-              : Colors.grey.shade100,
-          selectedColor: isDarkMode ? Colors.blue.shade900 : Colors.blue.shade100,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-            side: BorderSide(
-              color: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade300,
-            ),
-          ),
+  return Padding(
+    padding: const EdgeInsets.only(right: 8),
+    child: FilterChip(
+      label: Text(
+        label,
+        style: TextStyle(
+          fontSize: 12,
+          color: isDarkMode ? Colors.white : Colors.black,
         ),
       ),
-    );
-  }
+      selected: false,
+      onSelected: (selected) {
+        // Category filtering can be implemented here
+      },
+      backgroundColor: isDarkMode
+          ? Colors.grey.shade800
+          : Colors.grey.shade100,
+      selectedColor: isDarkMode ? Colors.blue.shade900 : Colors.blue.shade100,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(
+          color: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade300,
+        ),
+      ),
+    ),
+  );
+}
 
   // ==================== CART LIST ====================
   Widget _buildCartList(String currencySymbol, bool isDarkMode) {
@@ -354,16 +350,15 @@ class _HomeScreenState extends State<HomeScreen> {
               size: 30,
             ),
           ),
-          child: Material(
-            color: Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-            child: Card(
-              elevation: 2,
-              margin: const EdgeInsets.only(bottom: 8),
-              color: isDarkMode ? Colors.grey.shade800 : Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
+          child: Card(
+            elevation: 2,
+            margin: const EdgeInsets.only(bottom: 8),
+            color: isDarkMode ? Colors.grey.shade800 : Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Material(
+              color: Colors.transparent,
               child: ListTile(
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 16,
@@ -1383,11 +1378,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       var data =
                           snapshot.data!.docs[index].data()
                               as Map<String, dynamic>;
-                      return Material(
-                        color: Colors.transparent,
-                        borderRadius: BorderRadius.circular(8),
-                        child: Card(
-                          color: isDarkMode ? Colors.grey.shade800 : Colors.white,
+                      return Card(
+                        color: isDarkMode ? Colors.grey.shade800 : Colors.white,
+                        child: Material(
+                          color: Colors.transparent,
                           child: ListTile(
                             leading: CircleAvatar(
                               backgroundColor: isDarkMode

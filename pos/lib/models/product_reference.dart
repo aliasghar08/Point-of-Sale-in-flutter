@@ -627,11 +627,14 @@ class ProductReference {
     ],
   };
 
-  // Helper methods
+  // ===== HELPER METHODS =====
+
+  /// Get all products for a specific category
   static List<String> getProductsByCategory(String category) {
     return productNamesByCategory[category] ?? [];
   }
 
+  /// Search products across all categories or a specific category
   static List<String> searchProducts({
     required String query,
     String? category,
@@ -668,11 +671,80 @@ class ProductReference {
     return results.take(limit).toList();
   }
 
+  /// Get all category names
   static List<String> getCategories() {
     return productNamesByCategory.keys.toList();
   }
 
+  /// Get product count for a specific category
   static int getProductCountByCategory(String category) {
     return productNamesByCategory[category]?.length ?? 0;
+  }
+
+  /// Find which category a product belongs to
+  static String? findCategoryForProduct(String productName) {
+    if (productName.isEmpty) return null;
+    
+    final searchTerm = productName.toLowerCase().trim();
+    
+    for (var entry in productNamesByCategory.entries) {
+      for (var product in entry.value) {
+        if (product.toLowerCase() == searchTerm) {
+          return entry.key;
+        }
+      }
+    }
+    return null;
+  }
+
+  /// Get subcategories (currently returns the product names in a category as subcategories)
+  /// You can modify this to return actual subcategories if you have them defined
+  static List<String> getSubCategories(String category) {
+    // Return the product list as subcategories, or you can define specific subcategories
+    return productNamesByCategory[category] ?? [];
+  }
+
+  /// Check if a product exists in the reference data
+  static bool productExists(String productName) {
+    if (productName.isEmpty) return false;
+    return findCategoryForProduct(productName) != null;
+  }
+
+  /// Get all products across all categories
+  static List<String> getAllProducts() {
+    final List<String> allProducts = [];
+    productNamesByCategory.values.forEach((products) {
+      allProducts.addAll(products);
+    });
+    return allProducts;
+  }
+
+  /// Get products by partial match (more flexible than searchProducts)
+  static List<String> getProductsByPartialMatch(String query, {int limit = 10}) {
+    if (query.isEmpty) return [];
+    
+    final searchTerm = query.toLowerCase().trim();
+    final List<String> results = [];
+    
+    for (var entry in productNamesByCategory.entries) {
+      for (var product in entry.value) {
+        if (product.toLowerCase().contains(searchTerm)) {
+          results.add(product);
+        }
+      }
+    }
+    
+    results.sort((a, b) {
+      final aLower = a.toLowerCase();
+      final bLower = b.toLowerCase();
+      
+      if (aLower == searchTerm) return -1;
+      if (bLower == searchTerm) return 1;
+      if (aLower.startsWith(searchTerm) && !bLower.startsWith(searchTerm)) return -1;
+      if (bLower.startsWith(searchTerm) && !aLower.startsWith(searchTerm)) return 1;
+      return a.compareTo(b);
+    });
+    
+    return results.take(limit).toList();
   }
 }

@@ -37,9 +37,21 @@ class FirebaseService {
 
   // ==================== PRODUCTS ====================
 
-  // ✅ products getter - Returns top-level products collection
+  // ✅ products getter - Top-level products collection (Legacy/Admin access)
   CollectionReference<Map<String, dynamic>> get products {
     return _firestore.collection('products');
+  }
+
+  // ✅ getBusinessProducts - Business-scoped products collection
+  Future<CollectionReference<Map<String, dynamic>>> getBusinessProducts() async {
+    final businessId = await getCurrentBusinessId();
+    if (businessId == null) {
+      throw Exception('Business not found');
+    }
+    return _firestore
+        .collection('businesses')
+        .doc(businessId)
+        .collection('products');
   }
 
   // ✅ productsStream for real-time updates with business scoping
@@ -237,11 +249,73 @@ class FirebaseService {
     }
   }
 
+  // ✅ getProductByName - Search products by name in business
+  Future<QuerySnapshot> getProductByName(String name) async {
+    try {
+      if (!isAuthenticated) {
+        throw Exception('User not authenticated');
+      }
+
+      final businessId = await getCurrentBusinessId();
+      if (businessId == null) {
+        throw Exception('Business not found');
+      }
+
+      final productsRef = _firestore
+          .collection('businesses')
+          .doc(businessId)
+          .collection('products');
+
+      return await productsRef
+          .where('name', isGreaterThanOrEqualTo: name)
+          .where('name', isLessThanOrEqualTo: name + '\uf8ff')
+          .limit(20)
+          .get();
+    } catch (e) {
+      throw Exception('Failed to search products: $e');
+    }
+  }
+
+  // ✅ getAllProducts - Get all products from business
+  Future<QuerySnapshot> getAllProducts() async {
+    try {
+      if (!isAuthenticated) {
+        throw Exception('User not authenticated');
+      }
+
+      final businessId = await getCurrentBusinessId();
+      if (businessId == null) {
+        throw Exception('Business not found');
+      }
+
+      final productsRef = _firestore
+          .collection('businesses')
+          .doc(businessId)
+          .collection('products');
+
+      return await productsRef.get();
+    } catch (e) {
+      throw Exception('Failed to get products: $e');
+    }
+  }
+
   // ==================== SALES ====================
 
-  // ✅ sales getter - Returns top-level sales collection
+  // ✅ sales getter - Top-level sales collection (Legacy/Admin access)
   CollectionReference<Map<String, dynamic>> get sales {
     return _firestore.collection('sales');
+  }
+
+  // ✅ getBusinessSales - Business-scoped sales collection
+  Future<CollectionReference<Map<String, dynamic>>> getBusinessSales() async {
+    final businessId = await getCurrentBusinessId();
+    if (businessId == null) {
+      throw Exception('Business not found');
+    }
+    return _firestore
+        .collection('businesses')
+        .doc(businessId)
+        .collection('sales');
   }
 
   // ✅ salesStream for real-time updates
@@ -295,6 +369,71 @@ class FirebaseService {
       return docRef;
     } catch (e) {
       throw Exception('Failed to add sale: $e');
+    }
+  }
+
+  // ✅ getSalesByDate - Get sales by date range
+  Future<QuerySnapshot> getSalesByDate(DateTime startDate, DateTime endDate) async {
+    try {
+      if (!isAuthenticated) {
+        throw Exception('User not authenticated');
+      }
+
+      final businessId = await getCurrentBusinessId();
+      if (businessId == null) {
+        throw Exception('Business not found');
+      }
+
+      final salesRef = _firestore
+          .collection('businesses')
+          .doc(businessId)
+          .collection('sales');
+
+      return await salesRef
+          .where('saleDate', isGreaterThanOrEqualTo: startDate)
+          .where('saleDate', isLessThanOrEqualTo: endDate)
+          .orderBy('saleDate', descending: true)
+          .get();
+    } catch (e) {
+      throw Exception('Failed to get sales: $e');
+    }
+  }
+
+  // ✅ getSalesByReceiptNumber - Get sale by receipt number
+  Future<QuerySnapshot> getSalesByReceiptNumber(String receiptNumber) async {
+    try {
+      if (!isAuthenticated) {
+        throw Exception('User not authenticated');
+      }
+
+      final businessId = await getCurrentBusinessId();
+      if (businessId == null) {
+        throw Exception('Business not found');
+      }
+
+      final salesRef = _firestore
+          .collection('businesses')
+          .doc(businessId)
+          .collection('sales');
+
+      return await salesRef
+          .where('receiptNumber', isEqualTo: receiptNumber)
+          .limit(1)
+          .get();
+    } catch (e) {
+      throw Exception('Failed to get sale: $e');
+    }
+  }
+
+  // ✅ getTodaySales - Get today's sales
+  Future<QuerySnapshot> getTodaySales() async {
+    try {
+      final now = DateTime.now();
+      final startOfDay = DateTime(now.year, now.month, now.day);
+      final endOfDay = DateTime(now.year, now.month, now.day, 23, 59, 59);
+      return await getSalesByDate(startOfDay, endOfDay);
+    } catch (e) {
+      throw Exception('Failed to get today\'s sales: $e');
     }
   }
 
@@ -365,6 +504,28 @@ class FirebaseService {
     } catch (e) {
       debugPrint('Error getting business info: $e');
       return null;
+    }
+  }
+
+  // ✅ Update business info
+  Future<void> updateBusinessInfo(Map<String, dynamic> data) async {
+    try {
+      if (!isAuthenticated) {
+        throw Exception('User not authenticated');
+      }
+
+      final businessId = await getCurrentBusinessId();
+      if (businessId == null) {
+        throw Exception('Business not found');
+      }
+
+      data['updatedAt'] = FieldValue.serverTimestamp();
+      await _firestore
+          .collection('businesses')
+          .doc(businessId)
+          .update(data);
+    } catch (e) {
+      throw Exception('Failed to update business: $e');
     }
   }
 
@@ -545,6 +706,81 @@ class FirebaseService {
       });
     } catch (e) {
       throw Exception('Failed to remove user: $e');
+    }
+  }
+
+  // ✅ Get user profile
+  Future<DocumentSnapshot> getUserProfile(String userId) async {
+    try {
+      return await _firestore.collection('users').doc(userId).get();
+    } catch (e) {
+      throw Exception('Failed to get user profile: $e');
+    }
+  }
+
+  // ✅ Update user profile
+  Future<void> updateUserProfile(String userId, Map<String, dynamic> data) async {
+    try {
+      data['updatedAt'] = FieldValue.serverTimestamp();
+      await _firestore.collection('users').doc(userId).update(data);
+    } catch (e) {
+      throw Exception('Failed to update user profile: $e');
+    }
+  }
+
+  // ==================== DASHBOARD / STATISTICS ====================
+
+  // ✅ Get total products count
+  Future<int> getTotalProductsCount() async {
+    try {
+      final snapshot = await getAllProducts();
+      return snapshot.docs.length;
+    } catch (e) {
+      debugPrint('Error getting product count: $e');
+      return 0;
+    }
+  }
+
+  // ✅ Get total sales amount for today
+  Future<double> getTodaySalesAmount() async {
+    try {
+      final snapshot = await getTodaySales();
+      double total = 0.0;
+      for (var doc in snapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        total += (data['total'] ?? 0.0).toDouble();
+      }
+      return total;
+    } catch (e) {
+      debugPrint('Error getting today\'s sales: $e');
+      return 0.0;
+    }
+  }
+
+  // ✅ Get low stock products
+  Future<QuerySnapshot> getLowStockProducts() async {
+    try {
+      if (!isAuthenticated) {
+        throw Exception('User not authenticated');
+      }
+
+      final businessId = await getCurrentBusinessId();
+      if (businessId == null) {
+        throw Exception('Business not found');
+      }
+
+      final productsRef = _firestore
+          .collection('businesses')
+          .doc(businessId)
+          .collection('products');
+
+      // Get products where stock <= minStock
+      return await productsRef
+          .where('stock', isLessThanOrEqualTo: 5) // You can make this dynamic
+          .limit(20)
+          .get();
+    } catch (e) {
+      throw Exception('Failed to get low stock products: $e');
     }
   }
 
