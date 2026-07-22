@@ -1,4 +1,5 @@
 class ProductReference {
+  // ===== PRODUCT NAMES BY CATEGORY =====
   static final Map<String, List<String>> productNamesByCategory = {
     // ===== MEDICINES =====
     'Medicines': [
@@ -627,6 +628,79 @@ class ProductReference {
     ],
   };
 
+  // ===== UNITS =====
+  static const List<String> units = [
+    'pcs (Pieces)',
+    'kg (Kilograms)',
+    'g (Grams)',
+    'mg (Milligrams)',
+    'l (Liters)',
+    'ml (Milliliters)',
+    'm (Meters)',
+    'cm (Centimeters)',
+    'box (Box)',
+    'pack (Pack)',
+    'set (Set)',
+    'pair (Pair)',
+    'dozen (Dozen)',
+    'roll (Roll)',
+  ];
+
+  // ===== WEIGHT UNITS =====
+  static const List<String> weightUnits = ['kg', 'g', 'lbs', 'oz'];
+
+  // ===== TAX CLASSES =====
+  static const List<String> taxClasses = [
+    'Standard (18%)',
+    'Reduced (5%)',
+    'Zero (0%)',
+    'Exempt',
+  ];
+
+  // ===== PAYMENT METHODS =====
+  static const List<String> paymentMethods = [
+    'Cash',
+    'Card',
+    'Mobile Payment',
+    'Credit',
+  ];
+
+  // ===== UNIT CONVERSION MAP =====
+  static const Map<String, String> unitSymbols = {
+    'pcs (Pieces)': 'pcs',
+    'kg (Kilograms)': 'kg',
+    'g (Grams)': 'g',
+    'mg (Milligrams)': 'mg',
+    'l (Liters)': 'L',
+    'ml (Milliliters)': 'mL',
+    'm (Meters)': 'm',
+    'cm (Centimeters)': 'cm',
+    'box (Box)': 'box',
+    'pack (Pack)': 'pack',
+    'set (Set)': 'set',
+    'pair (Pair)': 'pair',
+    'dozen (Dozen)': 'doz',
+    'roll (Roll)': 'roll',
+  };
+
+  // ===== UNIT TYPES =====
+  static const Map<String, String> unitTypes = {
+    'pcs (Pieces)': 'count',
+    'kg (Kilograms)': 'weight',
+    'g (Grams)': 'weight',
+    'mg (Milligrams)': 'weight',
+    'l (Liters)': 'volume',
+    'ml (Milliliters)': 'volume',
+    'm (Meters)': 'length',
+    'cm (Centimeters)': 'length',
+    'box (Box)': 'container',
+    'pack (Pack)': 'container',
+    'set (Set)': 'container',
+    'pair (Pair)': 'container',
+    'dozen (Dozen)': 'container',
+    'roll (Roll)': 'container',
+  };
+
   // ===== HELPER METHODS =====
 
   /// Get all products for a specific category
@@ -698,9 +772,7 @@ class ProductReference {
   }
 
   /// Get subcategories (currently returns the product names in a category as subcategories)
-  /// You can modify this to return actual subcategories if you have them defined
   static List<String> getSubCategories(String category) {
-    // Return the product list as subcategories, or you can define specific subcategories
     return productNamesByCategory[category] ?? [];
   }
 
@@ -746,5 +818,65 @@ class ProductReference {
     });
     
     return results.take(limit).toList();
+  }
+
+  /// Get unit symbol
+  static String getUnitSymbol(String unit) {
+    return unitSymbols[unit] ?? unit;
+  }
+
+  /// Get unit type (count, weight, volume, length, container)
+  static String getUnitType(String unit) {
+    return unitTypes[unit] ?? 'count';
+  }
+
+  /// Check if unit is a weight unit
+  static bool isWeightUnit(String unit) {
+    return getUnitType(unit) == 'weight';
+  }
+
+  /// Check if unit is a volume unit
+  static bool isVolumeUnit(String unit) {
+    return getUnitType(unit) == 'volume';
+  }
+
+  /// Get payment methods
+  static List<String> getPaymentMethods() {
+    return paymentMethods;
+  }
+
+  /// Get units by type
+  static List<String> getUnitsByType(String type) {
+    return units.where((unit) => getUnitType(unit) == type).toList();
+  }
+
+  /// Get weight units
+  static List<String> getWeightUnits() {
+    return weightUnits;
+  }
+
+  /// Get tax classes
+  static List<String> getTaxClasses() {
+    return taxClasses;
+  }
+
+  /// Get all units
+  static List<String> getUnits() {
+    return units;
+  }
+
+  /// Get default unit
+  static String getDefaultUnit() {
+    return 'pcs (Pieces)';
+  }
+
+  /// Get default weight unit
+  static String getDefaultWeightUnit() {
+    return 'kg';
+  }
+
+  /// Get default tax class
+  static String getDefaultTaxClass() {
+    return 'Standard (18%)';
   }
 }

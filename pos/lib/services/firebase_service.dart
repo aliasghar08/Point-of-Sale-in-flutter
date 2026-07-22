@@ -14,11 +14,12 @@ class FirebaseService {
 
   bool get isAuthenticated => _currentUserId != null;
 
-  // ✅ Get the current user's business ID
+  // ✅ Get the current user's business ID - FIXED
   Future<String?> getCurrentBusinessId() async {
     try {
       if (!isAuthenticated) return null;
 
+      // First, check if user has a businessId in their user document
       final userDoc = await _firestore
           .collection('users')
           .doc(_currentUserId)
@@ -26,8 +27,64 @@ class FirebaseService {
 
       if (userDoc.exists) {
         final data = userDoc.data() as Map<String, dynamic>;
-        return data['businessId'] as String?;
+        final businessId = data['businessId'] as String?;
+        if (businessId != null && businessId.isNotEmpty) {
+          return businessId;
+        }
       }
+
+      // If no businessId, search the businesses collection
+      // Look for a business where the user is the owner
+      final businessesSnapshot = await _firestore
+          .collection('businesses')
+          .where('ownerId', isEqualTo: _currentUserId)
+          .limit(1)
+          .get();
+
+      if (businessesSnapshot.docs.isNotEmpty) {
+        // The document ID is the businessId
+        final businessId = businessesSnapshot.docs.first.id;
+        
+        // Save the businessId to the user's document for future use
+        await _firestore.collection('users').doc(_currentUserId).set({
+          'businessId': businessId,
+          'role': 'owner',
+          'email': _auth.currentUser?.email ?? '',
+          'name': _auth.currentUser?.displayName ?? 'User',
+          'isActive': true,
+          'createdAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+        
+        return businessId;
+      }
+
+      // Also check if user exists in any business's users sub-collection
+      final allBusinesses = await _firestore.collection('businesses').get();
+      
+      for (var businessDoc in allBusinesses.docs) {
+        final userInBusiness = await businessDoc.reference
+            .collection('users')
+            .doc(_currentUserId)
+            .get();
+        
+        if (userInBusiness.exists) {
+          final businessId = businessDoc.id;
+          
+          await _firestore.collection('users').doc(_currentUserId).set({
+            'businessId': businessId,
+            'role': 'owner',
+            'email': _auth.currentUser?.email ?? '',
+            'name': _auth.currentUser?.displayName ?? 'User',
+            'isActive': true,
+            'createdAt': FieldValue.serverTimestamp(),
+            'updatedAt': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+          
+          return businessId;
+        }
+      }
+
       return null;
     } catch (e) {
       debugPrint('Error getting business ID: $e');
@@ -450,6 +507,7 @@ class FirebaseService {
       final businessData = {
         'name': businessName,
         'ownerId': _currentUserId,
+        'isActive': true,
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       };
@@ -457,22 +515,22 @@ class FirebaseService {
       final businessRef = await _firestore.collection('businesses').add(businessData);
       final businessId = businessRef.id;
 
-      // 2. Add the user to the users collection with businessId
-      await _firestore.collection('users').doc(_currentUserId).set({
-        'businessId': businessId,
-        'role': 'owner',
-        'email': _auth.currentUser?.email ?? '',
+      // 2. Add user to business's users sub-collection
+      await businessRef.collection('users').doc(_currentUserId).set({
         'name': _auth.currentUser?.displayName ?? 'User',
+        'email': _auth.currentUser?.email ?? '',
+        'role': 'owner',
         'isActive': true,
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
-      // 3. Add user to business's users sub-collection
-      await businessRef.collection('users').doc(_currentUserId).set({
-        'name': _auth.currentUser?.displayName ?? 'User',
-        'email': _auth.currentUser?.email ?? '',
+      // 3. Update user's document with businessId
+      await _firestore.collection('users').doc(_currentUserId).set({
+        'businessId': businessId,
         'role': 'owner',
+        'email': _auth.currentUser?.email ?? '',
+        'name': _auth.currentUser?.displayName ?? 'User',
         'isActive': true,
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
@@ -504,283 +562,6 @@ class FirebaseService {
     } catch (e) {
       debugPrint('Error getting business info: $e');
       return null;
-    }
-  }
-
-  // ✅ Update business info
-  Future<void> updateBusinessInfo(Map<String, dynamic> data) async {
-    try {
-      if (!isAuthenticated) {
-        throw Exception('User not authenticated');
-      }
-
-      final businessId = await getCurrentBusinessId();
-      if (businessId == null) {
-        throw Exception('Business not found');
-      }
-
-      data['updatedAt'] = FieldValue.serverTimestamp();
-      await _firestore
-          .collection('businesses')
-          .doc(businessId)
-          .update(data);
-    } catch (e) {
-      throw Exception('Failed to update business: $e');
-    }
-  }
-
-  // ✅ Get all users from business
-  Future<QuerySnapshot> getBusinessUsers() async {
-    try {
-      if (!isAuthenticated) {
-        throw Exception('User not authenticated');
-      }
-
-      final businessId = await getCurrentBusinessId();
-      if (businessId == null) {
-        throw Exception('Business not found');
-      }
-
-      return await _firestore
-          .collection('businesses')
-          .doc(businessId)
-          .collection('users')
-          .get();
-    } catch (e) {
-      throw Exception('Failed to get business users: $e');
-    }
-  }
-
-  // ✅ Add user to business
-  Future<void> addUserToBusiness({
-    required String userId,
-    required String name,
-    required String email,
-    required String role,
-    required String phone,
-  }) async {
-    try {
-      if (!isAuthenticated) {
-        throw Exception('User not authenticated');
-      }
-
-      final businessId = await getCurrentBusinessId();
-      if (businessId == null) {
-        throw Exception('Business not found');
-      }
-
-      final businessRef = _firestore.collection('businesses').doc(businessId);
-
-      // Check if manager already exists
-      if (role == 'manager') {
-        final existingManager = await businessRef
-            .collection('users')
-            .where('role', isEqualTo: 'manager')
-            .limit(1)
-            .get();
-
-        if (existingManager.docs.isNotEmpty) {
-          throw Exception('This business already has a manager. Only one manager is allowed.');
-        }
-      }
-
-      // Add user to business users sub-collection
-      await businessRef.collection('users').doc(userId).set({
-        'name': name,
-        'email': email,
-        'role': role,
-        'phone': phone,
-        'isActive': true,
-        'createdAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-
-      // Update user's document with businessId
-      await _firestore.collection('users').doc(userId).set({
-        'businessId': businessId,
-        'role': role,
-        'email': email,
-        'name': name,
-        'isActive': true,
-        'createdAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-    } catch (e) {
-      throw Exception('Failed to add user to business: $e');
-    }
-  }
-
-  // ✅ Update user role
-  Future<void> updateUserRole(String userId, String newRole) async {
-    try {
-      if (!isAuthenticated) {
-        throw Exception('User not authenticated');
-      }
-
-      final businessId = await getCurrentBusinessId();
-      if (businessId == null) {
-        throw Exception('Business not found');
-      }
-
-      final businessRef = _firestore.collection('businesses').doc(businessId);
-
-      if (newRole == 'manager') {
-        final existingManager = await businessRef
-            .collection('users')
-            .where('role', isEqualTo: 'manager')
-            .limit(1)
-            .get();
-
-        if (existingManager.docs.isNotEmpty && existingManager.docs.first.id != userId) {
-          throw Exception('This business already has a manager. Only one manager is allowed.');
-        }
-      }
-
-      // Update in business users sub-collection
-      await businessRef.collection('users').doc(userId).update({
-        'role': newRole,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-
-      // Update in users collection
-      await _firestore.collection('users').doc(userId).update({
-        'role': newRole,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-    } catch (e) {
-      throw Exception('Failed to update user role: $e');
-    }
-  }
-
-  // ✅ Toggle user active status
-  Future<void> toggleUserActive(String userId, bool isActive) async {
-    try {
-      if (!isAuthenticated) {
-        throw Exception('User not authenticated');
-      }
-
-      final businessId = await getCurrentBusinessId();
-      if (businessId == null) {
-        throw Exception('Business not found');
-      }
-
-      final businessRef = _firestore.collection('businesses').doc(businessId);
-
-      // Update in business users sub-collection
-      await businessRef.collection('users').doc(userId).update({
-        'isActive': isActive,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-
-      // Update in users collection
-      await _firestore.collection('users').doc(userId).update({
-        'isActive': isActive,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-    } catch (e) {
-      throw Exception('Failed to toggle user status: $e');
-    }
-  }
-
-  // ✅ Remove user from business
-  Future<void> removeUserFromBusiness(String userId) async {
-    try {
-      if (!isAuthenticated) {
-        throw Exception('User not authenticated');
-      }
-
-      final businessId = await getCurrentBusinessId();
-      if (businessId == null) {
-        throw Exception('Business not found');
-      }
-
-      final businessRef = _firestore.collection('businesses').doc(businessId);
-
-      // Remove from business users sub-collection
-      await businessRef.collection('users').doc(userId).delete();
-
-      // Remove businessId from users collection
-      await _firestore.collection('users').doc(userId).update({
-        'businessId': FieldValue.delete(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-    } catch (e) {
-      throw Exception('Failed to remove user: $e');
-    }
-  }
-
-  // ✅ Get user profile
-  Future<DocumentSnapshot> getUserProfile(String userId) async {
-    try {
-      return await _firestore.collection('users').doc(userId).get();
-    } catch (e) {
-      throw Exception('Failed to get user profile: $e');
-    }
-  }
-
-  // ✅ Update user profile
-  Future<void> updateUserProfile(String userId, Map<String, dynamic> data) async {
-    try {
-      data['updatedAt'] = FieldValue.serverTimestamp();
-      await _firestore.collection('users').doc(userId).update(data);
-    } catch (e) {
-      throw Exception('Failed to update user profile: $e');
-    }
-  }
-
-  // ==================== DASHBOARD / STATISTICS ====================
-
-  // ✅ Get total products count
-  Future<int> getTotalProductsCount() async {
-    try {
-      final snapshot = await getAllProducts();
-      return snapshot.docs.length;
-    } catch (e) {
-      debugPrint('Error getting product count: $e');
-      return 0;
-    }
-  }
-
-  // ✅ Get total sales amount for today
-  Future<double> getTodaySalesAmount() async {
-    try {
-      final snapshot = await getTodaySales();
-      double total = 0.0;
-      for (var doc in snapshot.docs) {
-        final data = doc.data() as Map<String, dynamic>;
-        total += (data['total'] ?? 0.0).toDouble();
-      }
-      return total;
-    } catch (e) {
-      debugPrint('Error getting today\'s sales: $e');
-      return 0.0;
-    }
-  }
-
-  // ✅ Get low stock products
-  Future<QuerySnapshot> getLowStockProducts() async {
-    try {
-      if (!isAuthenticated) {
-        throw Exception('User not authenticated');
-      }
-
-      final businessId = await getCurrentBusinessId();
-      if (businessId == null) {
-        throw Exception('Business not found');
-      }
-
-      final productsRef = _firestore
-          .collection('businesses')
-          .doc(businessId)
-          .collection('products');
-
-      // Get products where stock <= minStock
-      return await productsRef
-          .where('stock', isLessThanOrEqualTo: 5) // You can make this dynamic
-          .limit(20)
-          .get();
-    } catch (e) {
-      throw Exception('Failed to get low stock products: $e');
     }
   }
 
