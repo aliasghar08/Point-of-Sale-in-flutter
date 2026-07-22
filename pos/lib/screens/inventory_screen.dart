@@ -44,7 +44,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
           _buildStatsSummary(isDarkMode),
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
-              // ✅ FIXED: Use productsStream() instead of products.snapshots()
               stream: _firebaseService.productsStream(),
               builder: (context, snapshot) {
                 // Handle loading state
@@ -102,7 +101,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   return _buildEmptyState(isDarkMode);
                 }
 
-                // Check if documents exist
+                // ✅ Check if the snapshot is from the empty fallback collection
+                // or if it genuinely has no documents
                 if (snapshot.data!.docs.isEmpty) {
                   return _buildEmptyState(isDarkMode);
                 }
@@ -603,7 +603,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
   // ==================== STATS SUMMARY ====================
   Widget _buildStatsSummary(bool isDarkMode) {
     return StreamBuilder<QuerySnapshot>(
-      // ✅ FIXED: Use productsStream() instead of products.snapshots()
       stream: _firebaseService.productsStream(),
       builder: (context, snapshot) {
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {

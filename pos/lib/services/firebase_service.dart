@@ -14,12 +14,13 @@ class FirebaseService {
 
   bool get isAuthenticated => _currentUserId != null;
 
+  // ✅ Get the current user's business ID
   Future<String?> getCurrentBusinessId() async {
     try {
       if (!isAuthenticated) return null;
 
       final userDoc = await _firestore
-          .collection('userBusinessLookup')
+          .collection('users')
           .doc(_currentUserId)
           .get();
 
@@ -34,26 +35,20 @@ class FirebaseService {
     }
   }
 
-  Future<DocumentReference?> getBusinessRef() async {
-    final businessId = await getCurrentBusinessId();
-    if (businessId == null) return null;
-    return _firestore.collection('businesses').doc(businessId);
-  }
-
   // ==================== PRODUCTS ====================
 
+  // ✅ products getter - Returns top-level products collection
   CollectionReference<Map<String, dynamic>> get products {
     return _firestore.collection('products');
   }
 
-  // ✅ Simple working solution - no custom classes needed
+  // ✅ productsStream for real-time updates with business scoping
   Stream<QuerySnapshot> productsStream() {
     return getCurrentBusinessId().asStream().asyncExpand((businessId) {
       if (businessId == null) {
         debugPrint('⚠️ No business found');
-        // Return empty stream with real snapshot
         return Stream.fromFuture(
-          _firestore.collection('_empty').limit(0).get()
+          _firestore.collection('_empty').limit(1).get()
         );
       }
 
@@ -66,57 +61,7 @@ class FirebaseService {
     });
   }
 
-  Future<CollectionReference<Map<String, dynamic>>> getProductsCollection() async {
-    final businessId = await getCurrentBusinessId();
-    if (businessId == null) {
-      throw Exception('Business not found');
-    }
-    return _firestore
-        .collection('businesses')
-        .doc(businessId)
-        .collection('products');
-  }
-
-  Future<QuerySnapshot> getProducts({
-    String? category,
-    bool? isActive,
-    int? limit,
-  }) async {
-    try {
-      if (!isAuthenticated) {
-        throw Exception('User not authenticated');
-      }
-
-      final businessId = await getCurrentBusinessId();
-      if (businessId == null) {
-        throw Exception('Business not found');
-      }
-
-      final productsRef = _firestore
-          .collection('businesses')
-          .doc(businessId)
-          .collection('products');
-
-      Query query = productsRef;
-
-      if (category != null && category.isNotEmpty) {
-        query = query.where('category', isEqualTo: category);
-      }
-
-      if (isActive != null) {
-        query = query.where('isActive', isEqualTo: isActive);
-      }
-
-      if (limit != null) {
-        query = query.limit(limit);
-      }
-
-      return await query.get();
-    } catch (e) {
-      throw Exception('Failed to get products: $e');
-    }
-  }
-
+  // ✅ addProduct - Add product to business
   Future<DocumentReference> addProduct(Map<String, dynamic> productData) async {
     try {
       if (!isAuthenticated) {
@@ -144,6 +89,7 @@ class FirebaseService {
     }
   }
 
+  // ✅ updateProduct - Update product in business
   Future<void> updateProduct(String id, Map<String, dynamic> data) async {
     try {
       if (!isAuthenticated) {
@@ -167,6 +113,7 @@ class FirebaseService {
     }
   }
 
+  // ✅ deleteProduct - Delete product from business
   Future<void> deleteProduct(String id) async {
     try {
       if (!isAuthenticated) {
@@ -189,6 +136,7 @@ class FirebaseService {
     }
   }
 
+  // ✅ getProductByBarcode - Search by barcode in business
   Future<QuerySnapshot> getProductByBarcode(String barcode) async {
     try {
       if (!isAuthenticated) {
@@ -214,6 +162,7 @@ class FirebaseService {
     }
   }
 
+  // ✅ getProductByQRCode - Search by QR code in business
   Future<QuerySnapshot> getProductByQRCode(String qrCode) async {
     try {
       if (!isAuthenticated) {
@@ -239,6 +188,7 @@ class FirebaseService {
     }
   }
 
+  // ✅ getProductById - Get product by ID from business
   Future<DocumentSnapshot> getProductById(String productId) async {
     try {
       if (!isAuthenticated) {
@@ -261,61 +211,7 @@ class FirebaseService {
     }
   }
 
-  Future<QuerySnapshot> searchProductsByName(String query) async {
-    try {
-      if (!isAuthenticated) {
-        throw Exception('User not authenticated');
-      }
-
-      final businessId = await getCurrentBusinessId();
-      if (businessId == null) {
-        throw Exception('Business not found');
-      }
-
-      final productsRef = _firestore
-          .collection('businesses')
-          .doc(businessId)
-          .collection('products');
-
-      if (query.isEmpty) {
-        return await productsRef.limit(20).get();
-      }
-
-      return await productsRef
-          .where('name', isGreaterThanOrEqualTo: query)
-          .where('name', isLessThanOrEqualTo: query + '\uf8ff')
-          .limit(20)
-          .get();
-    } catch (e) {
-      throw Exception('Failed to search products: $e');
-    }
-  }
-
-  Future<QuerySnapshot> getLowStockProducts(int threshold) async {
-    try {
-      if (!isAuthenticated) {
-        throw Exception('User not authenticated');
-      }
-
-      final businessId = await getCurrentBusinessId();
-      if (businessId == null) {
-        throw Exception('Business not found');
-      }
-
-      final productsRef = _firestore
-          .collection('businesses')
-          .doc(businessId)
-          .collection('products');
-
-      return await productsRef
-          .where('stock', isLessThanOrEqualTo: threshold)
-          .where('isActive', isEqualTo: true)
-          .get();
-    } catch (e) {
-      throw Exception('Failed to get low stock products: $e');
-    }
-  }
-
+  // ✅ updateProductStock - Update stock in business
   Future<void> updateProductStock(String productId, int quantityChange) async {
     try {
       if (!isAuthenticated) {
@@ -343,16 +239,18 @@ class FirebaseService {
 
   // ==================== SALES ====================
 
+  // ✅ sales getter - Returns top-level sales collection
   CollectionReference<Map<String, dynamic>> get sales {
     return _firestore.collection('sales');
   }
 
+  // ✅ salesStream for real-time updates
   Stream<QuerySnapshot> salesStream() {
     return getCurrentBusinessId().asStream().asyncExpand((businessId) {
       if (businessId == null) {
         debugPrint('⚠️ No business found');
         return Stream.fromFuture(
-          _firestore.collection('_empty').limit(0).get()
+          _firestore.collection('_empty').limit(1).get()
         );
       }
 
@@ -365,53 +263,7 @@ class FirebaseService {
     });
   }
 
-  Future<QuerySnapshot> getSales({
-    DateTime? fromDate,
-    DateTime? toDate,
-    String? productId,
-    int? limit,
-  }) async {
-    try {
-      if (!isAuthenticated) {
-        throw Exception('User not authenticated');
-      }
-
-      final businessId = await getCurrentBusinessId();
-      if (businessId == null) {
-        throw Exception('Business not found');
-      }
-
-      final salesRef = _firestore
-          .collection('businesses')
-          .doc(businessId)
-          .collection('sales');
-
-      Query query = salesRef;
-
-      if (fromDate != null) {
-        query = query.where('saleDate', isGreaterThanOrEqualTo: fromDate);
-      }
-
-      if (toDate != null) {
-        query = query.where('saleDate', isLessThanOrEqualTo: toDate);
-      }
-
-      if (productId != null && productId.isNotEmpty) {
-        query = query.where('productId', isEqualTo: productId);
-      }
-
-      if (limit != null) {
-        query = query.limit(limit);
-      }
-
-      query = query.orderBy('saleDate', descending: true);
-
-      return await query.get();
-    } catch (e) {
-      throw Exception('Failed to get sales: $e');
-    }
-  }
-
+  // ✅ addSale - Add sale to business
   Future<DocumentReference> addSale(Map<String, dynamic> saleData) async {
     try {
       if (!isAuthenticated) {
@@ -446,160 +298,77 @@ class FirebaseService {
     }
   }
 
-  Future<QuerySnapshot> getDailySales(DateTime date) async {
-    try {
-      if (!isAuthenticated) {
-        throw Exception('User not authenticated');
-      }
-
-      final businessId = await getCurrentBusinessId();
-      if (businessId == null) {
-        throw Exception('Business not found');
-      }
-
-      final salesRef = _firestore
-          .collection('businesses')
-          .doc(businessId)
-          .collection('sales');
-
-      DateTime start = DateTime(date.year, date.month, date.day);
-      DateTime end = start.add(const Duration(days: 1));
-
-      return await salesRef
-          .where('saleDate', isGreaterThanOrEqualTo: start)
-          .where('saleDate', isLessThan: end)
-          .orderBy('saleDate', descending: true)
-          .get();
-    } catch (e) {
-      throw Exception('Failed to get daily sales: $e');
-    }
-  }
-
-  Future<QuerySnapshot> getMonthlySales(DateTime date) async {
-    try {
-      if (!isAuthenticated) {
-        throw Exception('User not authenticated');
-      }
-
-      final businessId = await getCurrentBusinessId();
-      if (businessId == null) {
-        throw Exception('Business not found');
-      }
-
-      final salesRef = _firestore
-          .collection('businesses')
-          .doc(businessId)
-          .collection('sales');
-
-      DateTime start = DateTime(date.year, date.month, 1);
-      DateTime end = (date.month < 12)
-          ? DateTime(date.year, date.month + 1, 1)
-          : DateTime(date.year + 1, 1, 1);
-
-      return await salesRef
-          .where('saleDate', isGreaterThanOrEqualTo: start)
-          .where('saleDate', isLessThan: end)
-          .orderBy('saleDate', descending: true)
-          .get();
-    } catch (e) {
-      throw Exception('Failed to get monthly sales: $e');
-    }
-  }
-
-  Future<Map<String, dynamic>> getSalesSummary(DateTime date) async {
-    try {
-      if (!isAuthenticated) {
-        throw Exception('User not authenticated');
-      }
-
-      final businessId = await getCurrentBusinessId();
-      if (businessId == null) {
-        throw Exception('Business not found');
-      }
-
-      final salesRef = _firestore
-          .collection('businesses')
-          .doc(businessId)
-          .collection('sales');
-
-      DateTime start = DateTime(date.year, date.month, date.day);
-      DateTime end = start.add(const Duration(days: 1));
-
-      final dailySales = await salesRef
-          .where('saleDate', isGreaterThanOrEqualTo: start)
-          .where('saleDate', isLessThan: end)
-          .get();
-
-      double totalSales = 0;
-      double totalProfit = 0;
-      int totalItems = 0;
-
-      for (var doc in dailySales.docs) {
-        var data = doc.data() as Map<String, dynamic>;
-        totalSales += (data['total'] ?? 0).toDouble();
-        totalProfit += (data['profit'] ?? 0).toDouble();
-
-        final quantity = data['quantity'];
-        if (quantity is int) {
-          totalItems += quantity;
-        } else if (quantity is double) {
-          totalItems += quantity.toInt();
-        } else {
-          totalItems += (quantity ?? 0) as int;
-        }
-      }
-
-      return {
-        'totalSales': totalSales,
-        'totalProfit': totalProfit,
-        'totalItems': totalItems,
-        'transactionCount': dailySales.docs.length,
-      };
-    } catch (e) {
-      throw Exception('Failed to get sales summary: $e');
-    }
-  }
-
   // ==================== BUSINESS METHODS ====================
 
-  Future<DocumentSnapshot> getStoreSettings() async {
+  // ✅ Create a business and link the current user
+  Future<String> createBusiness(String businessName) async {
     try {
       if (!isAuthenticated) {
         throw Exception('User not authenticated');
       }
 
-      final businessId = await getCurrentBusinessId();
-      if (businessId == null) {
-        throw Exception('Business not found');
-      }
+      // 1. Create the business document
+      final businessData = {
+        'name': businessName,
+        'ownerId': _currentUserId,
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+      
+      final businessRef = await _firestore.collection('businesses').add(businessData);
+      final businessId = businessRef.id;
 
-      return await _firestore.collection('businesses').doc(businessId).get();
+      // 2. Add the user to the users collection with businessId
+      await _firestore.collection('users').doc(_currentUserId).set({
+        'businessId': businessId,
+        'role': 'owner',
+        'email': _auth.currentUser?.email ?? '',
+        'name': _auth.currentUser?.displayName ?? 'User',
+        'isActive': true,
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      // 3. Add user to business's users sub-collection
+      await businessRef.collection('users').doc(_currentUserId).set({
+        'name': _auth.currentUser?.displayName ?? 'User',
+        'email': _auth.currentUser?.email ?? '',
+        'role': 'owner',
+        'isActive': true,
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      return businessId;
     } catch (e) {
-      throw Exception('Failed to get store settings: $e');
+      throw Exception('Failed to create business: $e');
     }
   }
 
-  Future<void> saveStoreSettings(Map<String, dynamic> settings) async {
+  // ✅ Get business info
+  Future<Map<String, dynamic>?> getBusinessInfo() async {
     try {
-      if (!isAuthenticated) {
-        throw Exception('User not authenticated');
-      }
+      if (!isAuthenticated) return null;
 
       final businessId = await getCurrentBusinessId();
-      if (businessId == null) {
-        throw Exception('Business not found');
-      }
+      if (businessId == null) return null;
 
-      settings['updatedAt'] = FieldValue.serverTimestamp();
-      await _firestore
+      final doc = await _firestore
           .collection('businesses')
           .doc(businessId)
-          .set(settings, SetOptions(merge: true));
+          .get();
+
+      if (doc.exists) {
+        return doc.data() as Map<String, dynamic>;
+      }
+      return null;
     } catch (e) {
-      throw Exception('Failed to save store settings: $e');
+      debugPrint('Error getting business info: $e');
+      return null;
     }
   }
 
+  // ✅ Get all users from business
   Future<QuerySnapshot> getBusinessUsers() async {
     try {
       if (!isAuthenticated) {
@@ -621,6 +390,7 @@ class FirebaseService {
     }
   }
 
+  // ✅ Add user to business
   Future<void> addUserToBusiness({
     required String userId,
     required String name,
@@ -640,6 +410,7 @@ class FirebaseService {
 
       final businessRef = _firestore.collection('businesses').doc(businessId);
 
+      // Check if manager already exists
       if (role == 'manager') {
         final existingManager = await businessRef
             .collection('users')
@@ -648,12 +419,11 @@ class FirebaseService {
             .get();
 
         if (existingManager.docs.isNotEmpty) {
-          throw Exception(
-            'This business already has a manager. Only one manager is allowed.',
-          );
+          throw Exception('This business already has a manager. Only one manager is allowed.');
         }
       }
 
+      // Add user to business users sub-collection
       await businessRef.collection('users').doc(userId).set({
         'name': name,
         'email': email,
@@ -664,17 +434,22 @@ class FirebaseService {
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
-      await _firestore.collection('userBusinessLookup').doc(userId).set({
+      // Update user's document with businessId
+      await _firestore.collection('users').doc(userId).set({
         'businessId': businessId,
         'role': role,
         'email': email,
         'name': name,
+        'isActive': true,
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
       });
     } catch (e) {
       throw Exception('Failed to add user to business: $e');
     }
   }
 
+  // ✅ Update user role
   Future<void> updateUserRole(String userId, String newRole) async {
     try {
       if (!isAuthenticated) {
@@ -696,25 +471,27 @@ class FirebaseService {
             .get();
 
         if (existingManager.docs.isNotEmpty && existingManager.docs.first.id != userId) {
-          throw Exception(
-            'This business already has a manager. Only one manager is allowed.',
-          );
+          throw Exception('This business already has a manager. Only one manager is allowed.');
         }
       }
 
+      // Update in business users sub-collection
       await businessRef.collection('users').doc(userId).update({
         'role': newRole,
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
-      await _firestore.collection('userBusinessLookup').doc(userId).update({
+      // Update in users collection
+      await _firestore.collection('users').doc(userId).update({
         'role': newRole,
+        'updatedAt': FieldValue.serverTimestamp(),
       });
     } catch (e) {
       throw Exception('Failed to update user role: $e');
     }
   }
 
+  // ✅ Toggle user active status
   Future<void> toggleUserActive(String userId, bool isActive) async {
     try {
       if (!isAuthenticated) {
@@ -728,7 +505,14 @@ class FirebaseService {
 
       final businessRef = _firestore.collection('businesses').doc(businessId);
 
+      // Update in business users sub-collection
       await businessRef.collection('users').doc(userId).update({
+        'isActive': isActive,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      // Update in users collection
+      await _firestore.collection('users').doc(userId).update({
         'isActive': isActive,
         'updatedAt': FieldValue.serverTimestamp(),
       });
@@ -737,30 +521,7 @@ class FirebaseService {
     }
   }
 
-  Future<Map<String, dynamic>?> getBusinessInfo() async {
-    try {
-      if (!isAuthenticated) {
-        throw Exception('User not authenticated');
-      }
-
-      final businessId = await getCurrentBusinessId();
-      if (businessId == null) return null;
-
-      final doc = await _firestore
-          .collection('businesses')
-          .doc(businessId)
-          .get();
-
-      if (doc.exists) {
-        return doc.data() as Map<String, dynamic>;
-      }
-      return null;
-    } catch (e) {
-      debugPrint('Error getting business info: $e');
-      return null;
-    }
-  }
-
+  // ✅ Remove user from business
   Future<void> removeUserFromBusiness(String userId) async {
     try {
       if (!isAuthenticated) {
@@ -774,13 +535,19 @@ class FirebaseService {
 
       final businessRef = _firestore.collection('businesses').doc(businessId);
 
+      // Remove from business users sub-collection
       await businessRef.collection('users').doc(userId).delete();
 
-      await _firestore.collection('userBusinessLookup').doc(userId).delete();
+      // Remove businessId from users collection
+      await _firestore.collection('users').doc(userId).update({
+        'businessId': FieldValue.delete(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
     } catch (e) {
       throw Exception('Failed to remove user: $e');
     }
   }
 
+  // ✅ Get Firestore instance for batch operations
   FirebaseFirestore get firestore => _firestore;
 }

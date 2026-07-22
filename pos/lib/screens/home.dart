@@ -54,23 +54,6 @@ class _HomeScreenState extends State<HomeScreen> {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('POS System'),
-        backgroundColor: isDarkMode ? Colors.grey.shade900 : Colors.blue.shade700,
-        foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.history),
-            onPressed: _showSalesHistory,
-            tooltip: 'Sales History',
-          ),
-          IconButton(
-            icon: const Icon(Icons.clear_all),
-            onPressed: _clearCart,
-            tooltip: 'Clear Cart',
-          ),
-        ],
-      ),
       body: Column(
         children: [
           _buildSearchSection(isDarkMode),
@@ -309,26 +292,30 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildCategoryChip(String label, String? category, bool isDarkMode) {
     return Padding(
       padding: const EdgeInsets.only(right: 8),
-      child: FilterChip(
-        label: Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            color: isDarkMode ? Colors.white : Colors.black,
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(20),
+        child: FilterChip(
+          label: Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: isDarkMode ? Colors.white : Colors.black,
+            ),
           ),
-        ),
-        selected: false,
-        onSelected: (selected) {
-          // Category filtering can be implemented here
-        },
-        backgroundColor: isDarkMode
-            ? Colors.grey.shade800
-            : Colors.grey.shade100,
-        selectedColor: isDarkMode ? Colors.blue.shade900 : Colors.blue.shade100,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-          side: BorderSide(
-            color: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade300,
+          selected: false,
+          onSelected: (selected) {
+            // Category filtering can be implemented here
+          },
+          backgroundColor: isDarkMode
+              ? Colors.grey.shade800
+              : Colors.grey.shade100,
+          selectedColor: isDarkMode ? Colors.blue.shade900 : Colors.blue.shade100,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: BorderSide(
+              color: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade300,
+            ),
           ),
         ),
       ),
@@ -367,99 +354,103 @@ class _HomeScreenState extends State<HomeScreen> {
               size: 30,
             ),
           ),
-          child: Card(
-            elevation: 2,
-            margin: const EdgeInsets.only(bottom: 8),
-            color: isDarkMode ? Colors.grey.shade800 : Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: ListTile(
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 4,
+          child: Material(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+            child: Card(
+              elevation: 2,
+              margin: const EdgeInsets.only(bottom: 8),
+              color: isDarkMode ? Colors.grey.shade800 : Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
               ),
-              leading: CircleAvatar(
-                backgroundColor: isDarkMode
-                    ? Colors.blue.shade900
-                    : Colors.blue.shade100,
-                child: Text(
-                  product.stock.toString(),
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: isDarkMode ? Colors.blue.shade400 : Colors.blue,
-                  ),
+              child: ListTile(
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 4,
                 ),
-              ),
-              title: Text(
-                product.name,
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                  color: isDarkMode ? Colors.white : Colors.black,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              subtitle: Text(
-                '$currencySymbol${product.price.toStringAsFixed(2)} × ${product.stock}',
-                style: TextStyle(
-                  color: isDarkMode
-                      ? Colors.grey.shade400
-                      : Colors.grey.shade600,
-                ),
-              ),
-              trailing: Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    '$currencySymbol${itemTotal.toStringAsFixed(2)}',
+                leading: CircleAvatar(
+                  backgroundColor: isDarkMode
+                      ? Colors.blue.shade900
+                      : Colors.blue.shade100,
+                  child: Text(
+                    product.stock.toString(),
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      color: isDarkMode ? Colors.green.shade400 : Colors.green,
-                      fontSize: 16,
+                      color: isDarkMode ? Colors.blue.shade400 : Colors.blue,
                     ),
                   ),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: Icon(
-                          Icons.remove_circle_outline,
-                          color: isDarkMode
-                              ? Colors.red.shade400
-                              : Colors.red.shade300,
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            if (product.stock > 1) {
-                              _updateCartQuantity(product, -1);
-                            } else {
-                              _cartItems.removeAt(index);
-                              _updateTotals();
-                            }
-                          });
-                        },
-                        iconSize: 20,
-                      ),
-                      IconButton(
-                        icon: Icon(
-                          Icons.add_circle_outline,
-                          color: isDarkMode
-                              ? Colors.green.shade400
-                              : Colors.green.shade300,
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            _updateCartQuantity(product, 1);
-                          });
-                        },
-                        iconSize: 20,
-                      ),
-                    ],
+                ),
+                title: Text(
+                  product.name,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    color: isDarkMode ? Colors.white : Colors.black,
                   ),
-                ],
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                subtitle: Text(
+                  '$currencySymbol${product.price.toStringAsFixed(2)} × ${product.stock}',
+                  style: TextStyle(
+                    color: isDarkMode
+                        ? Colors.grey.shade400
+                        : Colors.grey.shade600,
+                  ),
+                ),
+                trailing: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      '$currencySymbol${itemTotal.toStringAsFixed(2)}',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: isDarkMode ? Colors.green.shade400 : Colors.green,
+                        fontSize: 16,
+                      ),
+                    ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: Icon(
+                            Icons.remove_circle_outline,
+                            color: isDarkMode
+                                ? Colors.red.shade400
+                                : Colors.red.shade300,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              if (product.stock > 1) {
+                                _updateCartQuantity(product, -1);
+                              } else {
+                                _cartItems.removeAt(index);
+                                _updateTotals();
+                              }
+                            });
+                          },
+                          iconSize: 20,
+                        ),
+                        IconButton(
+                          icon: Icon(
+                            Icons.add_circle_outline,
+                            color: isDarkMode
+                                ? Colors.green.shade400
+                                : Colors.green.shade300,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              _updateCartQuantity(product, 1);
+                            });
+                          },
+                          iconSize: 20,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -689,7 +680,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ==================== IMPROVED SEARCH LOGIC ====================
+  // ==================== SEARCH LOGIC ====================
   void _searchProduct(String query) async {
     if (query.isEmpty) {
       _showSnackBar('Please enter a search term');
@@ -701,13 +692,11 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     try {
-      // ✅ OPTIMIZATION: Use Future.wait for parallel queries
       final results = await Future.wait([
         _firebaseService.getProductByBarcode(query),
         _firebaseService.getProductByQRCode(query),
       ]);
 
-      // Check barcode result
       if (results[0].docs.isNotEmpty) {
         _addProductToCart(results[0].docs.first);
         _searchController.clear();
@@ -716,7 +705,6 @@ class _HomeScreenState extends State<HomeScreen> {
         return;
       }
 
-      // Check QR result
       if (results[1].docs.isNotEmpty) {
         _addProductToCart(results[1].docs.first);
         _searchController.clear();
@@ -725,7 +713,6 @@ class _HomeScreenState extends State<HomeScreen> {
         return;
       }
 
-      // Search by Name in Firebase
       try {
         QuerySnapshot nameResult = await _firebaseService.products
             .where('name', isGreaterThanOrEqualTo: query)
@@ -742,7 +729,6 @@ class _HomeScreenState extends State<HomeScreen> {
         debugPrint('Name search failed: $e');
       }
 
-      // Fallback to ProductReference for suggestions
       final suggestions = ProductReference.searchProducts(
         query: query,
         limit: 10,
@@ -765,7 +751,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // Show suggestion dialog with products from ProductReference
   void _showSuggestionDialog(List<String> suggestions, String query) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
@@ -805,7 +790,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   itemCount: suggestions.length,
                   itemBuilder: (context, index) {
                     final productName = suggestions[index];
-                    // ✅ FIX: Wrap ListTile in Material to handle ink effects
                     return Material(
                       color: Colors.transparent,
                       borderRadius: BorderRadius.circular(8),
@@ -867,7 +851,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Dialog to add new product from suggestion
   void _showAddProductDialog(String productName) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final priceController = TextEditingController();
@@ -952,7 +935,6 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           TextButton(
             onPressed: () {
-              // ✅ FIX: Dispose controllers when dialog closes
               priceController.dispose();
               costController.dispose();
               stockController.dispose();
@@ -975,7 +957,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 return;
               }
 
-              // ✅ FIX: Dispose controllers before navigating
               priceController.dispose();
               costController.dispose();
               stockController.dispose();
@@ -1002,7 +983,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Create and add product to Firebase
   void _createAndAddProduct(
     String name,
     double price,
@@ -1030,7 +1010,6 @@ class _HomeScreenState extends State<HomeScreen> {
       final docRef = await _firebaseService.products.add(product.toMap());
       final newProduct = product.copyWith(id: docRef.id);
 
-      // Add to cart
       if (mounted) {
         setState(() {
           _cartItems.add(newProduct.copyWith(stock: 1));
@@ -1088,15 +1067,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _removeFromCart(int index) {
-    setState(() {
-      _cartItems.removeAt(index);
-      _updateTotals();
-    });
-  }
-
   void _updateTotals() {
-    // ✅ OPTIMIZATION: Use fold for better performance
     _totalAmount = _cartItems.fold(0.0, (sum, item) => sum + (item.price * item.stock));
     _totalProfit = _cartItems.fold(0.0, (sum, item) => sum + ((item.price - item.costPrice) * item.stock));
   }
@@ -1104,7 +1075,6 @@ class _HomeScreenState extends State<HomeScreen> {
   void _processCheckout() async {
     if (_cartItems.isEmpty) return;
 
-    // ✅ OPTIMIZATION: Batch stock check using Future.wait
     final stockChecks = _cartItems.map((item) async {
       try {
         DocumentSnapshot doc = await _firebaseService.products
@@ -1123,7 +1093,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final results = await Future.wait(stockChecks);
     
-    // Check results
     for (var result in results) {
       final item = result['item'] as Product;
       final available = result['available'] as int;
@@ -1147,7 +1116,6 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       String receiptNumber = 'RCP-${DateTime.now().millisecondsSinceEpoch}';
 
-      // ✅ OPTIMIZATION: Batch sales creation
       final sales = _cartItems.map((item) {
         return Sale(
           id: '',
@@ -1164,16 +1132,13 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       }).toList();
 
-      // ✅ OPTIMIZATION: Use writeBatch for atomic operation
       final batch = _firebaseService.firestore.batch();
       
-      // Add sales
       for (var sale in sales) {
         final saleRef = _firebaseService.sales.doc();
         batch.set(saleRef, sale.toMap());
       }
       
-      // Update product stock
       for (var item in _cartItems) {
         final productRef = _firebaseService.products.doc(item.id);
         batch.update(productRef, {
@@ -1229,7 +1194,6 @@ class _HomeScreenState extends State<HomeScreen> {
             itemCount: snapshot.docs.length,
             itemBuilder: (context, index) {
               var data = snapshot.docs[index].data() as Map<String, dynamic>;
-              // ✅ FIX: Wrap ListTile in Material to handle ink effects
               return Material(
                 color: Colors.transparent,
                 borderRadius: BorderRadius.circular(8),
@@ -1419,7 +1383,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       var data =
                           snapshot.data!.docs[index].data()
                               as Map<String, dynamic>;
-                      // ✅ FIX: Wrap ListTile in Material to handle ink effects
                       return Material(
                         color: Colors.transparent,
                         borderRadius: BorderRadius.circular(8),
