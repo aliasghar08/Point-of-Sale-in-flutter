@@ -28,7 +28,7 @@ class FirebaseService {
 
   // =========================================================
 
-  // ✅ Get the current user's business ID - FIXED
+  // ✅ Get the current user's business ID
   Future<String?> getCurrentBusinessId() async {
     try {
       if (!isAuthenticated) return null;
@@ -108,17 +108,13 @@ class FirebaseService {
 
   // ==================== BUSINESS LOOKUP ====================
 
-  /// ✅ Search for businesses by name (case insensitive)
   Future<List<Map<String, dynamic>>> searchBusinesses(String query) async {
     try {
       if (query.isEmpty) return [];
 
       final searchTerm = query.toLowerCase().trim();
-      
-      // Get all businesses
       final snapshot = await _firestore.collection('businesses').get();
       
-      // Filter by name (case insensitive)
       final results = snapshot.docs.where((doc) {
         final data = doc.data() as Map<String, dynamic>;
         final name = (data['name'] ?? '').toString().toLowerCase();
@@ -140,17 +136,13 @@ class FirebaseService {
     }
   }
 
-  /// ✅ Get business by exact name (case insensitive)
   Future<Map<String, dynamic>?> getBusinessByName(String name) async {
     try {
       if (name.isEmpty) return null;
 
       final searchTerm = name.toLowerCase().trim();
-      
-      // Get all businesses
       final snapshot = await _firestore.collection('businesses').get();
       
-      // Find exact match (case insensitive)
       for (var doc in snapshot.docs) {
         final data = doc.data() as Map<String, dynamic>;
         final businessName = (data['name'] ?? '').toString().toLowerCase();
@@ -163,7 +155,6 @@ class FirebaseService {
           };
         }
       }
-      
       return null;
     } catch (e) {
       debugPrint('Error getting business by name: $e');
@@ -171,7 +162,6 @@ class FirebaseService {
     }
   }
 
-  /// ✅ Check if a business exists
   Future<bool> businessExists(String businessName) async {
     try {
       final business = await getBusinessByName(businessName);
@@ -181,7 +171,6 @@ class FirebaseService {
     }
   }
 
-  /// ✅ Get all businesses with their names for autocomplete
   Future<List<String>> getBusinessNames() async {
     try {
       final snapshot = await _firestore.collection('businesses').get();
@@ -198,7 +187,6 @@ class FirebaseService {
 
   // ==================== MEMBERS (Business Users) ====================
 
-  /// ✅ Get members sub-collection reference for a business
   CollectionReference getBusinessMembersCollection(String businessId) {
     return _firestore
         .collection('businesses')
@@ -206,7 +194,6 @@ class FirebaseService {
         .collection('members');
   }
 
-  /// ✅ Get all users from a business (now from members sub-collection)
   Future<List<Map<String, dynamic>>> getBusinessUsers(String businessId) async {
     try {
       final snapshot = await _firestore
@@ -234,7 +221,6 @@ class FirebaseService {
     }
   }
 
-  /// ✅ Get a specific user from a business (now from members sub-collection)
   Future<Map<String, dynamic>?> getBusinessUser(String businessId, String userId) async {
     try {
       final doc = await _firestore
@@ -262,7 +248,6 @@ class FirebaseService {
     }
   }
 
-  /// ✅ Add user to an existing business
   Future<void> addUserToBusiness({
     required String userId,
     required String email,
@@ -342,7 +327,6 @@ class FirebaseService {
     }
   }
 
-  /// ✅ Update user role in business
   Future<void> updateUserRoleInBusiness({
     required String businessId,
     required String userId,
@@ -405,7 +389,6 @@ class FirebaseService {
     }
   }
 
-  /// ✅ Toggle user active status in business
   Future<void> toggleUserActiveInBusiness({
     required String businessId,
     required String userId,
@@ -433,7 +416,6 @@ class FirebaseService {
     }
   }
 
-  /// ✅ Remove user from business
   Future<void> removeUserFromBusiness({
     required String businessId,
     required String userId,
@@ -461,10 +443,6 @@ class FirebaseService {
 
   // ==================== PRODUCTS ====================
 
-  CollectionReference<Map<String, dynamic>> get products {
-    return _firestore.collection('products');
-  }
-
   Stream<QuerySnapshot> productsStream() {
     return getCurrentBusinessId().asStream().asyncExpand((businessId) {
       if (businessId == null) {
@@ -483,7 +461,6 @@ class FirebaseService {
     });
   }
 
-  // ✅ addProduct - Hashed ID based on BusinessID, Product Name, and Barcode
   Future<DocumentReference> addProduct(Map<String, dynamic> productData) async {
     try {
       if (!isAuthenticated) {
@@ -775,10 +752,6 @@ class FirebaseService {
 
   // ==================== SALES (NOW USES BATCH WRITES) ====================
 
-  CollectionReference<Map<String, dynamic>> get sales {
-    return _firestore.collection('sales');
-  }
-
   Stream<QuerySnapshot> salesStream() {
     return getCurrentBusinessId().asStream().asyncExpand((businessId) {
       if (businessId == null) {
@@ -816,7 +789,7 @@ class FirebaseService {
     });
   }
 
-  // ✅ addSale - UPDATED TO BATCH WRITE (Signatures maintained)
+  // ✅ addSale - Explicitly records userId and strictly saves in business folder
   Future<DocumentReference> addSale(Map<String, dynamic> saleData) async {
     try {
       if (!isAuthenticated) throw Exception('User not authenticated');
@@ -826,8 +799,10 @@ class FirebaseService {
       final batch = _firestore.batch();
       final businessRef = _firestore.collection('businesses').doc(businessId);
 
-      // 1. Prepare Sale Document
-      saleData['createdBy'] = _currentUserId;
+      // 1. Prepare Sale Document with explicit User IDs
+      saleData['createdBy'] = _currentUserId; // Legacy compatibility
+      saleData['userId'] = _currentUserId; // ✅ Explicitly identifying who made the sale
+      saleData['sellerName'] = _auth.currentUser?.displayName ?? 'Unknown'; // ✅ Added for easy UI reading
       saleData['createdAt'] = FieldValue.serverTimestamp();
 
       final receipt = (saleData['receiptNumber'] ?? '').toString().trim();
@@ -869,7 +844,7 @@ class FirebaseService {
     }
   }
 
-  // ✅ addMultipleSales - UPDATED TO BATCH WRITE (Signatures maintained)
+  // ✅ addMultipleSales - Explicitly records userId and strictly saves in business folder
   Future<void> addMultipleSales(List<Map<String, dynamic>> salesData) async {
     try {
       if (!isAuthenticated) throw Exception('User not authenticated');
@@ -881,6 +856,8 @@ class FirebaseService {
       
       for (var sale in salesData) {
         sale['createdBy'] = _currentUserId;
+        sale['userId'] = _currentUserId; // ✅ Explicitly identifying who made the sale
+        sale['sellerName'] = _auth.currentUser?.displayName ?? 'Unknown';
         sale['createdAt'] = FieldValue.serverTimestamp();
         
         final receipt = (sale['receiptNumber'] ?? '').toString().trim();
