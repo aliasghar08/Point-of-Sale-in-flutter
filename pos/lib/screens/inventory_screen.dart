@@ -20,10 +20,15 @@ class _InventoryScreenState extends State<InventoryScreen> {
   final FirebaseService _firebaseService = FirebaseService();
   String _searchQuery = '';
   bool _isScanning = false;
+  
+  // ✅ ADDED: Cache the stream so typing in the search bar doesn't re-download the database
+  late Stream<QuerySnapshot> _productsStream;
 
   @override
   void initState() {
     super.initState();
+    // ✅ ADDED: Initialize the stream once
+    _productsStream = _firebaseService.productsStream();
   }
 
   @override
@@ -44,7 +49,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
           _buildStatsSummary(isDarkMode),
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
-              stream: _firebaseService.productsStream(),
+              stream: _productsStream, // ✅ CHANGED: Use the cached stream
               builder: (context, snapshot) {
                 // Handle loading state
                 if (snapshot.connectionState == ConnectionState.waiting) {
@@ -101,8 +106,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   return _buildEmptyState(isDarkMode);
                 }
 
-                // ✅ Check if the snapshot is from the empty fallback collection
-                // or if it genuinely has no documents
                 if (snapshot.data!.docs.isEmpty) {
                   return _buildEmptyState(isDarkMode);
                 }
@@ -112,7 +115,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 for (var doc in snapshot.data!.docs) {
                   try {
                     final data = doc.data() as Map<String, dynamic>;
-                    // Skip if no name field
                     if (!data.containsKey('name')) {
                       debugPrint('⚠️ Document missing "name" field: ${doc.id}');
                       continue;
@@ -124,7 +126,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   }
                 }
 
-                // Filter products
+                // Filter products locally (Fast!)
                 List<Product> filteredProducts = _filterProducts(products);
 
                 // Show no results if filtered list is empty but products exist
@@ -547,7 +549,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
     ).then((result) {
       if (result == true && mounted) {
         _showSnackBar('✅ Product added successfully!');
-        setState(() {});
       }
     });
   }
@@ -578,7 +579,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
     ).then((result) {
       if (result == true && mounted) {
         _showSnackBar('✅ Product added successfully!');
-        setState(() {});
       }
     });
   }
@@ -595,7 +595,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
     ).then((result) {
       if (result == true && mounted) {
         _showSnackBar('✅ Product updated successfully!');
-        setState(() {});
       }
     });
   }
@@ -603,7 +602,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
   // ==================== STATS SUMMARY ====================
   Widget _buildStatsSummary(bool isDarkMode) {
     return StreamBuilder<QuerySnapshot>(
-      stream: _firebaseService.productsStream(),
+      stream: _productsStream, // ✅ CHANGED: Use cached stream here too
       builder: (context, snapshot) {
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
           return const SizedBox.shrink();
@@ -1149,7 +1148,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
         await _firebaseService.deleteProduct(product.id);
         if (mounted) {
           _showSnackBar('✅ Product deleted successfully!');
-          setState(() {});
         }
       } catch (e) {
         if (mounted) {

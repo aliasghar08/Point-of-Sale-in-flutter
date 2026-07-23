@@ -30,7 +30,7 @@ class ThemeProvider extends ChangeNotifier {
         notifyListeners();
       }
     } catch (e) {
-      print('Error loading theme: $e');
+      debugPrint('❌ Error loading theme: $e');
     }
   }
 
@@ -40,7 +40,7 @@ class ThemeProvider extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_themeKey, _themeMode.toString());
     } catch (e) {
-      print('Error saving theme: $e');
+      debugPrint('❌ Error saving theme: $e');
     }
   }
 
@@ -51,15 +51,15 @@ class ThemeProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Toggle between light and dark (only if not system)
+  // Toggle between light and dark (smart toggle)
   Future<void> toggleTheme() async {
     if (_themeMode == ThemeMode.light) {
       await setThemeMode(ThemeMode.dark);
     } else if (_themeMode == ThemeMode.dark) {
       await setThemeMode(ThemeMode.light);
     } else {
-      // If system, default to light on toggle
-      await setThemeMode(ThemeMode.light);
+      // ✅ CHANGED: If on system mode, toggle to the exact opposite of what they are currently seeing
+      await setThemeMode(isDarkMode ? ThemeMode.light : ThemeMode.dark);
     }
   }
 

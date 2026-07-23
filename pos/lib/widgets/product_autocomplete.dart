@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:pos/models/product_reference.dart';
 
@@ -5,10 +6,12 @@ class ProductAutocomplete extends StatefulWidget {
   final Function(String) onProductSelected;
   final String? category;
   final String hintText;
+  final FocusNode focusNode; // ✅ Now properly required and utilized
 
   const ProductAutocomplete({
     super.key,
     required this.onProductSelected,
+    required this.focusNode,
     this.category,
     this.hintText = 'Search products...',
   });
@@ -19,26 +22,47 @@ class ProductAutocomplete extends StatefulWidget {
 
 class _ProductAutocompleteState extends State<ProductAutocomplete> {
   final TextEditingController _controller = TextEditingController();
-  final FocusNode _focusNode = FocusNode();
   List<String> _suggestions = [];
   bool _showSuggestions = false;
   bool _isLoading = false;
+  Timer? _debounce; // ✅ Added to prevent rapid-fire searching
 
   @override
   void initState() {
     super.initState();
-    print('📦 Available categories: ${ProductReference.getCategories()}');
+    debugPrint('📦 Available categories: ${ProductReference.getCategories()}');
+    
+    // ✅ Listen to focus changes to hide suggestions when tapping outside
+    widget.focusNode.addListener(() {
+      if (!widget.focusNode.hasFocus && mounted) {
+        setState(() {
+          _showSuggestions = false;
+        });
+      }
+    });
   }
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _controller.dispose();
-    _focusNode.dispose();
+    // ⚠️ Do NOT dispose widget.focusNode here! The parent (HomeScreen) owns it.
     super.dispose();
   }
 
+  void _onSearchChanged(String query) {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    
+    // ✅ Debounce for 300ms to prevent lag while typing fast
+    _debounce = Timer(const Duration(milliseconds: 300), () {
+      _searchProducts(query);
+    });
+  }
+
   void _searchProducts(String query) {
-    print('🔍 Searching for: "$query"');
+    if (!mounted) return;
+    
+    debugPrint('🔍 Searching for: "$query"');
     
     if (query.isEmpty) {
       setState(() {
@@ -58,29 +82,32 @@ class _ProductAutocompleteState extends State<ProductAutocomplete> {
         limit: 15,
       );
       
-      print('📊 Found ${results.length} results for "$query"');
-      if (results.isNotEmpty) {
-        print('📋 First 3 results: ${results.take(3).toList()}');
+      if (mounted) {
+        setState(() {
+          _suggestions = results;
+          _showSuggestions = results.isNotEmpty;
+          _isLoading = false;
+        });
       }
-      
-      setState(() {
-        _suggestions = results;
-        _showSuggestions = results.isNotEmpty;
-        _isLoading = false;
-      });
     } catch (e) {
-      print('❌ Error searching: $e');
-      setState(() => _isLoading = false);
+      debugPrint('❌ Error searching: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
   void _selectProduct(String product) {
-    _controller.text = product;
+    _controller.text = product; // Can keep or clear this depending on your UX preference
     setState(() {
       _showSuggestions = false;
       _suggestions = [];
     });
-    _focusNode.unfocus();
+    
+    // Optional: Clear the text field immediately after selection so it's ready for the next scan/search
+    _controller.clear(); 
+    
+    widget.focusNode.unfocus();
     widget.onProductSelected(product);
   }
 
@@ -114,11 +141,11 @@ class _ProductAutocompleteState extends State<ProductAutocomplete> {
         // Search field
         TextField(
           controller: _controller,
-          focusNode: _focusNode,
-          onChanged: _searchProducts,
+          focusNode: widget.focusNode, // ✅ USING THE PARENT'S FOCUS NODE
+          onChanged: _onSearchChanged, // ✅ Using debounced search
           onTap: () {
             // Show suggestions when tapping if there are any
-            if (_suggestions.isNotEmpty) {
+            if (_suggestions.isNotEmpty && _controller.text.isNotEmpty) {
               setState(() => _showSuggestions = true);
             }
           },
@@ -140,6 +167,7 @@ class _ProductAutocompleteState extends State<ProductAutocomplete> {
                         _suggestions = [];
                         _showSuggestions = false;
                       });
+                      widget.focusNode.requestFocus();
                     },
                   )
                 : null,
@@ -156,7 +184,13 @@ class _ProductAutocompleteState extends State<ProductAutocomplete> {
           ),
           onSubmitted: (value) {
             if (value.isNotEmpty) {
-              _selectProduct(value);
+              // If they hit enter, and there's a perfect match or only 1 suggestion, pick it.
+              // Otherwise, just do a standard search lookup in parent.
+              if (_suggestions.length == 1) {
+                 _selectProduct(_suggestions.first);
+              } else {
+                 _selectProduct(value);
+              }
             }
           },
         ),

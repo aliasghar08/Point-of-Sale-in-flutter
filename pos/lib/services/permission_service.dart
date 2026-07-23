@@ -1,14 +1,18 @@
+import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
+// Import the package with a prefix to resolve the name conflict
+import 'package:permission_handler/permission_handler.dart' as ph;
 
 class PermissionService {
   // ==================== OPEN APP SETTINGS ====================
   
   /// Open the app settings page so user can manually enable permissions
   static Future<void> openAppSettings() async {
-    await Permission.camera.request(); // This will trigger the permission dialog
-    // Actually open app settings
-    await openAppSettings();
+    await Permission.camera.request(); 
+    // ✅ FIX: Call the package's function using the 'ph' prefix
+    // This stops the infinite recursion crash!
+    await ph.openAppSettings();
   }
   
   /// Check if a specific permission is granted
@@ -232,7 +236,7 @@ class PermissionService {
           TextButton(
             onPressed: () {
               Navigator.pop(context);
-              openAppSettings();
+              openAppSettings(); // Safe because we fixed the internal loop
             },
             child: const Text('Open Settings'),
           ),
@@ -334,7 +338,6 @@ class PermissionService {
     // Request fine location (which includes coarse location)
     PermissionStatus status = await Permission.location.request();
     
-    // Also request approximate location (Android only)
     if (status.isGranted) {
       return true;
     }
@@ -348,9 +351,13 @@ class PermissionService {
     return false;
   }
 
-  // Check if device is Android
+  // ✅ FIX: Check if device is Android without requiring BuildContext
   static Future<bool> _isAndroid() async {
-    return Theme.of(await _getContext()).platform == TargetPlatform.android;
+    try {
+      return Platform.isAndroid;
+    } catch (e) {
+      return false; // Safely return false if running on Web
+    }
   }
 
   // Check if device is Android 13+
@@ -358,13 +365,6 @@ class PermissionService {
     // Simplified check - return false by default
     // You can use device_info_plus for accurate version checking
     return false;
-  }
-
-  // Get context helper
-  static Future<BuildContext> _getContext() async {
-    // This is a placeholder - in real usage, you'd pass context
-    // For now, return a dummy context
-    throw UnsupportedError('Context not available in static method');
   }
 
   // ==================== BATCH PERMISSION CHECKS ====================

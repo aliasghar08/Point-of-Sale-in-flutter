@@ -4,6 +4,7 @@ import 'package:pos/screens/reports_screen.dart';
 import 'package:pos/screens/sales_history_screen.dart';
 import 'package:pos/screens/settings_screen.dart';
 import 'package:pos/screens/crm_screen.dart';
+import 'package:pos/screens/user_management_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:pos/providers/auth_provider.dart';
 import 'package:pos/providers/settings_provider.dart';
@@ -39,6 +40,9 @@ class AppDrawer extends StatelessWidget {
       );
     }
 
+    // Role checks
+    final bool canViewTeam = user.role == 'owner' || user.role == 'manager';
+
     return Drawer(
       backgroundColor: isDarkMode ? Colors.grey.shade900 : Colors.white,
       child: Column(
@@ -61,7 +65,7 @@ class AppDrawer extends StatelessWidget {
                   onTap: () => _navigateTo(context, 0),
                 ),
 
-                // ===== CRM =====
+                // ===== CRM (Accessible to all to select customers for checkout) =====
                 _buildDrawerItem(
                   context,
                   icon: Icons.people,
@@ -80,7 +84,7 @@ class AppDrawer extends StatelessWidget {
 
                 const Divider(),
 
-                // ===== INVENTORY =====
+                // ===== INVENTORY (Role Protected) =====
                 if (user.canManageInventory)
                   _buildDrawerItem(
                     context,
@@ -91,40 +95,52 @@ class AppDrawer extends StatelessWidget {
                     onTap: () => _navigateTo(context, 1),
                   ),
 
-                // ===== USER MANAGEMENT =====
-                if (user.canManageUsers)
+                // ===== USER MANAGEMENT (Role Protected) =====
+                if (canViewTeam)
                   _buildDrawerItem(
                     context,
                     icon: Icons.admin_panel_settings,
-                    title: 'User Management',
+                    // ✅ CHANGED: Dynamically display title based on role
+                    title: user.role == 'owner' ? 'User Management' : 'Team Members',
                     isSelected: currentIndex == 2,
                     isDarkMode: isDarkMode,
-                    onTap: () => _navigateTo(context, 2),
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const UserManagementScreen(),
+                        ),
+                      );
+                    },
                   ),
 
-                const Divider(),
+                // Add a divider if they have access to reports so UI looks clean
+                if (user.canViewReports) const Divider(),
 
-                // ===== FEATURES =====
-                _buildDrawerItem(
-                  context,
-                  icon: Icons.history,
-                  title: 'Sales History',
-                  isDarkMode: isDarkMode,
-                  onTap: () {
-                    Navigator.pop(context);
-                    _showSalesHistory(context, isDarkMode);
-                  },
-                ),
-                _buildDrawerItem(
-                  context,
-                  icon: Icons.bar_chart,
-                  title: 'Reports',
-                  isDarkMode: isDarkMode,
-                  onTap: () {
-                    Navigator.pop(context);
-                    _showReports(context, isDarkMode);
-                  },
-                ),
+                // ===== FEATURES (Role Protected - Workers shouldn't see profit/totals) =====
+                if (user.canViewReports) ...[
+                  _buildDrawerItem(
+                    context,
+                    icon: Icons.history,
+                    title: 'Sales History',
+                    isDarkMode: isDarkMode,
+                    onTap: () {
+                      Navigator.pop(context);
+                      _showSalesHistory(context, isDarkMode);
+                    },
+                  ),
+                  _buildDrawerItem(
+                    context,
+                    icon: Icons.bar_chart,
+                    title: 'Reports',
+                    isDarkMode: isDarkMode,
+                    onTap: () {
+                      Navigator.pop(context);
+                      _showReports(context, isDarkMode);
+                    },
+                  ),
+                ],
 
                 const Divider(),
 
@@ -185,7 +201,7 @@ class AppDrawer extends StatelessWidget {
     bool isDarkMode,
   ) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.only(top: 48, left: 24, right: 24, bottom: 24), // Added top padding for status bar
       decoration: BoxDecoration(
         color: isDarkMode ? Colors.blue.shade900 : Colors.blue.shade700,
         borderRadius: const BorderRadius.only(
@@ -200,7 +216,7 @@ class AppDrawer extends StatelessWidget {
             radius: 35,
             backgroundColor: Colors.white,
             child: Text(
-              user.name.substring(0, 1).toUpperCase(),
+              user.name.isNotEmpty ? user.name.substring(0, 1).toUpperCase() : 'U',
               style: TextStyle(
                 fontSize: 30,
                 color: isDarkMode ? Colors.blue.shade700 : Colors.blue.shade700,
@@ -364,7 +380,6 @@ class AppDrawer extends StatelessWidget {
   }
 
   void _navigateToSettings(BuildContext context) {
-    Navigator.pop(context);
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const SettingsScreen()),
@@ -400,12 +415,15 @@ class AppDrawer extends StatelessWidget {
           ),
           ElevatedButton(
             onPressed: () async {
-              Navigator.pop(context);
+              Navigator.pop(context); // close dialog
               await authProvider.signOut();
+              
               if (context.mounted) {
-                Navigator.pushReplacement(
+                // Clears the entire navigation stack so back button can't bypass login
+                Navigator.pushAndRemoveUntil(
                   context,
                   MaterialPageRoute(builder: (context) => const LoginScreen()),
+                  (Route<dynamic> route) => false,
                 );
               }
             },

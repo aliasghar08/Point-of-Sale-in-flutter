@@ -14,7 +14,9 @@ class ReportsScreen extends StatefulWidget {
 
 class _ReportsScreenState extends State<ReportsScreen> {
   final FirebaseService _firebaseService = FirebaseService();
-  String _selectedPeriod = 'All'; // Default to All
+  
+  // ✅ CHANGED: Default to 'Today' instead of 'All' to save massive read costs
+  String _selectedPeriod = 'Today'; 
   DateTime _startDate = DateTime.now();
   DateTime _endDate = DateTime.now();
   bool _isLoading = true;
@@ -26,7 +28,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
   int _totalTransactions = 0;
   double _averageSale = 0;
   
-  // ✅ Customer Statistics
+  // Customer Statistics
   int _totalCustomers = 0;
   int _guestCustomers = 0;
   int _registeredCustomers = 0;
@@ -35,7 +37,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
   // Top products
   List<Map<String, dynamic>> _topProducts = [];
   
-  // ✅ Top customers
+  // Top customers
   List<Map<String, dynamic>> _topCustomers = [];
   
   // Payment method breakdown
@@ -45,12 +47,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
   List<Map<String, dynamic>> _dailySales = [];
 
   final List<String> _periodOptions = [
-    'All',
     'Today',
     'Week',
     'Month',
     'Year',
     'Custom',
+    'All', // Moved to end as a fallback option
   ];
 
   @override
@@ -66,14 +68,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
       
       // Fetch sales based on selected period
       if (_selectedPeriod == 'All') {
-        // Get all sales from business
         snapshot = await _firebaseService.getAllSales();
       } else {
-        // Get the date range
         final startDate = _getStartDate();
         final endDate = _getEndDate();
 
-        // Fetch sales in date range using FirebaseService
         snapshot = await _firebaseService.getSalesByDateRange(
           startDate: startDate,
           endDate: endDate,
@@ -88,7 +87,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
     } catch (e) {
       setState(() => _isLoading = false);
       _showSnackBar('Error loading reports: ${e.toString().replaceFirst('Exception: ', '')}', isError: true);
-      print('❌ Reports error: $e');
+      debugPrint('❌ Reports error: $e');
     }
   }
 
@@ -99,7 +98,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
     _totalItems = 0;
     _totalTransactions = docs.length;
     
-    // ✅ Reset customer stats
+    // Reset customer stats
     _totalCustomers = 0;
     _guestCustomers = 0;
     _registeredCustomers = 0;
@@ -110,16 +109,16 @@ class _ReportsScreenState extends State<ReportsScreen> {
     Map<String, double> paymentMap = {};
     Map<String, double> dailyMap = {};
     
-    // ✅ Customer tracking
+    // Customer tracking
     Map<String, Map<String, dynamic>> customerMap = {};
 
     for (var doc in docs) {
       var data = doc.data() as Map<String, dynamic>;
       
-      // Sales totals
-      double total = (data['total'] ?? 0).toDouble();
-      double profit = (data['profit'] ?? 0).toDouble();
-      int quantity = (data['quantity'] ?? 0).toInt();
+      // ✅ CHANGED: Safe number parsing for Firestore dynamic types
+      double total = ((data['total'] ?? 0) as num).toDouble();
+      double profit = ((data['profit'] ?? 0) as num).toDouble();
+      int quantity = ((data['quantity'] ?? 0) as num).toInt();
       
       _totalSales += total;
       _totalProfit += profit;
@@ -145,11 +144,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
       }
 
       // Daily sales
-      DateTime date = (data['saleDate'] as Timestamp).toDate();
+      // ✅ CHANGED: Safe timestamp parsing
+      DateTime date = (data['saleDate'] as Timestamp?)?.toDate() ?? DateTime.now();
       String dateKey = DateFormat('yyyy-MM-dd').format(date);
       dailyMap[dateKey] = (dailyMap[dateKey] ?? 0) + total;
 
-      // ✅ Customer tracking
+      // Customer tracking
       String customerId = data['customerId'] ?? 'guest';
       String customerName = data['customerName'] ?? 'Guest Customer';
       bool isGuest = data['isGuestCustomer'] ?? true;
@@ -184,7 +184,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
     _topProducts.sort((a, b) => b['quantity'].compareTo(a['quantity']));
     _topProducts = _topProducts.take(10).toList();
 
-    // ✅ Process top customers
+    // Process top customers
     _topCustomers = customerMap.values.toList();
     _topCustomers.sort((a, b) => b['totalSpent'].compareTo(a['totalSpent']));
     _topCustomers = _topCustomers.take(10).toList();
@@ -346,6 +346,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     if (period == 'Custom') {
                       _selectCustomDateRange();
                     } else {
+                      if (period == 'All') {
+                        _showSnackBar('Loading entire history...');
+                      }
                       _loadReports();
                     }
                   });
@@ -413,7 +416,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
     if (picked != null) {
       setState(() {
         _startDate = picked.start;
-        _endDate = picked.end;
+        _endDate = DateTime(
+          picked.end.year,
+          picked.end.month,
+          picked.end.day,
+          23, 59, 59,
+        );
       });
       _loadReports();
     }
@@ -497,7 +505,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
     );
   }
 
-  // ✅ Customer Summary Section
   Widget _buildCustomerSummary(String currencySymbol, bool isDarkMode) {
     if (_totalCustomers == 0 && _guestCustomers == 0) {
       return const SizedBox.shrink();
@@ -647,7 +654,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
       return item['sales'] > max ? item['sales'] : max;
     });
 
-    // If max is 0, set to 1 to avoid division by zero
     if (maxSales == 0) maxSales = 1;
 
     return Container(
@@ -690,7 +696,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
             height: 120,
             child: Row(
               children: [
-                // Y-axis labels
                 Column(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -711,7 +716,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   ],
                 ),
                 const SizedBox(width: 8),
-                // Chart bars
                 Expanded(
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.end,
@@ -983,7 +987,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
     );
   }
 
-  // ✅ Top Customers Section
   Widget _buildTopCustomers(String currencySymbol, bool isDarkMode) {
     if (_topCustomers.isEmpty) {
       return const SizedBox.shrink();

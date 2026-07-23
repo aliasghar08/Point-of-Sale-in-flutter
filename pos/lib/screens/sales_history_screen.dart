@@ -14,7 +14,9 @@ class SalesHistoryScreen extends StatefulWidget {
 
 class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
   final FirebaseService _firebaseService = FirebaseService();
-  String _filterType = 'All'; // All, Today, Week, Month, Custom
+  
+  // ✅ CHANGED: Default to 'Today' to prevent fetching thousands of docs on load
+  String _filterType = 'Today'; // All, Today, Week, Month, Custom
   String _searchQuery = '';
   bool _isLoading = true;
   List<QueryDocumentSnapshot> _allSales = [];
@@ -24,7 +26,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
   DateTime? _startDate;
   DateTime? _endDate;
 
-  final List<String> _filterOptions = ['All', 'Today', 'Week', 'Month', 'Custom'];
+  final List<String> _filterOptions = ['Today', 'Week', 'Month', 'Custom', 'All'];
   final TextEditingController _searchController = TextEditingController();
 
   @override
@@ -60,14 +62,19 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
             snapshot = await _firebaseService.getSalesByDateRange(
               startDate: _startDate!,
               endDate: _endDate!,
-              limit: 500,
+              limit: 500, // Safe limit
             );
           } else {
-            snapshot = await _firebaseService.getAllSales();
+            snapshot = await _firebaseService.getTodaySales(); // Fallback
           }
           break;
-        default:
+        case 'All':
+          // ⚠️ WARNING: If this gets too large, you should replace getAllSales 
+          // with a paginated query or a hard limit in FirebaseService.
           snapshot = await _firebaseService.getAllSales();
+          break;
+        default:
+          snapshot = await _firebaseService.getTodaySales();
           break;
       }
       
@@ -92,14 +99,14 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     String query = _searchQuery.toLowerCase();
     _filteredSales = _allSales.where((doc) {
       var data = doc.data() as Map<String, dynamic>;
-      String productName = (data['productName'] ?? '').toLowerCase();
-      String receiptNumber = (data['receiptNumber'] ?? '').toLowerCase();
-      String paymentMethod = (data['paymentMethod'] ?? '').toLowerCase();
+      String productName = (data['productName'] ?? '').toString().toLowerCase();
+      String receiptNumber = (data['receiptNumber'] ?? '').toString().toLowerCase();
+      String paymentMethod = (data['paymentMethod'] ?? '').toString().toLowerCase();
       
       // ✅ Customer search fields
-      String customerName = (data['customerName'] ?? '').toLowerCase();
-      String customerPhone = (data['customerPhone'] ?? '').toLowerCase();
-      String customerEmail = (data['customerEmail'] ?? '').toLowerCase();
+      String customerName = (data['customerName'] ?? '').toString().toLowerCase();
+      String customerPhone = (data['customerPhone'] ?? '').toString().toLowerCase();
+      String customerEmail = (data['customerEmail'] ?? '').toString().toLowerCase();
       
       return productName.contains(query) ||
           receiptNumber.contains(query) ||
@@ -123,6 +130,11 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
         _loadSales();
       }
     } else if (_filterType != newFilter) {
+      // ⚠️ Add a warning if they click 'All'
+      if (newFilter == 'All') {
+        _showSnackBar('Loading all history may take a moment...', isError: false);
+      }
+      
       setState(() {
         _filterType = newFilter;
       });
@@ -256,7 +268,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
               setState(() {
                 _startDate = null;
                 _endDate = null;
-                _filterType = 'All';
+                _filterType = 'Today'; // ✅ Changed fallback from 'All' to 'Today'
               });
               _loadSales();
             },
@@ -338,7 +350,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
           color: isDarkMode ? Colors.white : Colors.black,
         ),
         decoration: InputDecoration(
-          hintText: 'Search by product, customer, receipt, or payment...',
+          hintText: 'Search by product, customer, receipt...',
           hintStyle: TextStyle(
             color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
           ),
@@ -385,9 +397,11 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
 
     for (var doc in _filteredSales) {
       var data = doc.data() as Map<String, dynamic>;
-      totalSales += (data['total'] ?? 0).toDouble();
-      totalProfit += (data['profit'] ?? 0).toDouble();
-      totalItems += (data['quantity'] ?? 0) as int;
+      
+      // ✅ CHANGED: Safe parsing for Firestore numbers
+      totalSales += ((data['total'] ?? 0) as num).toDouble();
+      totalProfit += ((data['profit'] ?? 0) as num).toDouble();
+      totalItems += ((data['quantity'] ?? 0) as num).toInt();
     }
 
     return Container(
@@ -469,9 +483,10 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
       itemCount: _filteredSales.length,
       itemBuilder: (context, index) {
         var data = _filteredSales[index].data() as Map<String, dynamic>;
-        DateTime saleDate = (data['saleDate'] as Timestamp).toDate();
         
-        // ✅ Customer info
+        // ✅ CHANGED: Null safe timestamp parsing
+        DateTime saleDate = (data['saleDate'] as Timestamp?)?.toDate() ?? DateTime.now();
+        
         final customerName = data['customerName'] ?? 'Guest Customer';
         final customerPhone = data['customerPhone'] ?? '';
         final isGuestCustomer = data['isGuestCustomer'] ?? true;
@@ -488,7 +503,6 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Product Name Row
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -527,7 +541,6 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                   ],
                 ),
                 const SizedBox(height: 4),
-                // ✅ Customer Info Row
                 Row(
                   children: [
                     Icon(
@@ -565,7 +578,6 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                   ],
                 ),
                 const SizedBox(height: 4),
-                // Receipt and Date Row
                 Wrap(
                   spacing: 16,
                   runSpacing: 4,
@@ -609,7 +621,6 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                   ],
                 ),
                 const Divider(),
-                // Quantity, Price, Total, Profit Row
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -617,14 +628,16 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Quantity: ${data['quantity'] ?? 0}',
+                          // ✅ CHANGED: Safe parse quantity
+                          'Quantity: ${((data['quantity'] ?? 0) as num).toInt()}',
                           style: TextStyle(
                             fontSize: 14,
                             color: isDarkMode ? Colors.white : Colors.black,
                           ),
                         ),
                         Text(
-                          'Price: $currencySymbol${(data['price'] ?? 0).toStringAsFixed(2)}',
+                          // ✅ CHANGED: Safe parse price
+                          'Price: $currencySymbol${((data['price'] ?? 0) as num).toDouble().toStringAsFixed(2)}',
                           style: TextStyle(
                             fontSize: 12,
                             color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
@@ -636,7 +649,8 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
-                          '$currencySymbol${(data['total'] ?? 0).toStringAsFixed(2)}',
+                          // ✅ CHANGED: Safe parse total
+                          '$currencySymbol${((data['total'] ?? 0) as num).toDouble().toStringAsFixed(2)}',
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
@@ -644,7 +658,8 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                           ),
                         ),
                         Text(
-                          'Profit: $currencySymbol${(data['profit'] ?? 0).toStringAsFixed(2)}',
+                          // ✅ CHANGED: Safe parse profit
+                          'Profit: $currencySymbol${((data['profit'] ?? 0) as num).toDouble().toStringAsFixed(2)}',
                           style: TextStyle(
                             fontSize: 12,
                             color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,

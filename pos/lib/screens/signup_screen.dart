@@ -9,6 +9,7 @@ import 'dart:convert';
 import 'package:pos/providers/auth_provider.dart';
 import 'package:pos/services/permission_service.dart';
 import 'package:pos/models/countries.dart';
+import 'package:pos/services/firebase_service.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -37,22 +38,32 @@ class _SignupScreenState extends State<SignupScreen> {
   String _countryFlag = '🇵🇰';
   String _countryName = 'Pakistan';
 
-  // ✅ Use the imported countries list
+  // ✅ Business suggestions
+  final FirebaseService _firebaseService = FirebaseService();
+  List<String> _businessSuggestions = [];
+  bool _showSuggestions = false;
+  bool _isValidatingBusiness = false;
+  String? _businessValidationError;
+
+  // ✅ Add role options
+  final List<Map<String, dynamic>> _roleOptions = [
+    {'value': 'owner', 'label': 'Owner', 'icon': Icons.admin_panel_settings},
+    {'value': 'manager', 'label': 'Manager', 'icon': Icons.people_alt},
+    {'value': 'worker', 'label': 'Worker', 'icon': Icons.person_outline},
+  ];
+
+  // Use the imported countries list
   List<Country> get _countries => countries;
 
   @override
   void initState() {
     super.initState();
-    // ✅ Set Pakistan as default immediately
     _setDefaultCountry();
-    // Then try to detect country
     _detectCountry();
-    
-    // ✅ Add listener to format phone number as user types
     _phoneController.addListener(_formatPhoneNumberOnType);
+    _storeNameController.addListener(_onBusinessNameChanged);
   }
 
-  // ✅ Set Pakistan as default country
   void _setDefaultCountry() {
     final pakistan = CountryHelper.getCountryByCode('+92');
     if (pakistan != null) {
@@ -64,26 +75,149 @@ class _SignupScreenState extends State<SignupScreen> {
     }
   }
 
-  // ✅ Format phone number as user types
+  // ✅ Fixed phone number formatting - formats as XXX XXX XXXX
   void _formatPhoneNumberOnType() {
     final text = _phoneController.text.replaceAll(RegExp(r'\D'), '');
-    if (text.isEmpty) return;
-
-    String formatted = '';
-    if (text.length <= 4) {
-      formatted = text;
-    } else if (text.length <= 7) {
-      formatted = '${text.substring(0, 4)} ${text.substring(4)}';
-    } else {
-      formatted = '${text.substring(0, 4)} ${text.substring(4, 7)} ${text.substring(7)}';
+    if (text.isEmpty) {
+      if (_phoneController.text.isNotEmpty) {
+        _phoneController.text = '';
+      }
+      return;
     }
 
+    // Silently remove leading zero if present
+    String cleaned = text;
+    while (cleaned.startsWith('0')) {
+      cleaned = cleaned.substring(1);
+    }
+
+    // Limit to 10 digits max (for PK phone numbers)
+    if (cleaned.length > 10) {
+      cleaned = cleaned.substring(0, 10);
+    }
+
+    // ✅ CHANGED: Format the number to XXX XXX XXXX
+    String formatted = '';
+    if (cleaned.isEmpty) {
+      formatted = '';
+    } else if (cleaned.length <= 3) {
+      formatted = cleaned;
+    } else if (cleaned.length <= 6) {
+      formatted = '${cleaned.substring(0, 3)} ${cleaned.substring(3)}';
+    } else {
+      formatted =
+          '${cleaned.substring(0, 3)} ${cleaned.substring(3, 6)} ${cleaned.substring(6)}';
+    }
+
+    // Update the text field
     if (_phoneController.text != formatted) {
       _phoneController.value = TextEditingValue(
         text: formatted,
         selection: TextSelection.collapsed(offset: formatted.length),
       );
     }
+  }
+
+  // Handle business name changes for suggestions
+  void _onBusinessNameChanged() {
+    final query = _storeNameController.text;
+    if (query.isEmpty) {
+      setState(() {
+        _businessSuggestions = [];
+        _showSuggestions = false;
+        _businessValidationError = null;
+      });
+      return;
+    }
+
+    // Only show suggestions if role is manager or worker (NOT for owner)
+    // Owner should not see suggestions, they are creating a new business
+    if (_selectedRole == 'owner') {
+      setState(() {
+        _businessSuggestions = [];
+        _showSuggestions = false;
+        _businessValidationError = null;
+      });
+      return;
+    }
+
+    // Search for businesses (for manager/worker)
+    _searchBusinesses(query);
+  }
+
+  // Search businesses for suggestions (only for manager/worker)
+  Future<void> _searchBusinesses(String query) async {
+    if (query.length < 2) {
+      setState(() {
+        _businessSuggestions = [];
+        _showSuggestions = false;
+      });
+      return;
+    }
+
+    try {
+      final results = await _firebaseService.searchBusinesses(query);
+      setState(() {
+        _businessSuggestions = results.map((b) => b['name'] as String).toList();
+        _showSuggestions = true;
+        _businessValidationError = null;
+      });
+    } catch (e) {
+      setState(() {
+        _businessSuggestions = [];
+        _showSuggestions = false;
+      });
+    }
+  }
+
+  // Validate business name when user selects or types (only for manager/worker)
+  Future<void> _validateBusinessName() async {
+    final businessName = _storeNameController.text.trim();
+    if (businessName.isEmpty) {
+      setState(() {
+        _businessValidationError = 'Please enter a business name';
+      });
+      return;
+    }
+
+    setState(() {
+      _isValidatingBusiness = true;
+      _businessValidationError = null;
+    });
+
+    try {
+      final exists = await _firebaseService.businessExists(businessName);
+      if (!exists) {
+        setState(() {
+          _businessValidationError =
+              'Business "$businessName" not found. Please check the spelling or create a new business as Owner.';
+          _isValidatingBusiness = false;
+        });
+      } else {
+        setState(() {
+          _businessValidationError = null;
+          _isValidatingBusiness = false;
+          _showSuggestions = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _businessValidationError = 'Error validating business: $e';
+        _isValidatingBusiness = false;
+      });
+    }
+  }
+
+  // Select a suggestion (only for manager/worker)
+  void _selectSuggestion(String suggestion) {
+    setState(() {
+      _storeNameController.text = suggestion;
+      _businessSuggestions = [];
+      _showSuggestions = false;
+      _businessValidationError = null;
+    });
+    // Validate after selection
+    _validateBusinessName();
   }
 
   Future<void> _detectCountry() async {
@@ -105,11 +239,11 @@ class _SignupScreenState extends State<SignupScreen> {
           final data = json.decode(response.body);
           if (data['status'] == 'success') {
             detectedCountryCode = data['countryCode']?.toString().toUpperCase();
-            print('📍 Country detected via IP: $detectedCountryCode');
+            debugPrint('📍 Country detected via IP: $detectedCountryCode');
           }
         }
       } catch (e) {
-        print('IP Geolocation failed: $e');
+        debugPrint('IP Geolocation failed: $e');
       }
 
       // ===== METHOD 2: Try Device Locale =====
@@ -117,19 +251,21 @@ class _SignupScreenState extends State<SignupScreen> {
         try {
           final locale = WidgetsBinding.instance.platformDispatcher.locale;
           detectedCountryCode = locale.countryCode?.toUpperCase() ?? '';
-          print('📍 Country detected via Locale: $detectedCountryCode');
+          debugPrint('📍 Country detected via Locale: $detectedCountryCode');
         } catch (e) {
-          print('Locale detection failed: $e');
+          debugPrint('Locale detection failed: $e');
         }
       }
 
       // ===== SET FINAL COUNTRY =====
-      if (detectedCountryCode != null && 
-          detectedCountryCode.isNotEmpty && 
-          detectedCountryCode != 'US' && 
+      if (detectedCountryCode != null &&
+          detectedCountryCode.isNotEmpty &&
+          detectedCountryCode != 'US' &&
           detectedCountryCode != 'CA') {
-        final matchingCountry = CountryHelper.getCountryByIso(detectedCountryCode);
-        
+        final matchingCountry = CountryHelper.getCountryByIso(
+          detectedCountryCode,
+        );
+
         if (matchingCountry != null) {
           setState(() {
             _selectedCountryCode = matchingCountry.code;
@@ -137,21 +273,21 @@ class _SignupScreenState extends State<SignupScreen> {
             _countryName = matchingCountry.name;
             _isDetectingCountry = false;
           });
-          print('✅ Country set to: $_countryName ($_selectedCountryCode)');
+          debugPrint('✅ Country set to: $_countryName ($_selectedCountryCode)');
         } else {
-          print('⚠️ Country not found, keeping Pakistan');
+          debugPrint('⚠️ Country not found, keeping Pakistan');
           setState(() {
             _isDetectingCountry = false;
           });
         }
       } else {
-        print('⚠️ Keeping default country: Pakistan (+92)');
+        debugPrint('⚠️ Keeping default country: Pakistan (+92)');
         setState(() {
           _isDetectingCountry = false;
         });
       }
     } catch (e) {
-      print('❌ Country detection error: $e');
+      debugPrint('❌ Country detection error: $e');
       setState(() {
         _isDetectingCountry = false;
       });
@@ -175,6 +311,13 @@ class _SignupScreenState extends State<SignupScreen> {
     final settingsProvider = Provider.of<SettingsProvider>(context);
     final currencySymbol = settingsProvider.currencySymbol;
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
+    // Business name field is ALWAYS enabled
+    // Only show suggestions for manager/worker
+    final bool showBusinessSuggestions =
+        (_selectedRole == 'manager' || _selectedRole == 'worker') &&
+        _showSuggestions &&
+        _businessSuggestions.isNotEmpty;
 
     return Scaffold(
       appBar: AppBar(
@@ -209,7 +352,7 @@ class _SignupScreenState extends State<SignupScreen> {
             ),
             const SizedBox(height: 24),
             Text(
-              'Create Your Business',
+              'Create Account',
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
@@ -218,7 +361,9 @@ class _SignupScreenState extends State<SignupScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Set up your business and add your first team member',
+              _selectedRole == 'owner'
+                  ? 'Set up your business and add your first team member'
+                  : 'Join an existing business as a $_selectedRole',
               style: TextStyle(
                 fontSize: 14,
                 color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
@@ -358,55 +503,347 @@ class _SignupScreenState extends State<SignupScreen> {
               key: _formKey,
               child: Column(
                 children: [
-                  // ===== BUSINESS/STORE NAME (NEW) =====
-                  TextFormField(
-                    controller: _storeNameController,
-                    decoration: InputDecoration(
-                      labelText: 'Business / Store Name *',
-                      labelStyle: TextStyle(
+                  // ===== ROLE SELECTION DROPDOWN (Moved to top) =====
+                  Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: isDarkMode
+                            ? Colors.grey.shade600
+                            : Colors.grey.shade300,
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: DropdownButtonFormField<String>(
+                      value: _selectedRole,
+                      decoration: const InputDecoration(
+                        labelText: 'Role *',
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12),
+                      ),
+                      dropdownColor: isDarkMode
+                          ? Colors.grey.shade800
+                          : Colors.white,
+                      style: TextStyle(
                         color: isDarkMode ? Colors.white : Colors.black,
                       ),
-                      hintText: 'Enter your business name',
-                      hintStyle: TextStyle(
-                        color: isDarkMode
-                            ? Colors.grey.shade400
-                            : Colors.grey.shade600,
-                      ),
-                      prefixIcon: Icon(
-                        Icons.storefront,
-                        color: isDarkMode
-                            ? Colors.grey.shade400
-                            : Colors.grey.shade600,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
-                      ),
-                      filled: true,
-                      fillColor: isDarkMode
-                          ? Colors.grey.shade800
-                          : Colors.grey.shade50,
+                      items: _roleOptions.map((role) {
+                        return DropdownMenuItem(
+                          value: role['value'] as String,
+                          child: Row(
+                            children: [
+                              Icon(
+                                role['icon'],
+                                size: 20,
+                                color: isDarkMode
+                                    ? Colors.grey.shade400
+                                    : Colors.grey.shade600,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                role['label'],
+                                style: TextStyle(
+                                  color: isDarkMode
+                                      ? Colors.white
+                                      : Colors.black,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedRole = value!;
+                          _businessSuggestions = [];
+                          _showSuggestions = false;
+                          _businessValidationError = null;
+                          _storeNameController.clear();
+                        });
+                      },
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please select a role';
+                        }
+                        return null;
+                      },
                     ),
-                    style: TextStyle(
-                      color: isDarkMode ? Colors.white : Colors.black,
+                  ),
+
+                  const SizedBox(height: 8),
+                  // Info about roles
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
                     ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter your business name';
-                      }
-                      if (value.length < 3) {
-                        return 'Business name must be at least 3 characters';
-                      }
-                      return null;
-                    },
+                    decoration: BoxDecoration(
+                      color: isDarkMode
+                          ? Colors.blue.shade900.withOpacity(0.3)
+                          : Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: isDarkMode
+                            ? Colors.blue.shade700
+                            : Colors.blue.shade200,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          _selectedRole == 'owner'
+                              ? Icons.admin_panel_settings
+                              : Icons.info_outline,
+                          size: 16,
+                          color: isDarkMode
+                              ? Colors.blue.shade400
+                              : Colors.blue.shade700,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _selectedRole == 'owner'
+                                ? 'You are creating a new business as the owner.'
+                                : 'You are joining an existing business as a $_selectedRole.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isDarkMode
+                                  ? Colors.blue.shade400
+                                  : Colors.blue.shade700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // ===== BUSINESS/STORE NAME (ALWAYS ENABLED) =====
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              controller: _storeNameController,
+                              enabled: true, // ALWAYS ENABLED
+                              decoration: InputDecoration(
+                                labelText: 'Business / Store Name *',
+                                labelStyle: TextStyle(
+                                  color: isDarkMode
+                                      ? Colors.white
+                                      : Colors.black,
+                                ),
+                                hintText: _selectedRole == 'owner'
+                                    ? 'Enter your business name'
+                                    : 'Enter existing business name',
+                                hintStyle: TextStyle(
+                                  color: isDarkMode
+                                      ? Colors.grey.shade400
+                                      : Colors.grey.shade600,
+                                ),
+                                prefixIcon: Icon(
+                                  _selectedRole == 'owner'
+                                      ? Icons.storefront
+                                      : Icons.search,
+                                  color: isDarkMode
+                                      ? Colors.grey.shade400
+                                      : Colors.grey.shade600,
+                                ),
+                                suffixIcon: _isValidatingBusiness
+                                    ? const SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : null,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide.none,
+                                ),
+                                filled: true,
+                                fillColor: isDarkMode
+                                    ? Colors.grey.shade800
+                                    : Colors.grey.shade50,
+                              ),
+                              style: TextStyle(
+                                color: isDarkMode ? Colors.white : Colors.black,
+                              ),
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Please enter a business name';
+                                }
+                                if (_selectedRole != 'owner' &&
+                                    _businessValidationError != null) {
+                                  return _businessValidationError;
+                                }
+                                return null;
+                              },
+                            ),
+                          ),
+                          if (_selectedRole != 'owner' &&
+                              _storeNameController.text.isNotEmpty)
+                            IconButton(
+                              icon: Icon(
+                                Icons.check_circle,
+                                color: _businessValidationError == null
+                                    ? Colors.green
+                                    : Colors.red,
+                              ),
+                              onPressed: _validateBusinessName,
+                              tooltip: 'Validate Business',
+                            ),
+                        ],
+                      ),
+                      // Suggestions dropdown (only for manager/worker)
+                      if (showBusinessSuggestions)
+                        Container(
+                          margin: const EdgeInsets.only(top: 4),
+                          decoration: BoxDecoration(
+                            color: isDarkMode
+                                ? Colors.grey.shade800
+                                : Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            boxShadow: [
+                              BoxShadow(
+                                color: isDarkMode
+                                    ? Colors.black.withOpacity(0.3)
+                                    : Colors.grey.withOpacity(0.2),
+                                spreadRadius: 1,
+                                blurRadius: 8,
+                              ),
+                            ],
+                          ),
+                          constraints: const BoxConstraints(maxHeight: 150),
+                          child: ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: _businessSuggestions.length,
+                            itemBuilder: (context, index) {
+                              final suggestion = _businessSuggestions[index];
+                              return Material(
+                                color: Colors.transparent,
+                                child: ListTile(
+                                  leading: Icon(
+                                    Icons.storefront,
+                                    color: isDarkMode
+                                        ? Colors.grey.shade400
+                                        : Colors.grey.shade600,
+                                    size: 16,
+                                  ),
+                                  title: Text(
+                                    suggestion,
+                                    style: TextStyle(
+                                      color: isDarkMode
+                                          ? Colors.white
+                                          : Colors.black,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  trailing: Icon(
+                                    Icons.add_circle_outline,
+                                    color: isDarkMode
+                                        ? Colors.blue.shade400
+                                        : Colors.blue.shade700,
+                                    size: 16,
+                                  ),
+                                  onTap: () => _selectSuggestion(suggestion),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      // Validation error message (only for manager/worker)
+                      if (_selectedRole != 'owner' &&
+                          _businessValidationError != null)
+                        Container(
+                          margin: const EdgeInsets.only(top: 4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isDarkMode
+                                ? Colors.red.shade900.withOpacity(0.3)
+                                : Colors.red.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.error_outline,
+                                size: 14,
+                                color: isDarkMode
+                                    ? Colors.red.shade400
+                                    : Colors.red.shade700,
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  _businessValidationError!,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: isDarkMode
+                                        ? Colors.red.shade400
+                                        : Colors.red.shade700,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      // Found message (only for manager/worker)
+                      if (_selectedRole != 'owner' &&
+                          _businessValidationError == null &&
+                          _storeNameController.text.isNotEmpty &&
+                          !_isValidatingBusiness)
+                        Container(
+                          margin: const EdgeInsets.only(top: 4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isDarkMode
+                                ? Colors.green.shade900.withOpacity(0.3)
+                                : Colors.green.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.check_circle,
+                                size: 14,
+                                color: isDarkMode
+                                    ? Colors.green.shade400
+                                    : Colors.green.shade700,
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  '✓ Business found! You will be added as a $_selectedRole.',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: isDarkMode
+                                        ? Colors.green.shade400
+                                        : Colors.green.shade700,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
                   ),
                   const SizedBox(height: 16),
-                  
-                  // ===== YOUR NAME (Owner) =====
+
+                  // ===== YOUR NAME =====
                   TextFormField(
                     controller: _nameController,
                     decoration: InputDecoration(
-                      labelText: 'Your Full Name (Owner) *',
+                      labelText: 'Your Full Name *',
                       labelStyle: TextStyle(
                         color: isDarkMode ? Colors.white : Colors.black,
                       ),
@@ -445,7 +882,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     },
                   ),
                   const SizedBox(height: 16),
-                  
+
                   TextFormField(
                     controller: _emailController,
                     decoration: InputDecoration(
@@ -489,7 +926,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     },
                   ),
                   const SizedBox(height: 16),
-                  
+
                   TextFormField(
                     controller: _passwordController,
                     obscureText: _obscurePassword,
@@ -548,7 +985,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     },
                   ),
                   const SizedBox(height: 16),
-                  
+
                   TextFormField(
                     controller: _confirmPasswordController,
                     obscureText: _obscureConfirmPassword,
@@ -607,7 +1044,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     },
                   ),
                   const SizedBox(height: 16),
-                  
+
                   // ===== PHONE NUMBER WITH COUNTRY CODE =====
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -640,7 +1077,10 @@ class _SignupScreenState extends State<SignupScreen> {
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Text(country.flag, style: const TextStyle(fontSize: 14)),
+                                    Text(
+                                      country.flag,
+                                      style: const TextStyle(fontSize: 14),
+                                    ),
                                     const SizedBox(width: 2),
                                     Text(
                                       country.iso,
@@ -668,7 +1108,9 @@ class _SignupScreenState extends State<SignupScreen> {
                             }).toList(),
                             onChanged: (value) {
                               if (value != null) {
-                                final selected = CountryHelper.getCountryByCode(value)!;
+                                final selected = CountryHelper.getCountryByCode(
+                                  value,
+                                )!;
                                 setState(() {
                                   _selectedCountryCode = selected.code;
                                   _countryFlag = selected.flag;
@@ -688,7 +1130,7 @@ class _SignupScreenState extends State<SignupScreen> {
                             labelStyle: TextStyle(
                               color: isDarkMode ? Colors.white : Colors.black,
                             ),
-                            hintText: '0300 123 4567',
+                            hintText: '300 123 4567',
                             hintStyle: TextStyle(
                               color: isDarkMode
                                   ? Colors.grey.shade400
@@ -714,14 +1156,20 @@ class _SignupScreenState extends State<SignupScreen> {
                             color: isDarkMode ? Colors.white : Colors.black,
                           ),
                           inputFormatters: [
+                            _NoLeadingZeroFormatter(),
                             FilteringTextInputFormatter.digitsOnly,
-                            LengthLimitingTextInputFormatter(11),
+                            LengthLimitingTextInputFormatter(
+                              10,
+                            ), // Limit to 10 digits
                           ],
                           validator: (value) {
                             if (value == null || value.isEmpty) {
                               return 'Please enter your phone number';
                             }
-                            final digitsOnly = value.replaceAll(RegExp(r'\D'), '');
+                            final digitsOnly = value.replaceAll(
+                              RegExp(r'\D'),
+                              '',
+                            );
                             if (digitsOnly.length < 7) {
                               return 'Please enter a valid phone number';
                             }
@@ -760,104 +1208,8 @@ class _SignupScreenState extends State<SignupScreen> {
                         ],
                       ),
                     ),
-                  const SizedBox(height: 16),
-                  
-                  // ===== ROLE SELECTION (Now only Owner is shown, others added later) =====
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: isDarkMode
-                          ? Colors.blue.shade900.withOpacity(0.3)
-                          : Colors.blue.shade50,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: isDarkMode
-                            ? Colors.blue.shade700
-                            : Colors.blue.shade200,
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.admin_panel_settings,
-                          color: isDarkMode
-                              ? Colors.blue.shade400
-                              : Colors.blue.shade700,
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Role: Owner',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
-                                  color: isDarkMode ? Colors.white : Colors.black,
-                                ),
-                              ),
-                              Text(
-                                'You are creating this business as the owner. '
-                                'You can add managers and workers later.',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: isDarkMode
-                                      ? Colors.grey.shade400
-                                      : Colors.grey.shade600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isDarkMode
-                          ? Colors.orange.shade900.withOpacity(0.5)
-                          : Colors.orange.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: isDarkMode
-                            ? Colors.orange.shade700
-                            : Colors.orange.shade200,
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.info_outline,
-                          size: 16,
-                          color: isDarkMode
-                              ? Colors.orange.shade400
-                              : Colors.orange.shade700,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Each business can have only ONE manager. '
-                            'Additional managers cannot be added.',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: isDarkMode
-                                  ? Colors.orange.shade400
-                                  : Colors.orange.shade700,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
                   const SizedBox(height: 24),
-                  
+
                   if (authProvider.error != null)
                     Container(
                       padding: const EdgeInsets.all(12),
@@ -908,7 +1260,7 @@ class _SignupScreenState extends State<SignupScreen> {
                       ),
                     ),
                   const SizedBox(height: 16),
-                  
+
                   SizedBox(
                     width: double.infinity,
                     height: 50,
@@ -917,15 +1269,14 @@ class _SignupScreenState extends State<SignupScreen> {
                           ? null
                           : () async {
                               if (_formKey.currentState?.validate() ?? false) {
-                                final phoneDigits = _phoneController.text.replaceAll(RegExp(r'\D'), '');
-                                
-                                // ✅ The business name is now stored as the storeName
-                                // ✅ The owner is created with role 'owner'
+                                final phoneDigits = _phoneController.text
+                                    .replaceAll(RegExp(r'\D'), '');
+
                                 bool success = await authProvider.signUp(
                                   email: _emailController.text.trim(),
                                   password: _passwordController.text,
                                   name: _nameController.text.trim(),
-                                  role: 'owner',  // Always owner for the first user
+                                  role: _selectedRole,
                                   phone: _selectedCountryCode + phoneDigits,
                                   storeName: _storeNameController.text.trim(),
                                 );
@@ -934,7 +1285,9 @@ class _SignupScreenState extends State<SignupScreen> {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                       content: Text(
-                                        'Business created successfully! Please sign in.',
+                                        _selectedRole == 'owner'
+                                            ? 'Business created successfully! Please sign in.'
+                                            : 'Account created successfully! Please sign in.',
                                         style: TextStyle(
                                           color: isDarkMode
                                               ? Colors.white
@@ -945,7 +1298,7 @@ class _SignupScreenState extends State<SignupScreen> {
                                           ? Colors.green.shade400
                                           : Colors.green,
                                       behavior: SnackBarBehavior.floating,
-                                      shape: RoundedRectangleBorder(
+                                      shape: const RoundedRectangleBorder(
                                         borderRadius: BorderRadius.vertical(
                                           top: Radius.circular(8),
                                         ),
@@ -985,9 +1338,11 @@ class _SignupScreenState extends State<SignupScreen> {
                                 ),
                               ),
                             )
-                          : const Text(
-                              'Create Business',
-                              style: TextStyle(
+                          : Text(
+                              _selectedRole == 'owner'
+                                  ? 'Create Business'
+                                  : 'Join Business',
+                              style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.white,
@@ -1044,5 +1399,28 @@ class _SignupScreenState extends State<SignupScreen> {
         ),
       ),
     );
+  }
+}
+
+// Custom TextInputFormatter that silently removes leading zero
+class _NoLeadingZeroFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    // Get the text without spaces
+    final String newText = newValue.text.replaceAll(RegExp(r'\s'), '');
+
+    // If the text starts with '0', silently remove it
+    if (newText.startsWith('0')) {
+      final String cleanedText = newValue.text.replaceFirst('0', '');
+      return newValue.copyWith(
+        text: cleanedText,
+        selection: TextSelection.collapsed(offset: cleanedText.length),
+      );
+    }
+
+    return newValue;
   }
 }

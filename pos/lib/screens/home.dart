@@ -29,7 +29,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoading = false;
   String _selectedPaymentMethod = 'Cash';
 
-  // ✅ Customer Info for checkout
+  // Customer Info for checkout
   String _customerId = 'guest';
   String _customerName = 'Guest Customer';
   String _customerPhone = '';
@@ -58,21 +58,104 @@ class _HomeScreenState extends State<HomeScreen> {
     final showProfit = settingsProvider.showProfitInPOS;
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
+    // ✅ RESPONSIVE LAYOUT BUILDER
     return Scaffold(
-      body: Column(
-        children: [
-          _buildSearchSection(isDarkMode),
-          Expanded(
-            flex: 1,
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _cartItems.isEmpty
-                    ? _buildEmptyCart(isDarkMode)
-                    : _buildCartList(currencySymbol, isDarkMode),
-          ),
-          _buildCheckoutSection(currencySymbol, showProfit, isDarkMode),
-        ],
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          // If screen is wide (PC/Web/Tablet Landscape)
+          if (constraints.maxWidth > 800) {
+            return _buildDesktopLayout(currencySymbol, showProfit, isDarkMode);
+          }
+          // If screen is narrow (Mobile)
+          return _buildMobileLayout(currencySymbol, showProfit, isDarkMode);
+        },
       ),
+    );
+  }
+
+  // ==================== LAYOUT: MOBILE ====================
+  Widget _buildMobileLayout(String currencySymbol, bool showProfit, bool isDarkMode) {
+    return Column(
+      children: [
+        _buildSearchSection(isDarkMode),
+        Expanded(
+          flex: 1,
+          child: _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : _cartItems.isEmpty
+                  ? _buildEmptyCartPrompt(isDarkMode)
+                  : _buildCartList(currencySymbol, isDarkMode),
+        ),
+        _buildCheckoutSection(currencySymbol, showProfit, isDarkMode),
+      ],
+    );
+  }
+
+  // ==================== LAYOUT: DESKTOP / WEB ====================
+  Widget _buildDesktopLayout(String currencySymbol, bool showProfit, bool isDarkMode) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // LEFT PANE: Search & Prompt
+        Expanded(
+          flex: 5,
+          child: Column(
+            children: [
+              _buildSearchSection(isDarkMode),
+              Expanded(
+                child: _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : _buildEmptyCartPrompt(isDarkMode), // Show big search prompt on left
+              ),
+            ],
+          ),
+        ),
+        
+        // DIVIDER
+        VerticalDivider(
+          width: 1,
+          thickness: 1,
+          color: isDarkMode ? Colors.grey.shade800 : Colors.grey.shade300,
+        ),
+        
+        // RIGHT PANE: Cart & Checkout (Fixed Width to prevent stretching)
+        Container(
+          width: 400,
+          color: isDarkMode ? Colors.grey.shade900 : Colors.grey.shade50,
+          child: Column(
+            children: [
+              // Cart Header
+              Container(
+                padding: const EdgeInsets.all(16),
+                color: isDarkMode ? Colors.black26 : Colors.white,
+                child: Row(
+                  children: [
+                    Icon(Icons.shopping_cart, color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Current Order',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: isDarkMode ? Colors.white : Colors.black,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              // Cart Items
+              Expanded(
+                child: _cartItems.isEmpty
+                    ? _buildSmallEmptyCartHint(isDarkMode) // Small hint instead of giant button
+                    : _buildCartList(currencySymbol, isDarkMode),
+              ),
+              // Checkout
+              _buildCheckoutSection(currencySymbol, showProfit, isDarkMode),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -100,6 +183,7 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               Expanded(
                 child: ProductAutocomplete(
+                  focusNode: _searchFocusNode, // ✅ PASSED FOCUS NODE HERE
                   onProductSelected: (productName) {
                     _searchProduct(productName);
                   },
@@ -356,8 +440,10 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ==================== EMPTY CART ====================
-  Widget _buildEmptyCart(bool isDarkMode) {
+  // ==================== EMPTY STATES ====================
+  
+  // Big prompt (Used on Mobile when empty, and Desktop Left Panel)
+  Widget _buildEmptyCartPrompt(bool isDarkMode) {
     return Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(vertical: 40),
@@ -371,7 +457,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 16),
             Text(
-              'Cart is Empty',
+              'Add Items to Order',
               style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
@@ -395,7 +481,7 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 24),
             ElevatedButton.icon(
               onPressed: () {
-                _searchFocusNode.requestFocus();
+                _searchFocusNode.requestFocus(); // ✅ Now this actually works!
               },
               icon: const Icon(Icons.search),
               label: const Text('Start Searching'),
@@ -415,6 +501,27 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  // Small hint (Used on Desktop Right Panel when cart is empty)
+  Widget _buildSmallEmptyCartHint(bool isDarkMode) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.shopping_basket_outlined, size: 48, color: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade300),
+          const SizedBox(height: 16),
+          Text(
+            'Cart is empty',
+            style: TextStyle(
+              fontSize: 16,
+              color: isDarkMode ? Colors.grey.shade500 : Colors.grey.shade600,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -896,7 +1003,6 @@ class _HomeScreenState extends State<HomeScreen> {
         barcode: barcode.isNotEmpty ? barcode : '',
       );
 
-      // Use FirebaseService to add product
       final docRef = await _firebaseService.addProduct(product.toMap());
       final newProduct = product.copyWith(id: docRef.id);
 
@@ -962,13 +1068,10 @@ class _HomeScreenState extends State<HomeScreen> {
     _totalProfit = _cartItems.fold(0.0, (sum, item) => sum + ((item.price - item.costPrice) * item.stock));
   }
 
-  // ==================== SHOW CUSTOMER DIALOG ====================
   Future<void> _showCustomerDialog() async {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     
-    // For now, show a simple dialog to enter customer name and phone
-    // Later, you can replace this with a full customer search/selection
-    final nameController = TextEditingController(text: _customerName);
+    final nameController = TextEditingController(text: _customerName == 'Guest Customer' ? '' : _customerName);
     final phoneController = TextEditingController(text: _customerPhone);
     final emailController = TextEditingController(text: _customerEmail ?? '');
     
@@ -1022,7 +1125,6 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           TextButton(
             onPressed: () {
-              // Set as guest
               setState(() {
                 _customerId = 'guest';
                 _customerName = 'Guest Customer';
@@ -1034,7 +1136,7 @@ class _HomeScreenState extends State<HomeScreen> {
               _showSnackBar('Set as Guest Customer');
             },
             child: Text(
-              'Guest',
+              'Skip (Guest)',
               style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
             ),
           ),
@@ -1052,41 +1154,30 @@ class _HomeScreenState extends State<HomeScreen> {
                 _isGuestCustomer = _customerName == 'Guest Customer';
               });
               Navigator.pop(context);
-              _showSnackBar('Customer set: ${_customerName}');
+              _showSnackBar('Customer set: $_customerName');
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
               foregroundColor: Colors.white,
             ),
-            child: const Text('Set Customer'),
+            child: const Text('Save Customer'),
           ),
         ],
       ),
     );
   }
 
-  // ==================== CHECKOUT PROCESS ====================
   void _processCheckout() async {
     if (_cartItems.isEmpty) return;
 
     setState(() => _isLoading = true);
 
     try {
-      // 1. Show customer dialog first
       await _showCustomerDialog();
       
-      // If still guest, continue
-      if (_isGuestCustomer && _customerName == 'Guest Customer') {
-        // Using guest customer
-      }
-
-      // 2. Get product IDs for stock check
       final productIds = _cartItems.map((item) => item.id).toList();
-      
-      // 3. Fetch all products at once using FirebaseService
       final productDocs = await _firebaseService.getProductsByIds(productIds);
       
-      // 4. Verify stock availability
       for (var item in _cartItems) {
         final doc = productDocs[item.id];
         if (doc == null || !doc.exists) {
@@ -1096,7 +1187,7 @@ class _HomeScreenState extends State<HomeScreen> {
         }
         
         final data = doc.data() as Map<String, dynamic>;
-        final availableStock = (data['stock'] ?? 0).toInt();
+        final availableStock = ((data['stock'] ?? 0) as num).toInt(); // ✅ Safe parsing
         
         if (availableStock < item.stock) {
           _showSnackBar(
@@ -1107,21 +1198,18 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       }
 
-      // 5. Show confirmation dialog
       final confirm = await _showConfirmationDialog();
       if (!confirm) {
         setState(() => _isLoading = false);
         return;
       }
 
-      // 6. SAVE RECEIPT DATA BEFORE CLEARING CART
       final receiptNumber = 'RCP-${DateTime.now().millisecondsSinceEpoch}';
       final receiptCartItems = List<Product>.from(_cartItems);
       final receiptTotalAmount = _totalAmount;
       final receiptTotalProfit = _totalProfit;
       final receiptPaymentMethod = _selectedPaymentMethod;
 
-      // 7. Prepare sales data with customer info
       final salesData = _cartItems.map((item) {
         return {
           'productId': item.id,
@@ -1134,7 +1222,6 @@ class _HomeScreenState extends State<HomeScreen> {
           'saleDate': DateTime.now(),
           'paymentMethod': _selectedPaymentMethod,
           'receiptNumber': receiptNumber,
-          // ✅ Customer Fields
           'customerId': _customerId,
           'customerName': _customerName,
           'customerPhone': _customerPhone,
@@ -1144,36 +1231,37 @@ class _HomeScreenState extends State<HomeScreen> {
         };
       }).toList();
 
-      // 8. Prepare stock updates (negative values for deduction)
       final stockUpdates = <String, int>{};
       for (var item in _cartItems) {
         stockUpdates[item.id] = -item.stock;
       }
 
-      // 9. Execute batch operations using FirebaseService
       await Future.wait([
         _firebaseService.addMultipleSales(salesData),
         _firebaseService.updateMultipleProductsStock(stockUpdates),
       ]);
 
-      // 10. Clear cart
       setState(() {
         _cartItems.clear();
         _updateTotals();
         _isLoading = false;
+        
+        // Reset customer for next order
+        _customerId = 'guest';
+        _customerName = 'Guest Customer';
+        _customerPhone = '';
+        _customerEmail = null;
+        _isGuestCustomer = true;
       });
 
-      // 11. Show snackbar
       _showSnackBar('✅ Sale completed! Receipt #$receiptNumber');
 
-      // 12. Show receipt with saved data
       _showReceiptDialog(
         cartItems: receiptCartItems,
         totalAmount: receiptTotalAmount,
         totalProfit: receiptTotalProfit,
         paymentMethod: receiptPaymentMethod,
         receiptNumber: receiptNumber,
-        // ✅ Pass customer info to receipt
         customerName: _customerName,
         customerPhone: _customerPhone,
         customerEmail: _customerEmail,
@@ -1187,7 +1275,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // ==================== RECEIPT DIALOG ====================
   void _showReceiptDialog({
     required List<Product> cartItems,
     required double totalAmount,
@@ -1216,10 +1303,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _showProductSelection(QuerySnapshot snapshot) {
-    final settingsProvider = Provider.of<SettingsProvider>(
-      context,
-      listen: false,
-    );
+    final settingsProvider = Provider.of<SettingsProvider>(context, listen: false);
     final currencySymbol = settingsProvider.currencySymbol;
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
@@ -1248,31 +1332,23 @@ class _HomeScreenState extends State<HomeScreen> {
                 borderRadius: BorderRadius.circular(8),
                 child: ListTile(
                   leading: CircleAvatar(
-                    backgroundColor: isDarkMode
-                        ? Colors.blue.shade900
-                        : Colors.blue.shade100,
+                    backgroundColor: isDarkMode ? Colors.blue.shade900 : Colors.blue.shade100,
                     child: Text(
                       (data['stock'] ?? 0).toString(),
                       style: TextStyle(
-                        color: isDarkMode
-                            ? Colors.blue.shade400
-                            : Colors.blue.shade700,
+                        color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
                   title: Text(
                     data['name'] ?? '',
-                    style: TextStyle(
-                      color: isDarkMode ? Colors.white : Colors.black,
-                    ),
+                    style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
                   ),
                   subtitle: Text(
                     'Price: $currencySymbol${data['price']} | Stock: ${data['stock']}',
                     style: TextStyle(
-                      color: isDarkMode
-                          ? Colors.grey.shade400
-                          : Colors.grey.shade600,
+                      color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
                     ),
                   ),
                   trailing: IconButton(
@@ -1312,9 +1388,7 @@ class _HomeScreenState extends State<HomeScreen> {
       context,
       MaterialPageRoute(
         builder: (context) => QRScanner(
-          onScan: (qrCode) {
-            _searchProduct(qrCode);
-          },
+          onScan: (qrCode) => _searchProduct(qrCode),
         ),
       ),
     );
@@ -1325,9 +1399,7 @@ class _HomeScreenState extends State<HomeScreen> {
       context,
       MaterialPageRoute(
         builder: (context) => BarcodeScanner(
-          onScan: (barcode) {
-            _searchProduct(barcode);
-          },
+          onScan: (barcode) => _searchProduct(barcode),
         ),
       ),
     );
@@ -1341,150 +1413,7 @@ class _HomeScreenState extends State<HomeScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) => VoiceInput(
-        onVoiceRecognized: (text) {
-          _searchProduct(text);
-        },
-      ),
-    );
-  }
-
-  void _showSalesHistory() {
-    final settingsProvider = Provider.of<SettingsProvider>(
-      context,
-      listen: false,
-    );
-    final currencySymbol = settingsProvider.currencySymbol;
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      backgroundColor: isDarkMode ? Colors.grey.shade900 : Colors.white,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(16),
-        height: MediaQuery.of(context).size.height * 0.8,
-        child: Column(
-          children: [
-            Text(
-              'Sales History',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: isDarkMode ? Colors.white : Colors.black,
-              ),
-            ),
-            Divider(
-              color: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade300,
-            ),
-            Expanded(
-              child: StreamBuilder<QuerySnapshot>(
-                stream: _firebaseService.getSalesStreamForBusiness(),
-                builder: (context, snapshot) {
-                  if (snapshot.hasError) {
-                    return Center(
-                      child: Text(
-                        'Error: ${snapshot.error}',
-                        style: TextStyle(
-                          color: isDarkMode ? Colors.white : Colors.black,
-                        ),
-                      ),
-                    );
-                  }
-
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-
-                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                    return Center(
-                      child: Text(
-                        'No sales yet',
-                        style: TextStyle(
-                          color: isDarkMode ? Colors.white : Colors.black,
-                        ),
-                      ),
-                    );
-                  }
-
-                  return ListView.builder(
-                    itemCount: snapshot.data!.docs.length,
-                    itemBuilder: (context, index) {
-                      var data =
-                          snapshot.data!.docs[index].data()
-                              as Map<String, dynamic>;
-                      return Card(
-                        color: isDarkMode ? Colors.grey.shade800 : Colors.white,
-                        child: Material(
-                          color: Colors.transparent,
-                          child: ListTile(
-                            leading: CircleAvatar(
-                              backgroundColor: isDarkMode
-                                  ? Colors.green.shade900
-                                  : Colors.green.shade100,
-                              child: Text(
-                                (data['quantity'] ?? 0).toString(),
-                                style: TextStyle(
-                                  color: isDarkMode
-                                      ? Colors.green.shade400
-                                      : Colors.green.shade700,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                            title: Text(
-                              data['productName'] ?? '',
-                              style: TextStyle(
-                                color: isDarkMode ? Colors.white : Colors.black,
-                              ),
-                            ),
-                            subtitle: Text(
-                              'Receipt: ${data['receiptNumber']}\n'
-                              'Payment: ${data['paymentMethod']}',
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: isDarkMode
-                                    ? Colors.grey.shade400
-                                    : Colors.grey.shade600,
-                              ),
-                            ),
-                            trailing: Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  '$currencySymbol${(data['total'] ?? 0).toStringAsFixed(2)}',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: isDarkMode
-                                        ? Colors.green.shade400
-                                        : Colors.green,
-                                  ),
-                                ),
-                                Text(
-                                  'Profit: $currencySymbol${(data['profit'] ?? 0).toStringAsFixed(2)}',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: isDarkMode
-                                        ? Colors.blue.shade400
-                                        : Colors.blue.shade700,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
+        onVoiceRecognized: (text) => _searchProduct(text),
       ),
     );
   }
@@ -1519,93 +1448,79 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<bool> _showConfirmationDialog() async {
-    final settingsProvider = Provider.of<SettingsProvider>(
-      context,
-      listen: false,
-    );
+    final settingsProvider = Provider.of<SettingsProvider>(context, listen: false);
     final currencySymbol = settingsProvider.currencySymbol;
     final showProfit = settingsProvider.showProfitInPOS;
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return await showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: Text(
-              'Confirm Checkout',
-              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
-            ),
-            backgroundColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Total items: ${_cartItems.length}',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w500,
-                    color: isDarkMode ? Colors.white : Colors.black,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Total amount: $currencySymbol${_totalAmount.toStringAsFixed(2)}',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: isDarkMode ? Colors.green.shade400 : Colors.green,
-                  ),
-                ),
-                if (showProfit) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    'Total profit: $currencySymbol${_totalProfit.toStringAsFixed(2)}',
-                    style: TextStyle(
-                      color: isDarkMode
-                          ? Colors.blue.shade400
-                          : Colors.blue.shade700,
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 8),
-                Divider(
-                  color: isDarkMode
-                      ? Colors.grey.shade700
-                      : Colors.grey.shade300,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Proceed with checkout?',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w500,
-                    color: isDarkMode ? Colors.white : Colors.black,
-                  ),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: Text(
-                  'Cancel',
-                  style: TextStyle(
-                    color: isDarkMode ? Colors.white : Colors.black,
-                  ),
-                ),
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          'Confirm Checkout',
+          style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+        ),
+        backgroundColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Total items: ${_cartItems.length}',
+              style: TextStyle(
+                fontWeight: FontWeight.w500,
+                color: isDarkMode ? Colors.white : Colors.black,
               ),
-              ElevatedButton(
-                onPressed: () => Navigator.pop(context, true),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: isDarkMode
-                      ? Colors.green.shade400
-                      : Colors.green.shade700,
-                  foregroundColor: Colors.white,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Total amount: $currencySymbol${_totalAmount.toStringAsFixed(2)}',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: isDarkMode ? Colors.green.shade400 : Colors.green,
+              ),
+            ),
+            if (showProfit) ...[
+              const SizedBox(height: 4),
+              Text(
+                'Total profit: $currencySymbol${_totalProfit.toStringAsFixed(2)}',
+                style: TextStyle(
+                  color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
                 ),
-                child: const Text('Confirm'),
               ),
             ],
+            const SizedBox(height: 8),
+            Divider(color: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade300),
+            const SizedBox(height: 8),
+            Text(
+              'Proceed with checkout?',
+              style: TextStyle(
+                fontWeight: FontWeight.w500,
+                color: isDarkMode ? Colors.white : Colors.black,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+            ),
           ),
-        ) ??
-        false;
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isDarkMode ? Colors.green.shade400 : Colors.green.shade700,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Confirm'),
+          ),
+        ],
+      ),
+    ) ?? false;
   }
 
   void _showSnackBar(String message) {

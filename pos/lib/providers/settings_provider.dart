@@ -5,7 +5,8 @@ import '../models/settings_model.dart';
 
 class SettingsProvider extends ChangeNotifier {
   AppSettings _settings = AppSettings();
-  bool _isLoading = false;
+  // ✅ CHANGED: Default to true so we don't need to synchronously notify listeners on boot
+  bool _isLoading = true; 
 
   AppSettings get settings => _settings;
   bool get isLoading => _isLoading;
@@ -24,7 +25,7 @@ class SettingsProvider extends ChangeNotifier {
   String get dateFormat => _settings.dateFormat;
   String get timeFormat => _settings.timeFormat;
   
-  // ✅ Customer related getters
+  // Customer related getters
   bool get enableCustomerLoyalty => _settings.enableCustomerLoyalty;
   bool get requireCustomerInfo => _settings.requireCustomerInfo;
   int get pointsPerCurrency => _settings.pointsPerCurrency;
@@ -35,9 +36,7 @@ class SettingsProvider extends ChangeNotifier {
 
   // Load settings from SharedPreferences
   Future<void> loadSettings() async {
-    _isLoading = true;
-    notifyListeners();
-
+    // ✅ REMOVED synchronous notifyListeners() to prevent startup crashes
     try {
       final prefs = await SharedPreferences.getInstance();
       final String? settingsJson = prefs.getString('app_settings');
@@ -47,10 +46,10 @@ class SettingsProvider extends ChangeNotifier {
         _settings = AppSettings.fromMap(data);
       }
     } catch (e) {
-      print('Error loading settings: $e');
+      debugPrint('❌ Error loading settings: $e');
     } finally {
       _isLoading = false;
-      notifyListeners();
+      notifyListeners(); // Safe to call here because of the async gap
     }
   }
 
@@ -60,7 +59,7 @@ class SettingsProvider extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('app_settings', json.encode(_settings.toMap()));
     } catch (e) {
-      print('Error saving settings: $e');
+      debugPrint('❌ Error saving settings: $e');
     }
   }
 
@@ -133,7 +132,7 @@ class SettingsProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ✅ Customer Settings Methods
+  // Customer Settings Methods
   Future<void> toggleCustomerLoyalty() async {
     _settings = _settings.copyWith(enableCustomerLoyalty: !_settings.enableCustomerLoyalty);
     await _saveSettings();
@@ -169,10 +168,10 @@ class SettingsProvider extends ChangeNotifier {
         // No settings found, create with location-based currency
         _settings = await AppSettings.createWithLocationBasedCurrency();
         await _saveSettings();
-        print('✅ Settings initialized with location-based currency');
+        debugPrint('✅ Settings initialized with location-based currency');
       }
     } catch (e) {
-      print('Error loading settings: $e');
+      debugPrint('❌ Error loading settings: $e');
       // Fallback to default
       _settings = AppSettings();
     } finally {

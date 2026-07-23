@@ -1,10 +1,12 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:pos/models/user.dart';
+import 'package:pos/services/firebase_service.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseService _firebaseService = FirebaseService();
 
   // Stream of auth state changes
   Stream<User?> get authStateChanges => _auth.authStateChanges();
@@ -12,7 +14,7 @@ class AuthService {
   // Get current user
   User? get currentUser => _auth.currentUser;
 
-  // ✅ UPDATED: Sign up with business-centric structure (NO root users collection)
+  // ✅ UPDATED: Sign up perfectly synced with FirebaseService architecture
   Future<AppUser?> signUp({
     required String email,
     required String password,
@@ -32,20 +34,52 @@ class AuthService {
       if (user == null) throw Exception('Failed to create user');
 
       final uid = user.uid;
+      
+      // Update Firebase Auth profile
+      await user.updateDisplayName(name);
 
-      // Step 2: Create Business document
-      final businessData = {
-        'name': storeName,
-        'createdAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-        'ownerId': uid,
-        'isActive': true,
-      };
+      // ✅ Step 2: Determine if creating or joining a business
+      String businessId;
+      DocumentReference businessRef;
 
-      final businessRef = await _firestore.collection('businesses').add(businessData);
-      final businessId = businessRef.id;
+      if (role == 'owner') {
+        // Owner creates a brand new business
+        final businessData = {
+          'name': storeName,
+          'createdAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+          'ownerId': uid,
+          'isActive': true,
+        };
 
-      // Step 3: Create AppUser
+        businessRef = await _firestore.collection('businesses').add(businessData);
+        businessId = businessRef.id;
+
+        // Create default business settings ONLY for the new business
+        await businessRef.collection('settings').doc('store_settings').set({
+          'currency': 'PKR',
+          'country': 'Pakistan',
+          'createdAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      } else {
+        // Manager/Worker joins an existing business
+        final businessQuery = await _firestore
+            .collection('businesses')
+            .where('name', isEqualTo: storeName)
+            .limit(1)
+            .get();
+
+        if (businessQuery.docs.isEmpty) {
+          // If they somehow bypass the UI validation, catch it here
+          throw Exception('Business "$storeName" not found. Please check spelling or contact the owner.');
+        }
+
+        businessId = businessQuery.docs.first.id;
+        businessRef = _firestore.collection('businesses').doc(businessId);
+      }
+
+      // Step 3: Create AppUser object
       AppUser appUser = AppUser(
         id: uid,
         email: email,
@@ -57,8 +91,8 @@ class AuthService {
         isActive: true,
       );
 
-      // Step 4: Add user to business's users sub-collection (NO root users collection)
-      await businessRef.collection('users').doc(uid).set({
+      // Step 4: Add to business's MEMBERS sub-collection
+      await businessRef.collection('members').doc(uid).set({
         'id': uid,
         'name': name,
         'email': email,
@@ -69,7 +103,18 @@ class AuthService {
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
-      // Step 5: Add to lightweight lookup collection for quick businessId retrieval
+      // Step 5: Add to ROOT users collection (FirebaseService relies on this for fast startup)
+      await _firestore.collection('users').doc(uid).set({
+        'businessId': businessId,
+        'role': role,
+        'email': email,
+        'name': name,
+        'isActive': true,
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      // Step 6: Add to lightweight lookup collection
       await _firestore.collection('userBusinessLookup').doc(uid).set({
         'businessId': businessId,
         'role': role,
@@ -78,21 +123,13 @@ class AuthService {
         'createdAt': FieldValue.serverTimestamp(),
       });
 
-      // Step 6: Create business settings
-      await businessRef.collection('settings').doc('store_settings').set({
-        'currency': 'PKR',
-        'country': 'Pakistan',
-        'createdAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-
       return appUser;
     } catch (e) {
       throw _handleAuthError(e);
     }
   }
 
-  // ✅ UPDATED: Sign in using lookup collection
+  // ✅ UPDATED: Sign in using lookup collection and MEMBERS sub-collection
   Future<AppUser?> signIn({
     required String email,
     required String password,
@@ -108,7 +145,7 @@ class AuthService {
 
       final uid = user.uid;
 
-      // ✅ Get business ID from lookup collection
+      // Get business ID from lookup collection
       final lookupDoc = await _firestore
           .collection('userBusinessLookup')
           .doc(uid)
@@ -121,15 +158,11 @@ class AuthService {
       final lookupData = lookupDoc.data() as Map<String, dynamic>;
       final businessId = lookupData['businessId'] as String;
 
-      if (businessId == null) {
-        throw Exception('Business not found for user');
-      }
-
-      // ✅ Get user data from business's users sub-collection
+      // Get user data from business's MEMBERS sub-collection
       final userDoc = await _firestore
           .collection('businesses')
           .doc(businessId)
-          .collection('users')
+          .collection('members')
           .doc(uid)
           .get();
 
@@ -142,10 +175,9 @@ class AuthService {
       // Check if user is active
       if (data['isActive'] == false) {
         await _auth.signOut();
-        throw Exception('Account has been deactivated');
+        throw Exception('Account has been deactivated by the owner');
       }
 
-      // Add businessId to the data
       data['businessId'] = businessId;
 
       return AppUser.fromMap(data, uid);
@@ -159,7 +191,7 @@ class AuthService {
     await _auth.signOut();
   }
 
-  // ✅ UPDATED: Get current user data from lookup and business
+  // ✅ UPDATED: Get current user data from MEMBERS sub-collection
   Future<AppUser?> getCurrentUserData() async {
     User? user = _auth.currentUser;
     if (user == null) return null;
@@ -167,209 +199,100 @@ class AuthService {
     try {
       final uid = user.uid;
 
-      // ✅ Get business ID from lookup
       final lookupDoc = await _firestore
           .collection('userBusinessLookup')
           .doc(uid)
           .get();
 
-      if (!lookupDoc.exists) {
-        print('⚠️ No lookup found for user: $uid');
-        return null;
-      }
+      if (!lookupDoc.exists) return null;
 
       final lookupData = lookupDoc.data() as Map<String, dynamic>;
       final businessId = lookupData['businessId'] as String;
 
-      if (businessId == null) {
-        print('⚠️ No businessId in lookup for user: $uid');
-        return null;
-      }
-
-      // ✅ Get user data from business's users sub-collection
+      // Get from MEMBERS
       final userDoc = await _firestore
           .collection('businesses')
           .doc(businessId)
-          .collection('users')
+          .collection('members')
           .doc(uid)
           .get();
 
-      if (!userDoc.exists) {
-        print('⚠️ User document not found in business: $uid');
-        return null;
-      }
+      if (!userDoc.exists) return null;
 
       var data = userDoc.data() as Map<String, dynamic>;
       data['businessId'] = businessId;
 
       return AppUser.fromMap(data, uid);
     } catch (e) {
-      print('❌ Error getting user data: $e');
       return null;
     }
   }
 
-  // ✅ UPDATED: Update user profile in business
+  // ✅ UPDATED: Update user profile safely across all collections
   Future<void> updateUserProfile(String userId, Map<String, dynamic> data) async {
     try {
-      // Get business ID from lookup
-      final lookupDoc = await _firestore
-          .collection('userBusinessLookup')
-          .doc(userId)
-          .get();
-
-      if (!lookupDoc.exists) {
-        throw Exception('User not found');
-      }
+      final lookupDoc = await _firestore.collection('userBusinessLookup').doc(userId).get();
+      if (!lookupDoc.exists) throw Exception('User not found');
 
       final businessId = lookupDoc.data()?['businessId'] as String;
 
-      if (businessId == null) {
-        throw Exception('Business not found');
-      }
+      data['updatedAt'] = FieldValue.serverTimestamp();
 
-      // Update in business's users sub-collection
+      // Update in MEMBERS
       await _firestore
           .collection('businesses')
           .doc(businessId)
-          .collection('users')
+          .collection('members')
           .doc(userId)
           .update(data);
+          
+      // Keep root users in sync
+      await _firestore.collection('users').doc(userId).update(data);
     } catch (e) {
       throw Exception('Failed to update user: $e');
     }
   }
 
-  // ✅ UPDATED: Get all users from business
+  // ===========================================================================
+  // 🚀 DELEGATED METHODS
+  // These previously duplicated logic. Now they route directly to FirebaseService.
+  // ===========================================================================
+
   Future<List<AppUser>> getAllUsers() async {
-    try {
-      final currentUser = _auth.currentUser;
-      if (currentUser == null) {
-        throw Exception('Not authenticated');
-      }
+    final businessId = await _firebaseService.getCurrentBusinessId();
+    if (businessId == null) throw Exception('Business not found');
 
-      // Get business ID from lookup
-      final lookupDoc = await _firestore
-          .collection('userBusinessLookup')
-          .doc(currentUser.uid)
-          .get();
-
-      if (!lookupDoc.exists) {
-        throw Exception('User business not found');
-      }
-
-      final businessId = lookupDoc.data()?['businessId'] as String;
-
-      if (businessId == null) {
-        throw Exception('Business not found');
-      }
-
-      // Get all users from business
-      final snapshot = await _firestore
-          .collection('businesses')
-          .doc(businessId)
-          .collection('users')
-          .get();
-
-      return snapshot.docs.map((doc) {
-        var data = doc.data() as Map<String, dynamic>;
-        data['businessId'] = businessId;
-        return AppUser.fromMap(data, doc.id);
-      }).toList();
-    } catch (e) {
-      throw Exception('Failed to get users: $e');
-    }
+    // Use the optimized FirebaseService method
+    final rawUsers = await _firebaseService.getBusinessUsers(businessId);
+    
+    return rawUsers.map((data) {
+      data['businessId'] = businessId;
+      return AppUser.fromMap(data, data['id']);
+    }).toList();
   }
 
-  // ✅ UPDATED: Update user role in business
   Future<void> updateUserRole(String userId, String newRole) async {
-    try {
-      // Get business ID from lookup
-      final lookupDoc = await _firestore
-          .collection('userBusinessLookup')
-          .doc(userId)
-          .get();
-
-      if (!lookupDoc.exists) {
-        throw Exception('User not found');
-      }
-
-      final businessId = lookupDoc.data()?['businessId'] as String;
-
-      if (businessId == null) {
-        throw Exception('Business not found');
-      }
-
-      // If changing to manager, check if manager already exists
-      if (newRole == 'manager') {
-        final existingManager = await _firestore
-            .collection('businesses')
-            .doc(businessId)
-            .collection('users')
-            .where('role', isEqualTo: 'manager')
-            .limit(1)
-            .get();
-
-        if (existingManager.docs.isNotEmpty && existingManager.docs.first.id != userId) {
-          throw Exception('This business already has a manager. Only one manager is allowed.');
-        }
-      }
-
-      // Update in business's users sub-collection
-      await _firestore
-          .collection('businesses')
-          .doc(businessId)
-          .collection('users')
-          .doc(userId)
-          .update({
-            'role': newRole,
-            'updatedAt': FieldValue.serverTimestamp(),
-          });
-
-      // Update in lookup collection
-      await _firestore
-          .collection('userBusinessLookup')
-          .doc(userId)
-          .update({
-            'role': newRole,
-          });
-    } catch (e) {
-      throw Exception('Failed to update user role: $e');
-    }
+    final businessId = await _firebaseService.getCurrentBusinessId();
+    if (businessId == null) throw Exception('Business not found');
+    
+    // Delegate to FirebaseService
+    await _firebaseService.updateUserRoleInBusiness(
+      businessId: businessId, 
+      userId: userId, 
+      newRole: newRole
+    );
   }
 
-  // ✅ UPDATED: Toggle user active status
   Future<void> toggleUserActive(String userId, bool isActive) async {
-    try {
-      // Get business ID from lookup
-      final lookupDoc = await _firestore
-          .collection('userBusinessLookup')
-          .doc(userId)
-          .get();
-
-      if (!lookupDoc.exists) {
-        throw Exception('User not found');
-      }
-
-      final businessId = lookupDoc.data()?['businessId'] as String;
-
-      if (businessId == null) {
-        throw Exception('Business not found');
-      }
-
-      // Update in business's users sub-collection
-      await _firestore
-          .collection('businesses')
-          .doc(businessId)
-          .collection('users')
-          .doc(userId)
-          .update({
-            'isActive': isActive,
-            'updatedAt': FieldValue.serverTimestamp(),
-          });
-    } catch (e) {
-      throw Exception('Failed to toggle user status: $e');
-    }
+    final businessId = await _firebaseService.getCurrentBusinessId();
+    if (businessId == null) throw Exception('Business not found');
+    
+    // Delegate to FirebaseService
+    await _firebaseService.toggleUserActiveInBusiness(
+      businessId: businessId, 
+      userId: userId, 
+      isActive: isActive
+    );
   }
 
   // Error handler
@@ -381,15 +304,15 @@ class AuthService {
         case 'wrong-password':
           return 'Incorrect password.';
         case 'email-already-in-use':
-          return 'Email is already registered.';
+          return 'Email is already registered. Try logging in.';
         case 'invalid-email':
-          return 'Invalid email address.';
+          return 'Invalid email address format.';
         case 'weak-password':
-          return 'Password is too weak.';
+          return 'Password is too weak. Use at least 6 characters.';
         case 'too-many-requests':
-          return 'Too many attempts. Please try again later.';
+          return 'Too many failed attempts. Please try again later.';
         default:
-          return error.message ?? 'An error occurred.';
+          return error.message ?? 'An authentication error occurred.';
       }
     }
     return error.toString();
