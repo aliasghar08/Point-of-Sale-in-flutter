@@ -28,7 +28,7 @@ class FirebaseService {
 
   // =========================================================
 
-  // ✅ Get the current user's business ID
+  // ✅ Get the current user's business ID - FIXED
   Future<String?> getCurrentBusinessId() async {
     try {
       if (!isAuthenticated) return null;
@@ -801,8 +801,8 @@ class FirebaseService {
 
       // 1. Prepare Sale Document with explicit User IDs
       saleData['createdBy'] = _currentUserId; // Legacy compatibility
-      saleData['userId'] = _currentUserId; // ✅ Explicitly identifying who made the sale
-      saleData['sellerName'] = _auth.currentUser?.displayName ?? 'Unknown'; // ✅ Added for easy UI reading
+      saleData['userId'] = _currentUserId; 
+      saleData['sellerName'] = _auth.currentUser?.displayName ?? 'Unknown'; 
       saleData['createdAt'] = FieldValue.serverTimestamp();
 
       final receipt = (saleData['receiptNumber'] ?? '').toString().trim();
@@ -828,6 +828,11 @@ class FirebaseService {
       if (customerId != null && customerId.isNotEmpty && customerId != 'guest' && !isGuest) {
         final customerRef = businessRef.collection('customers').doc(customerId);
         batch.set(customerRef, {
+          // ✅ ADDED: Include the customer's personal details to prevent empty docs
+          'name': saleData['customerName'] ?? 'Unknown',
+          'phone': saleData['customerPhone'] ?? '',
+          'email': saleData['customerEmail'] ?? '',
+          'address': saleData['customerAddress'] ?? '',
           'totalSpent': FieldValue.increment((saleData['total'] ?? 0.0).toDouble()),
           'totalOrders': FieldValue.increment(1),
           'lastPurchaseDate': saleData['saleDate'] ?? FieldValue.serverTimestamp(),
@@ -856,7 +861,7 @@ class FirebaseService {
       
       for (var sale in salesData) {
         sale['createdBy'] = _currentUserId;
-        sale['userId'] = _currentUserId; // ✅ Explicitly identifying who made the sale
+        sale['userId'] = _currentUserId; 
         sale['sellerName'] = _auth.currentUser?.displayName ?? 'Unknown';
         sale['createdAt'] = FieldValue.serverTimestamp();
         
@@ -881,6 +886,11 @@ class FirebaseService {
         if (customerId != null && customerId.isNotEmpty && customerId != 'guest' && !isGuest) {
           final customerRef = businessRef.collection('customers').doc(customerId);
           batch.set(customerRef, {
+            // ✅ ADDED: Include the customer's personal details to prevent empty docs
+            'name': sale['customerName'] ?? 'Unknown',
+            'phone': sale['customerPhone'] ?? '',
+            'email': sale['customerEmail'] ?? '',
+            'address': sale['customerAddress'] ?? '',
             'totalSpent': FieldValue.increment((sale['total'] ?? 0.0).toDouble()),
             'totalOrders': FieldValue.increment(1),
             'lastPurchaseDate': sale['saleDate'] ?? FieldValue.serverTimestamp(),
@@ -1093,9 +1103,7 @@ class FirebaseService {
   }
 
   // ==================== CUSTOMERS (CRM) ====================
-  // All signatures match your old code exactly, but now use the real Customers collection!
 
-  // 🚀 NEW: Add a customer to the CRM
   Future<DocumentReference> addCustomer(Map<String, dynamic> customerData) async {
     try {
       if (!isAuthenticated) throw Exception('User not authenticated');
@@ -1127,7 +1135,6 @@ class FirebaseService {
     }
   }
 
-  // 🚀 NEW: Update existing customer
   Future<void> updateCustomer(String customerId, Map<String, dynamic> data) async {
     try {
       final businessId = await getCurrentBusinessId();
@@ -1140,7 +1147,6 @@ class FirebaseService {
     }
   }
 
-  // ✅ getCustomers - Signature maintained, internal logic upgraded
   Future<List<Map<String, dynamic>>> getCustomers() async {
     try {
       if (!isAuthenticated) {
@@ -1152,7 +1158,6 @@ class FirebaseService {
         throw Exception('Business not found');
       }
 
-      // Now pulling from the dedicated customers collection
       final snapshot = await _firestore
           .collection('businesses')
           .doc(businessId)
@@ -1161,7 +1166,7 @@ class FirebaseService {
 
       return snapshot.docs.map((doc) {
         final data = doc.data();
-        data['id'] = doc.id; // Inject ID to perfectly match the old map structure
+        data['id'] = doc.id;
         return data;
       }).toList();
     } catch (e) {
@@ -1169,7 +1174,6 @@ class FirebaseService {
     }
   }
 
-  // ✅ getCustomerById - Signature maintained, internal logic upgraded
   Future<Map<String, dynamic>?> getCustomerById(String customerId) async {
     try {
       if (!isAuthenticated) {
@@ -1181,7 +1185,6 @@ class FirebaseService {
         throw Exception('Business not found');
       }
 
-      // Now pulling direct document read instead of querying thousands of sales
       final doc = await _firestore
           .collection('businesses')
           .doc(businessId)
@@ -1192,14 +1195,13 @@ class FirebaseService {
       if (!doc.exists) return null;
 
       final data = doc.data() as Map<String, dynamic>;
-      data['id'] = doc.id; // Inject ID to perfectly match old structure
+      data['id'] = doc.id;
       return data;
     } catch (e) {
       throw Exception('Failed to get customer: $e');
     }
   }
 
-  // ✅ searchCustomers - Signature maintained, runs instantly now
   Future<List<Map<String, dynamic>>> searchCustomers(String query) async {
     try {
       if (query.isEmpty) return [];
@@ -1217,7 +1219,6 @@ class FirebaseService {
     }
   }
 
-  // ✅ getCustomerSales - Unchanged, this was already correct (queries sales)
   Future<QuerySnapshot> getCustomerSales(String customerId) async {
     try {
       if (!isAuthenticated) {
@@ -1243,19 +1244,16 @@ class FirebaseService {
 
   // ==================== BUSINESS METHODS ====================
 
-  // ✅ createBusiness - Hashed ID based on Business Name and User ID
   Future<String> createBusiness(String businessName) async {
     try {
       if (!isAuthenticated) {
         throw Exception('User not authenticated');
       }
 
-      // Create a deterministic hash for the business
       final nameStr = businessName.trim().toLowerCase();
       final uniqueString = '${nameStr}_$_currentUserId';
       final businessId = _generateHashId(uniqueString);
 
-      // 1. Create the business document using the hashed ID
       final businessData = {
         'name': businessName,
         'ownerId': _currentUserId,
@@ -1267,7 +1265,6 @@ class FirebaseService {
       final businessRef = _firestore.collection('businesses').doc(businessId);
       await businessRef.set(businessData);
 
-      // 2. Add user to business's members sub-collection
       await businessRef.collection('members').doc(_currentUserId).set({
         'id': _currentUserId,
         'name': _auth.currentUser?.displayName ?? 'User',
@@ -1278,7 +1275,6 @@ class FirebaseService {
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
-      // 3. Update user's document with businessId
       await _firestore.collection('users').doc(_currentUserId).set({
         'businessId': businessId,
         'role': 'owner',
@@ -1289,7 +1285,6 @@ class FirebaseService {
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
-      // 4. Add to lookup collection
       await _firestore.collection('userBusinessLookup').doc(_currentUserId).set({
         'businessId': businessId,
         'role': 'owner',

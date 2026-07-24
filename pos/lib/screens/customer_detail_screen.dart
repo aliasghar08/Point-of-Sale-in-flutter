@@ -77,7 +77,7 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          widget.customerName,
+          "Customer Details",
           style: const TextStyle(color: Colors.white),
         ),
         backgroundColor: isDarkMode ? Colors.blue.shade800 : Colors.blue.shade700,
@@ -134,12 +134,12 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
     final phone = _customer?['phone'] ?? '';
     final email = _customer?['email'] ?? '';
     final address = _customer?['address'] ?? '';
-    final createdAt = _customer?['createdAt'] != null
-        ? (_customer!['createdAt'] as Timestamp).toDate()
-        : DateTime.now();
+    
+    // ✅ CHANGED: Safe Timestamp parsing to prevent startup crashes
+    final createdAt = (_customer?['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now();
 
     final initials = name.isNotEmpty
-        ? name.split(' ').map((e) => e[0]).take(2).join().toUpperCase()
+        ? name.split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(2).join().toUpperCase()
         : '?';
 
     return Card(
@@ -215,12 +215,13 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
   }
 
   Widget _buildStats(String currencySymbol, bool isDarkMode) {
-    final totalSpent = _customer?['totalSpent'] ?? 0.0;
-    final totalOrders = _customer?['totalOrders'] ?? 0;
+    // ✅ CHANGED: Safe number parsing for totalSpent and totalOrders
+    final totalSpent = ((_customer?['totalSpent'] ?? 0) as num).toDouble();
+    final totalOrders = ((_customer?['totalOrders'] ?? 0) as num).toInt();
     final avgOrder = totalOrders > 0 ? totalSpent / totalOrders : 0;
-    final lastPurchase = _customer?['lastPurchaseDate'] != null
-        ? (_customer!['lastPurchaseDate'] as Timestamp).toDate()
-        : null;
+    
+    // ✅ CHANGED: Safe Timestamp parsing
+    final lastPurchase = (_customer?['lastPurchaseDate'] as Timestamp?)?.toDate();
 
     return Card(
       color: isDarkMode ? Colors.grey.shade800 : Colors.white,
@@ -325,7 +326,8 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
                 Text(
                   'Total: $currencySymbol${_sales.fold(0.0, (sum, doc) {
                     final data = doc.data() as Map<String, dynamic>;
-                    return sum + (data['total'] ?? 0.0);
+                    // ✅ CHANGED: Safe number parsing for the fold sum
+                    return sum + ((data['total'] ?? 0) as num).toDouble();
                   }).toStringAsFixed(2)}',
                   style: TextStyle(
                     fontSize: 14,
@@ -351,10 +353,11 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
             else
               ..._sales.take(20).map((doc) {
                 final data = doc.data() as Map<String, dynamic>;
+                // ✅ CHANGED: Safe Timestamp and Number casting inside the map
                 final date = (data['saleDate'] as Timestamp?)?.toDate();
                 final productName = data['productName'] ?? 'Unknown Product';
-                final quantity = data['quantity'] ?? 0;
-                final total = data['total'] ?? 0.0;
+                final quantity = ((data['quantity'] ?? 0) as num).toInt();
+                final total = ((data['total'] ?? 0) as num).toDouble();
                 final receiptNumber = data['receiptNumber'] ?? 'N/A';
 
                 return Container(

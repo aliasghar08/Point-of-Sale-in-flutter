@@ -48,7 +48,6 @@ class _CrmScreenState extends State<CrmScreen> {
     try {
       final customers = await _firebaseService.getCustomers();
       setState(() {
-        // ✅ CHANGED: Safely handle sorting with null/num checks
         _customers = customers..sort((a, b) {
           final spentA = ((a['totalSpent'] ?? 0) as num).toDouble();
           final spentB = ((b['totalSpent'] ?? 0) as num).toDouble();
@@ -70,16 +69,17 @@ class _CrmScreenState extends State<CrmScreen> {
     if (_searchQuery.isNotEmpty) {
       final query = _searchQuery.toLowerCase().trim();
       filtered = filtered.where((customer) {
-        return (customer['name'] ?? '').toString().toLowerCase().contains(query) ||
-            (customer['phone'] ?? '').toString().contains(query) ||
-            (customer['email'] ?? '').toString().toLowerCase().contains(query);
+        final cName = (customer['name'] ?? customer['customerName'] ?? '').toString().toLowerCase();
+        final cPhone = (customer['phone'] ?? customer['customerPhone'] ?? '').toString();
+        final cEmail = (customer['email'] ?? customer['customerEmail'] ?? '').toString().toLowerCase();
+        
+        return cName.contains(query) || cPhone.contains(query) || cEmail.contains(query);
       }).toList();
     }
 
     // Apply value filter
     if (_selectedFilter != 'All') {
       filtered = filtered.where((customer) {
-        // ✅ CHANGED: Safe parsing for Firestore numbers
         final spent = ((customer['totalSpent'] ?? 0) as num).toDouble();
         
         switch (_selectedFilter) {
@@ -284,7 +284,6 @@ class _CrmScreenState extends State<CrmScreen> {
     int totalOrders = 0;
 
     for (var customer in _filteredCustomers) {
-      // ✅ CHANGED: Safe parsing for Firestore numbers
       totalRevenue += ((customer['totalSpent'] ?? 0) as num).toDouble();
       totalOrders += ((customer['totalOrders'] ?? 0) as num).toInt();
     }
@@ -376,18 +375,18 @@ class _CrmScreenState extends State<CrmScreen> {
   }
 
   Widget _buildCustomerCard(Map<String, dynamic> customer, String currencySymbol, bool isDarkMode) {
-    final name = customer['name'] ?? 'Unknown Customer';
-    final phone = customer['phone'] ?? '';
-    final email = customer['email'] ?? '';
+    final rawName = customer['name'] ?? customer['customerName'];
+    final name = (rawName == null || rawName.toString().trim().isEmpty) ? 'Unknown Customer' : rawName.toString();
     
-    // ✅ CHANGED: Safe parse numbers
+    final phone = (customer['phone'] ?? customer['customerPhone'] ?? '').toString();
+    final email = (customer['email'] ?? customer['customerEmail'] ?? '').toString();
+    
     final totalSpent = ((customer['totalSpent'] ?? 0) as num).toDouble();
     final totalOrders = ((customer['totalOrders'] ?? 0) as num).toInt();
     
-    // ✅ CHANGED: Safe parse timestamps
     final lastPurchase = (customer['lastPurchaseDate'] as Timestamp?)?.toDate();
 
-    final initials = name.toString().isNotEmpty 
+    final initials = name.isNotEmpty 
         ? name.split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(2).join().toUpperCase()
         : '?';
 
@@ -417,7 +416,6 @@ class _CrmScreenState extends State<CrmScreen> {
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () {
-          // If ID exists, navigate. Older records without IDs might need handling.
           if (customer['id'] != null) {
             Navigator.push(
               context,
@@ -462,7 +460,7 @@ class _CrmScreenState extends State<CrmScreen> {
                             color: isDarkMode ? Colors.white : Colors.black,
                           ),
                         ),
-                        if (phone.toString().isNotEmpty)
+                        if (phone.isNotEmpty)
                           Text(
                             '📱 $phone',
                             style: TextStyle(
@@ -470,7 +468,7 @@ class _CrmScreenState extends State<CrmScreen> {
                               color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
                             ),
                           ),
-                        if (email.toString().isNotEmpty)
+                        if (email.isNotEmpty)
                           Text(
                             '✉️ $email',
                             style: TextStyle(
@@ -594,7 +592,6 @@ class _CrmScreenState extends State<CrmScreen> {
     );
   }
 
-  // ========== ADD CUSTOMER DIALOG ==========
   void _showAddCustomerDialog(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final _formKey = GlobalKey<FormState>();
@@ -603,13 +600,12 @@ class _CrmScreenState extends State<CrmScreen> {
     final _emailController = TextEditingController();
     final _addressController = TextEditingController();
     
-    // Track loading state for the button
     bool _isSaving = false;
 
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => StatefulBuilder( // Use StatefulBuilder to update loading UI inside dialog
+      builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) {
           return AlertDialog(
             title: Text(
@@ -727,20 +723,18 @@ class _CrmScreenState extends State<CrmScreen> {
                     setDialogState(() => _isSaving = true);
                     
                     try {
-                      // ✅ CHANGED: Actually save the customer to Firebase!
                       await _firebaseService.addCustomer({
                         'name': _nameController.text.trim(),
                         'phone': _phoneController.text.trim(),
                         'email': _emailController.text.trim(),
                         'address': _addressController.text.trim(),
                         'isGuestCustomer': false,
-                        // totalSpent and totalOrders will be defaulted to 0 automatically
                       });
                       
                       if (context.mounted) {
                         Navigator.pop(context);
                         _showSnackBar('Customer added successfully!');
-                        _loadCustomers(); // Refresh the list
+                        _loadCustomers();
                       }
                     } catch (e) {
                       setDialogState(() => _isSaving = false);
