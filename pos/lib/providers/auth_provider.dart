@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:pos/models/user.dart';
 import 'package:pos/services/auth_service.dart';
+import 'package:pos/services/firebase_service.dart';
 
 class AuthProvider extends ChangeNotifier {
   final AuthService _authService = AuthService();
+  final FirebaseService _firebaseService = FirebaseService();
   
   AppUser? _currentUser;
   bool _isLoading = false;
@@ -42,7 +45,7 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  // ✅ Sign up with business structure
+  // ✅ Sign up - Only completes Firestore setup (user already created during verification)
   Future<bool> signUp({
     required String email,
     required String password,
@@ -56,26 +59,110 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _currentUser = await _authService.signUp(
-        email: email,
-        password: password,
-        name: name,
-        role: role,
-        phone: phone,
-        storeName: storeName,
-      );
+      // Get the current Firebase user (created during email verification)
+      final firebaseUser = FirebaseAuth.instance.currentUser;
+      
+      if (firebaseUser == null) {
+        // If no user exists, sign in to get the user
+        await FirebaseAuth.instance.signInWithEmailAndPassword(
+          email: email,
+          password: password,
+        );
+      }
+
+      // Now create the business and user data in Firestore
+      final businessId = await _firebaseService.createBusiness(storeName);
+      
+      if (businessId.isEmpty) {
+        throw Exception('Failed to create business');
+      }
+
+      // Get the updated user data
+      _currentUser = await _authService.getCurrentUserData();
       
       if (_currentUser != null) {
         print('✅ Signup successful!');
         print('✅ User: ${_currentUser!.name}');
         print('✅ Business ID: ${_currentUser!.businessId}');
         print('✅ Role: ${_currentUser!.role}');
+        
+        // Sign out immediately after signup (user will sign in manually)
+        await _authService.signOut();
+        _currentUser = null;
       }
       
-      return _currentUser != null;
+      return true;
     } catch (e) {
       _error = e.toString();
       print('❌ Signup error: $e');
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  // ✅ Complete signup after email verification
+  Future<bool> completeSignup({
+    required String email,
+    required String password,
+    required String name,
+    required String role,
+    required String phone,
+    required String storeName,
+  }) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      // Sign in to get the user
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      final firebaseUser = FirebaseAuth.instance.currentUser;
+      
+      if (firebaseUser == null) {
+        throw Exception('User not found');
+      }
+
+      // Check if email is verified
+      await firebaseUser.reload();
+      if (!firebaseUser.emailVerified) {
+        throw Exception('Email not verified. Please verify your email first.');
+      }
+
+      // Create business and user data
+      final businessId = await _firebaseService.createBusiness(storeName);
+      
+      if (businessId.isEmpty) {
+        throw Exception('Failed to create business');
+      }
+
+      // Add user to business members
+      await _firebaseService.addUserToBusiness(
+        userId: firebaseUser.uid,
+        email: email,
+        name: name,
+        role: role,
+        phone: phone,
+        businessId: businessId,
+      );
+
+      // Get the updated user data
+      _currentUser = await _authService.getCurrentUserData();
+      
+      // Sign out after signup
+      await _authService.signOut();
+      _currentUser = null;
+      
+      print('✅ Signup completed successfully!');
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      print('❌ Complete signup error: $e');
       return false;
     } finally {
       _isLoading = false;

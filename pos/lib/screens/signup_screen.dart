@@ -75,6 +75,61 @@ class _SignupScreenState extends State<SignupScreen> {
     }
   }
 
+  static final RegExp _emailRegex = RegExp(
+    r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
+  );
+
+  String? _validateEmail(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'Please enter your email address';
+    }
+    final trimmed = value.trim();
+    if (!EmailValidator.validate(trimmed) || !_emailRegex.hasMatch(trimmed)) {
+      return 'Please enter a valid email address (e.g. name@example.com)';
+    }
+    return null;
+  }
+
+  int _getExpectedPhoneDigits(String code) {
+    switch (code) {
+      case '+92': // Pakistan
+      case '+91': // India
+      case '+1': // USA / Canada
+      case '+44': // UK
+      case '+61': // Australia
+      case '+86': // China
+      case '+81': // Japan
+      case '+82': // South Korea
+        return 10;
+      case '+971': // UAE
+      case '+966': // Saudi Arabia
+      case '+968': // Oman
+        return 9;
+      case '+974': // Qatar
+      case '+973': // Bahrain
+      case '+965': // Kuwait
+        return 8;
+      default:
+        return 10;
+    }
+  }
+
+  String? _validatePhone(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'Please enter your phone number';
+    }
+    final digits = value.replaceAll(RegExp(r'\D'), '');
+    final expectedLength = _getExpectedPhoneDigits(_selectedCountryCode);
+
+    if (digits.length != expectedLength) {
+      if (_selectedCountryCode == '+92') {
+        return 'Pakistan phone number must be $expectedLength digits (e.g. 300 1234567)';
+      }
+      return 'Phone number for $_countryName must be $expectedLength digits';
+    }
+    return null;
+  }
+
   // ✅ Fixed phone number formatting - formats as XXX XXX XXXX
   void _formatPhoneNumberOnType() {
     final text = _phoneController.text.replaceAll(RegExp(r'\D'), '');
@@ -91,12 +146,12 @@ class _SignupScreenState extends State<SignupScreen> {
       cleaned = cleaned.substring(1);
     }
 
-    // Limit to 10 digits max (for PK phone numbers)
-    if (cleaned.length > 10) {
-      cleaned = cleaned.substring(0, 10);
+    final maxDigits = _getExpectedPhoneDigits(_selectedCountryCode);
+    if (cleaned.length > maxDigits) {
+      cleaned = cleaned.substring(0, maxDigits);
     }
 
-    // ✅ CHANGED: Format the number to XXX XXX XXXX
+    // Format the number to XXX XXX XXXX
     String formatted = '';
     if (cleaned.isEmpty) {
       formatted = '';
@@ -890,7 +945,7 @@ class _SignupScreenState extends State<SignupScreen> {
                       labelStyle: TextStyle(
                         color: isDarkMode ? Colors.white : Colors.black,
                       ),
-                      hintText: 'Enter your email',
+                      hintText: 'name@example.com',
                       hintStyle: TextStyle(
                         color: isDarkMode
                             ? Colors.grey.shade400
@@ -912,18 +967,11 @@ class _SignupScreenState extends State<SignupScreen> {
                           : Colors.grey.shade50,
                     ),
                     keyboardType: TextInputType.emailAddress,
+                    autovalidateMode: AutovalidateMode.onUserInteraction,
                     style: TextStyle(
                       color: isDarkMode ? Colors.white : Colors.black,
                     ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter your email';
-                      }
-                      if (!EmailValidator.validate(value)) {
-                        return 'Please enter a valid email';
-                      }
-                      return null;
-                    },
+                    validator: _validateEmail,
                   ),
                   const SizedBox(height: 16),
 
@@ -1116,6 +1164,7 @@ class _SignupScreenState extends State<SignupScreen> {
                                   _countryFlag = selected.flag;
                                   _countryName = selected.name;
                                 });
+                                _formatPhoneNumberOnType();
                               }
                             },
                           ),
@@ -1130,7 +1179,9 @@ class _SignupScreenState extends State<SignupScreen> {
                             labelStyle: TextStyle(
                               color: isDarkMode ? Colors.white : Colors.black,
                             ),
-                            hintText: '300 123 4567',
+                            hintText: _selectedCountryCode == '+92'
+                                ? '300 1234567'
+                                : 'Phone number',
                             hintStyle: TextStyle(
                               color: isDarkMode
                                   ? Colors.grey.shade400
@@ -1152,29 +1203,16 @@ class _SignupScreenState extends State<SignupScreen> {
                                 : Colors.grey.shade50,
                           ),
                           keyboardType: TextInputType.phone,
+                          autovalidateMode: AutovalidateMode.onUserInteraction,
                           style: TextStyle(
                             color: isDarkMode ? Colors.white : Colors.black,
                           ),
                           inputFormatters: [
                             _NoLeadingZeroFormatter(),
                             FilteringTextInputFormatter.digitsOnly,
-                            LengthLimitingTextInputFormatter(
-                              10,
-                            ), // Limit to 10 digits
+                            LengthLimitingTextInputFormatter(14),
                           ],
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter your phone number';
-                            }
-                            final digitsOnly = value.replaceAll(
-                              RegExp(r'\D'),
-                              '',
-                            );
-                            if (digitsOnly.length < 7) {
-                              return 'Please enter a valid phone number';
-                            }
-                            return null;
-                          },
+                          validator: _validatePhone,
                         ),
                       ),
                     ],

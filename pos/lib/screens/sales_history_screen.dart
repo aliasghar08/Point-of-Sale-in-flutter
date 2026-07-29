@@ -224,21 +224,26 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          _buildFilterBar(isDarkMode),
-          if (_filterType == 'Custom' && _startDate != null && _endDate != null)
-            _buildCustomDateRangeBadge(isDarkMode),
-          _buildSearchBar(isDarkMode),
-          _buildSummaryStats(isDarkMode, currencySymbol),
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _filteredSales.isEmpty
-                    ? _buildEmptyState(isDarkMode)
-                    : _buildSalesList(currencySymbol, isDarkMode),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1100),
+          child: Column(
+            children: [
+              _buildFilterBar(isDarkMode),
+              if (_filterType == 'Custom' && _startDate != null && _endDate != null)
+                _buildCustomDateRangeBadge(isDarkMode),
+              _buildSearchBar(isDarkMode),
+              _buildSummaryStats(isDarkMode, currencySymbol),
+              Expanded(
+                child: _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : _filteredSales.isEmpty
+                        ? _buildEmptyState(isDarkMode)
+                        : _buildSalesList(currencySymbol, isDarkMode),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

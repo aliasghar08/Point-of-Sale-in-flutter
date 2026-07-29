@@ -10,6 +10,8 @@ import 'package:provider/provider.dart';
 import 'package:pos/models/product_reference.dart';
 import 'package:pos/widgets/product_autocomplete.dart';
 import 'package:pos/widgets/receipt_dialog.dart';
+import 'package:pos/widgets/customer_selection_dialog.dart';
+
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -58,23 +60,13 @@ class _HomeScreenState extends State<HomeScreen> {
     final showProfit = settingsProvider.showProfitInPOS;
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
-    // ✅ RESPONSIVE LAYOUT BUILDER
     return Scaffold(
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          // If screen is wide (PC/Web/Tablet Landscape)
-          if (constraints.maxWidth > 800) {
-            return _buildDesktopLayout(currencySymbol, showProfit, isDarkMode);
-          }
-          // If screen is narrow (Mobile)
-          return _buildMobileLayout(currencySymbol, showProfit, isDarkMode);
-        },
-      ),
+      body: _buildMainLayout(currencySymbol, showProfit, isDarkMode),
     );
   }
 
-  // ==================== LAYOUT: MOBILE ====================
-  Widget _buildMobileLayout(String currencySymbol, bool showProfit, bool isDarkMode) {
+  // ==================== MAIN POS LAYOUT ====================
+  Widget _buildMainLayout(String currencySymbol, bool showProfit, bool isDarkMode) {
     return Column(
       children: [
         _buildSearchSection(isDarkMode),
@@ -87,74 +79,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   : _buildCartList(currencySymbol, isDarkMode),
         ),
         _buildCheckoutSection(currencySymbol, showProfit, isDarkMode),
-      ],
-    );
-  }
-
-  // ==================== LAYOUT: DESKTOP / WEB ====================
-  Widget _buildDesktopLayout(String currencySymbol, bool showProfit, bool isDarkMode) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // LEFT PANE: Search & Prompt
-        Expanded(
-          flex: 5,
-          child: Column(
-            children: [
-              _buildSearchSection(isDarkMode),
-              Expanded(
-                child: _isLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : _buildEmptyCartPrompt(isDarkMode), // Show big search prompt on left
-              ),
-            ],
-          ),
-        ),
-        
-        // DIVIDER
-        VerticalDivider(
-          width: 1,
-          thickness: 1,
-          color: isDarkMode ? Colors.grey.shade800 : Colors.grey.shade300,
-        ),
-        
-        // RIGHT PANE: Cart & Checkout (Fixed Width to prevent stretching)
-        Container(
-          width: 400,
-          color: isDarkMode ? Colors.grey.shade900 : Colors.grey.shade50,
-          child: Column(
-            children: [
-              // Cart Header
-              Container(
-                padding: const EdgeInsets.all(16),
-                color: isDarkMode ? Colors.black26 : Colors.white,
-                child: Row(
-                  children: [
-                    Icon(Icons.shopping_cart, color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Current Order',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: isDarkMode ? Colors.white : Colors.black,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(height: 1),
-              // Cart Items
-              Expanded(
-                child: _cartItems.isEmpty
-                    ? _buildSmallEmptyCartHint(isDarkMode) // Small hint instead of giant button
-                    : _buildCartList(currencySymbol, isDarkMode),
-              ),
-              // Checkout
-              _buildCheckoutSection(currencySymbol, showProfit, isDarkMode),
-            ],
-          ),
-        ),
       ],
     );
   }
@@ -760,7 +684,7 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
         content: SizedBox(
           width: double.maxFinite,
-          height: 350,
+          height: MediaQuery.of(context).size.height * 0.4,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1050,6 +974,177 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  void _addProductToCartFromModel(Product product) {
+    var existingIndex = _cartItems.indexWhere(
+      (item) => item.id == product.id,
+    );
+
+    setState(() {
+      if (existingIndex != -1) {
+        var existing = _cartItems[existingIndex];
+        _cartItems[existingIndex] = existing.copyWith(
+          stock: existing.stock + 1,
+        );
+      } else {
+        _cartItems.add(product.copyWith(stock: 1));
+      }
+      _updateTotals();
+    });
+
+    _showSnackBar('${product.name} added to cart');
+  }
+
+  Widget _buildDesktopProductCatalog(String currencySymbol, bool isDarkMode) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: _firebaseService.productsStream(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (!snapshot.hasData || snapshot.data == null || snapshot.data!.docs.isEmpty) {
+          return _buildEmptyCartPrompt(isDarkMode);
+        }
+
+        List<Product> products = [];
+        for (var doc in snapshot.data!.docs) {
+          try {
+            final data = doc.data() as Map<String, dynamic>;
+            if (!data.containsKey('name')) continue;
+            products.add(Product.fromMap(data, doc.id));
+          } catch (e) {
+            debugPrint('Error parsing product: $e');
+          }
+        }
+
+        if (products.isEmpty) {
+          return _buildEmptyCartPrompt(isDarkMode);
+        }
+
+        return Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Text(
+                  'Product Catalog (${products.length} Items)',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: isDarkMode ? Colors.white : Colors.grey.shade800,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: GridView.builder(
+                  gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                    maxCrossAxisExtent: 220,
+                    childAspectRatio: 1.1,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                  ),
+                  itemCount: products.length,
+                  itemBuilder: (context, index) {
+                    final product = products[index];
+                    return Card(
+                      elevation: 2,
+                      color: isDarkMode ? Colors.grey.shade800 : Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () => _addProductToCartFromModel(product),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 18,
+                                    backgroundColor: isDarkMode ? Colors.blue.shade900 : Colors.blue.shade100,
+                                    child: Text(
+                                      product.name.isNotEmpty ? product.name.substring(0, 1).toUpperCase() : 'P',
+                                      style: TextStyle(
+                                        color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      product.name,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                        color: isDarkMode ? Colors.white : Colors.black,
+                                      ),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        '$currencySymbol${product.price.toStringAsFixed(2)}',
+                                        style: TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.bold,
+                                          color: isDarkMode ? Colors.green.shade400 : Colors.green.shade700,
+                                        ),
+                                      ),
+                                      Text(
+                                        'Stock: ${product.stock}',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: product.stock <= product.minStock
+                                              ? Colors.red
+                                              : (isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.all(6),
+                                    decoration: BoxDecoration(
+                                      color: isDarkMode ? Colors.blue.shade900 : Colors.blue.shade50,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Icon(
+                                      Icons.add_shopping_cart,
+                                      size: 18,
+                                      color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   void _updateCartQuantity(Product product, int change) {
     int index = _cartItems.indexOf(product);
     if (index != -1) {
@@ -1068,114 +1163,47 @@ class _HomeScreenState extends State<HomeScreen> {
     _totalProfit = _cartItems.fold(0.0, (sum, item) => sum + ((item.price - item.costPrice) * item.stock));
   }
 
-  Future<void> _showCustomerDialog() async {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    
-    final nameController = TextEditingController(text: _customerName == 'Guest Customer' ? '' : _customerName);
-    final phoneController = TextEditingController(text: _customerPhone);
-    final emailController = TextEditingController(text: _customerEmail ?? '');
-    
-    return showDialog(
+  Future<bool> _showCustomerDialog() async {
+    final result = await showDialog<CustomerDetails>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(
-          'Customer Info',
-          style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
-        ),
-        backgroundColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
-              decoration: InputDecoration(
-                labelText: 'Customer Name',
-                labelStyle: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
-                border: const OutlineInputBorder(),
-                prefixIcon: const Icon(Icons.person),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: phoneController,
-              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
-              decoration: InputDecoration(
-                labelText: 'Phone Number',
-                labelStyle: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
-                border: const OutlineInputBorder(),
-                prefixIcon: const Icon(Icons.phone),
-              ),
-              keyboardType: TextInputType.phone,
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: emailController,
-              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
-              decoration: InputDecoration(
-                labelText: 'Email (optional)',
-                labelStyle: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
-                border: const OutlineInputBorder(),
-                prefixIcon: const Icon(Icons.email),
-              ),
-              keyboardType: TextInputType.emailAddress,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              setState(() {
-                _customerId = 'guest';
-                _customerName = 'Guest Customer';
-                _customerPhone = '';
-                _customerEmail = null;
-                _isGuestCustomer = true;
-              });
-              Navigator.pop(context);
-              _showSnackBar('Set as Guest Customer');
-            },
-            child: Text(
-              'Skip (Guest)',
-              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              setState(() {
-                _customerId = 'customer_${DateTime.now().millisecondsSinceEpoch}';
-                _customerName = nameController.text.trim().isNotEmpty 
-                    ? nameController.text.trim() 
-                    : 'Guest Customer';
-                _customerPhone = phoneController.text.trim();
-                _customerEmail = emailController.text.trim().isNotEmpty 
-                    ? emailController.text.trim() 
-                    : null;
-                _isGuestCustomer = _customerName == 'Guest Customer';
-              });
-              Navigator.pop(context);
-              _showSnackBar('Customer set: $_customerName');
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Save Customer'),
-          ),
-        ],
+      barrierDismissible: false,
+      builder: (context) => CustomerSelectionDialog(
+        initialName: _customerName,
+        initialPhone: _customerPhone,
+        initialEmail: _customerEmail,
+        initialAddress: _customerAddress,
       ),
     );
+
+    if (result == null) {
+      return false;
+    }
+
+    setState(() {
+      _customerId = result.id;
+      _customerName = result.name;
+      _customerPhone = result.phone;
+      _customerEmail = result.email;
+      _customerAddress = result.address;
+      _isGuestCustomer = result.isGuest;
+    });
+
+    return true;
   }
 
   void _processCheckout() async {
     if (_cartItems.isEmpty) return;
 
+    final customerSet = await _showCustomerDialog();
+    if (!customerSet) {
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     try {
-      await _showCustomerDialog();
-      
       final productIds = _cartItems.map((item) => item.id).toList();
+
       final productDocs = await _firebaseService.getProductsByIds(productIds);
       
       for (var item in _cartItems) {
@@ -1399,6 +1427,7 @@ class _HomeScreenState extends State<HomeScreen> {
       context,
       MaterialPageRoute(
         builder: (context) => BarcodeScanner(
+          expectedType: ScannerExpectedType.barcode,
           onScan: (barcode) => _searchProduct(barcode),
         ),
       ),

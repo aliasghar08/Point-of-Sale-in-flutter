@@ -23,8 +23,8 @@ class AppSettings {
   final int pointsPerCurrency;
 
   AppSettings({
-    this.currencySymbol = '₹',
-    this.currencyCode = 'INR',
+    this.currencySymbol = 'Rs',
+    this.currencyCode = 'PKR',
     this.enableNotifications = true,
     this.enableSound = true,
     this.enableVibration = true,
@@ -66,8 +66,8 @@ class AppSettings {
 
   factory AppSettings.fromMap(Map<String, dynamic> map) {
     return AppSettings(
-      currencySymbol: map['currencySymbol'] ?? '₹',
-      currencyCode: map['currencyCode'] ?? 'INR',
+      currencySymbol: map['currencySymbol'] ?? 'Rs',
+      currencyCode: map['currencyCode'] ?? 'PKR',
       enableNotifications: map['enableNotifications'] ?? true,
       enableSound: map['enableSound'] ?? true,
       enableVibration: map['enableVibration'] ?? true,

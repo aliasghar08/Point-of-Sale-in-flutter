@@ -306,15 +306,44 @@ class _UserManagementContentState extends State<_UserManagementContent> {
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 80), // Padding for FAB
-      itemCount: _businessUsers.length,
-      itemBuilder: (context, index) {
-        final user = _businessUsers[index];
-        return InkWell(
-          onTap: () => _showUserDetailsDialog(context, user, isDarkMode),
-          borderRadius: BorderRadius.circular(12),
-          child: _buildUserCard(context, user, isDarkMode),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth >= 800;
+        return Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1000),
+            child: isWide
+                ? GridView.builder(
+                    padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 80),
+                    gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                      maxCrossAxisExtent: 450,
+                      mainAxisExtent: 130,
+                      crossAxisSpacing: 16,
+                      mainAxisSpacing: 12,
+                    ),
+                    itemCount: _businessUsers.length,
+                    itemBuilder: (context, index) {
+                      final user = _businessUsers[index];
+                      return InkWell(
+                        onTap: () => _showUserDetailsDialog(context, user, isDarkMode),
+                        borderRadius: BorderRadius.circular(12),
+                        child: _buildUserCard(context, user, isDarkMode),
+                      );
+                    },
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 80),
+                    itemCount: _businessUsers.length,
+                    itemBuilder: (context, index) {
+                      final user = _businessUsers[index];
+                      return InkWell(
+                        onTap: () => _showUserDetailsDialog(context, user, isDarkMode),
+                        borderRadius: BorderRadius.circular(12),
+                        child: _buildUserCard(context, user, isDarkMode),
+                      );
+                    },
+                  ),
+          ),
         );
       },
     );

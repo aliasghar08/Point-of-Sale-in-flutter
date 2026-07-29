@@ -38,117 +38,139 @@ class _InventoryScreenState extends State<InventoryScreen> {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      body: Column(
-        children: [
-          _buildSearchBar(isDarkMode),
-          _buildStatsSummary(isDarkMode),
-          Expanded(
-            child: StreamBuilder<QuerySnapshot>(
-              stream: _firebaseService.productsStream(),
-              builder: (context, snapshot) {
-                // Handle loading state
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        CircularProgressIndicator(),
-                        SizedBox(height: 16),
-                        Text('Loading products...'),
-                      ],
-                    ),
-                  );
-                }
-
-                // Handle error state
-                if (snapshot.hasError) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.error_outline,
-                          size: 60,
-                          color: isDarkMode ? Colors.red.shade400 : Colors.red.shade300,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Error loading products',
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: isDarkMode ? Colors.white : Colors.grey.shade600,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 24),
-                          child: Text(
-                            snapshot.error.toString(),
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade500,
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final isWide = constraints.maxWidth >= 800;
+          return Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1200),
+              child: Column(
+                children: [
+                  _buildSearchBar(isDarkMode),
+                  _buildStatsSummary(isDarkMode),
+                  Expanded(
+                    child: StreamBuilder<QuerySnapshot>(
+                      stream: _firebaseService.productsStream(),
+                      builder: (context, snapshot) {
+                        // Handle loading state
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return const Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                CircularProgressIndicator(),
+                                SizedBox(height: 16),
+                                Text('Loading products...'),
+                              ],
                             ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                      ],
+                          );
+                        }
+
+                        // Handle error state
+                        if (snapshot.hasError) {
+                          return Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.error_outline,
+                                  size: 60,
+                                  color: isDarkMode ? Colors.red.shade400 : Colors.red.shade300,
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'Error loading products',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    color: isDarkMode ? Colors.white : Colors.grey.shade600,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                                  child: Text(
+                                    snapshot.error.toString(),
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade500,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }
+
+                        // Check if we have data
+                        if (!snapshot.hasData || snapshot.data == null) {
+                          return _buildEmptyState(isDarkMode);
+                        }
+
+                        if (snapshot.data!.docs.isEmpty) {
+                          return _buildEmptyState(isDarkMode);
+                        }
+
+                        // Parse products
+                        List<Product> products = [];
+                        for (var doc in snapshot.data!.docs) {
+                          try {
+                            final data = doc.data() as Map<String, dynamic>;
+                            if (!data.containsKey('name')) {
+                              continue;
+                            }
+                            final product = Product.fromMap(data, doc.id);
+                            products.add(product);
+                          } catch (e) {
+                            debugPrint('❌ Error parsing product: $e');
+                          }
+                        }
+
+                        // Filter products
+                        List<Product> filteredProducts = _filterProducts(products);
+
+                        if (filteredProducts.isEmpty && products.isNotEmpty) {
+                          return _buildNoResultsState(isDarkMode);
+                        }
+
+                        if (filteredProducts.isEmpty) {
+                          return _buildEmptyState(isDarkMode);
+                        }
+
+                        // Build product list / grid depending on viewport width
+                        if (isWide) {
+                          return GridView.builder(
+                            padding: const EdgeInsets.all(16),
+                            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                              maxCrossAxisExtent: 450,
+                              mainAxisExtent: 110,
+                              crossAxisSpacing: 16,
+                              mainAxisSpacing: 12,
+                            ),
+                            itemCount: filteredProducts.length,
+                            itemBuilder: (context, index) {
+                              final product = filteredProducts[index];
+                              return _buildProductCard(product, currencySymbol, isDarkMode);
+                            },
+                          );
+                        }
+
+                        return ListView.builder(
+                          padding: const EdgeInsets.all(16),
+                          itemCount: filteredProducts.length,
+                          itemBuilder: (context, index) {
+                            final product = filteredProducts[index];
+                            return _buildProductCard(product, currencySymbol, isDarkMode);
+                          },
+                        );
+                      },
                     ),
-                  );
-                }
-
-                // Check if we have data
-                if (!snapshot.hasData || snapshot.data == null) {
-                  return _buildEmptyState(isDarkMode);
-                }
-
-                // ✅ Check if the snapshot is from the empty fallback collection
-                // or if it genuinely has no documents
-                if (snapshot.data!.docs.isEmpty) {
-                  return _buildEmptyState(isDarkMode);
-                }
-
-                // Parse products
-                List<Product> products = [];
-                for (var doc in snapshot.data!.docs) {
-                  try {
-                    final data = doc.data() as Map<String, dynamic>;
-                    // Skip if no name field
-                    if (!data.containsKey('name')) {
-                      debugPrint('⚠️ Document missing "name" field: ${doc.id}');
-                      continue;
-                    }
-                    final product = Product.fromMap(data, doc.id);
-                    products.add(product);
-                  } catch (e) {
-                    debugPrint('❌ Error parsing product: $e');
-                  }
-                }
-
-                // Filter products
-                List<Product> filteredProducts = _filterProducts(products);
-
-                // Show no results if filtered list is empty but products exist
-                if (filteredProducts.isEmpty && products.isNotEmpty) {
-                  return _buildNoResultsState(isDarkMode);
-                }
-
-                if (filteredProducts.isEmpty) {
-                  return _buildEmptyState(isDarkMode);
-                }
-
-                // Build product list
-                return ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: filteredProducts.length,
-                  itemBuilder: (context, index) {
-                    final product = filteredProducts[index];
-                    return _buildProductCard(product, currencySymbol, isDarkMode);
-                  },
-                );
-              },
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          );
+        },
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _showAddProductScreen,
@@ -329,6 +351,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
       context,
       MaterialPageRoute(
         builder: (context) => BarcodeScanner(
+          expectedType: ScannerExpectedType.barcode,
           onScan: (barcode) {
             _handleScanResult(barcode, 'Barcode');
           },

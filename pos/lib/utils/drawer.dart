@@ -13,11 +13,13 @@ import 'package:pos/screens/login_screen.dart';
 class AppDrawer extends StatelessWidget {
   final int currentIndex;
   final Function(int) onItemSelected;
+  final bool isDesktopSidebar;
 
   const AppDrawer({
     super.key,
     required this.currentIndex,
     required this.onItemSelected,
+    this.isDesktopSidebar = false,
   });
 
   @override
@@ -72,7 +74,7 @@ class AppDrawer extends StatelessWidget {
                   title: 'CRM',
                   isDarkMode: isDarkMode,
                   onTap: () {
-                    Navigator.pop(context);
+                    if (!isDesktopSidebar) Navigator.pop(context);
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -105,7 +107,7 @@ class AppDrawer extends StatelessWidget {
                     isSelected: currentIndex == 2,
                     isDarkMode: isDarkMode,
                     onTap: () {
-                      Navigator.pop(context);
+                      if (!isDesktopSidebar) Navigator.pop(context);
                       Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -126,7 +128,7 @@ class AppDrawer extends StatelessWidget {
                     title: 'Sales History',
                     isDarkMode: isDarkMode,
                     onTap: () {
-                      Navigator.pop(context);
+                      if (!isDesktopSidebar) Navigator.pop(context);
                       _showSalesHistory(context, isDarkMode);
                     },
                   ),
@@ -136,7 +138,7 @@ class AppDrawer extends StatelessWidget {
                     title: 'Reports',
                     isDarkMode: isDarkMode,
                     onTap: () {
-                      Navigator.pop(context);
+                      if (!isDesktopSidebar) Navigator.pop(context);
                       _showReports(context, isDarkMode);
                     },
                   ),
@@ -151,7 +153,7 @@ class AppDrawer extends StatelessWidget {
                   title: 'Settings',
                   isDarkMode: isDarkMode,
                   onTap: () {
-                    Navigator.pop(context);
+                    if (!isDesktopSidebar) Navigator.pop(context);
                     _navigateToSettings(context);
                   },
                 ),
@@ -165,7 +167,7 @@ class AppDrawer extends StatelessWidget {
                   title: 'Help & Support',
                   isDarkMode: isDarkMode,
                   onTap: () {
-                    Navigator.pop(context);
+                    if (!isDesktopSidebar) Navigator.pop(context);
                     _showHelp(context, isDarkMode);
                   },
                 ),
@@ -175,7 +177,7 @@ class AppDrawer extends StatelessWidget {
                   title: 'About',
                   isDarkMode: isDarkMode,
                   onTap: () {
-                    Navigator.pop(context);
+                    if (!isDesktopSidebar) Navigator.pop(context);
                     _showAbout(context, isDarkMode);
                   },
                 ),
@@ -372,8 +374,10 @@ class AppDrawer extends StatelessWidget {
   // ==================== NAVIGATION METHODS ====================
 
   void _navigateTo(BuildContext context, int index) {
-    // Close the drawer first
-    Navigator.pop(context);
+    // Close the drawer first if mobile
+    if (!isDesktopSidebar) {
+      Navigator.pop(context);
+    }
 
     // Then navigate using the callback
     onItemSelected(index);

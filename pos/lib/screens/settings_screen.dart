@@ -61,31 +61,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
               ),
             )
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  _buildUserInfoSection(authProvider, isDarkMode),
-                  const SizedBox(height: 16),
-                  _buildThemeSection(themeProvider, isDarkMode),
-                  const SizedBox(height: 16),
-                  _buildCurrencySection(settingsProvider, settings, isDarkMode),
-                  const SizedBox(height: 16),
-                  _buildInventorySection(settingsProvider, settings, isDarkMode),
-                  const SizedBox(height: 16),
-                  _buildPOSSection(settingsProvider, settings, isDarkMode),
-                  const SizedBox(height: 16),
-                  _buildCustomerSection(settingsProvider, settings, isDarkMode), // ✅ Added
-                  const SizedBox(height: 16),
-                  _buildNotificationSection(settingsProvider, settings, isDarkMode),
-                  const SizedBox(height: 16),
-                  _buildDataSection(settingsProvider, settings, isDarkMode),
-                  const SizedBox(height: 16),
-                  _buildAboutSection(isDarkMode),
-                  const SizedBox(height: 24),
-                  _buildLogoutButton(authProvider, isDarkMode),
-                  const SizedBox(height: 16),
-                ],
+          : Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 850),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      _buildUserInfoSection(authProvider, isDarkMode),
+                      const SizedBox(height: 16),
+                      _buildThemeSection(themeProvider, isDarkMode),
+                      const SizedBox(height: 16),
+                      _buildCurrencySection(settingsProvider, settings, isDarkMode),
+                      const SizedBox(height: 16),
+                      _buildInventorySection(settingsProvider, settings, isDarkMode),
+                      const SizedBox(height: 16),
+                      _buildPOSSection(settingsProvider, settings, isDarkMode),
+                      const SizedBox(height: 16),
+                      _buildCustomerSection(settingsProvider, settings, isDarkMode), // ✅ Added
+                      const SizedBox(height: 16),
+                      _buildNotificationSection(settingsProvider, settings, isDarkMode),
+                      const SizedBox(height: 16),
+                      _buildDataSection(settingsProvider, settings, isDarkMode),
+                      const SizedBox(height: 16),
+                      _buildAboutSection(isDarkMode),
+                      const SizedBox(height: 24),
+                      _buildLogoutButton(authProvider, isDarkMode),
+                      const SizedBox(height: 16),
+                    ],
+                  ),
+                ),
               ),
             ),
     );

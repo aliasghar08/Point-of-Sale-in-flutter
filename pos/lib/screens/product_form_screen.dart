@@ -9,6 +9,7 @@ import 'package:pos/services/firebase_service.dart';
 import 'package:pos/providers/settings_provider.dart';
 import 'package:pos/models/product_reference.dart';
 import 'package:pos/utils/field_info.dart';
+import 'package:pos/widgets/barcode_scanner.dart';
 
 class ProductFormScreen extends StatefulWidget {
   final Product? product;
@@ -361,14 +362,111 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     );
   }
 
+  DateTime _normalizeDate(DateTime date) {
+    return DateTime(date.year, date.month, date.day);
+  }
+
+  void _openScanner(String target) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => BarcodeScanner(
+          title: target == 'qr' ? 'Scan QR Code' : 'Scan Barcode',
+          hintText: target == 'qr'
+              ? 'Align QR code inside frame to scan'
+              : 'Align barcode inside frame to scan',
+          expectedType: target == 'qr'
+              ? ScannerExpectedType.qrCode
+              : ScannerExpectedType.barcode,
+          onScan: (code) {
+            setState(() {
+              if (target == 'qr') {
+                _qrCodeController.text = code;
+              } else {
+                _barcodeController.text = code;
+              }
+            });
+            _showSnackBar('✅ ${target == 'qr' ? 'QR Code' : 'Barcode'} scanned: $code');
+          },
+        ),
+      ),
+    );
+  }
+
+  void _clearDate(String type) {
+    setState(() {
+      switch (type) {
+        case 'manufacture':
+          _manufactureDate = null;
+          break;
+        case 'expiry':
+          _expiryDate = null;
+          break;
+        case 'bestBefore':
+          _bestBeforeDate = null;
+          break;
+      }
+    });
+  }
+
   Future<void> _selectDate(BuildContext context, String type) async {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     
+    DateTime firstDate = DateTime(2000, 1, 1);
+    DateTime lastDate = DateTime(2100, 12, 31);
+    DateTime? currentSelected;
+
+    if (type == 'manufacture') {
+      currentSelected = _manufactureDate;
+      // Manufacture date cannot be after Best Before or Expiry date
+      if (_bestBeforeDate != null && _expiryDate != null) {
+        lastDate = _bestBeforeDate!.isBefore(_expiryDate!)
+            ? _normalizeDate(_bestBeforeDate!)
+            : _normalizeDate(_expiryDate!);
+      } else if (_bestBeforeDate != null) {
+        lastDate = _normalizeDate(_bestBeforeDate!);
+      } else if (_expiryDate != null) {
+        lastDate = _normalizeDate(_expiryDate!);
+      }
+    } else if (type == 'bestBefore') {
+      currentSelected = _bestBeforeDate;
+      // Best Before cannot be before Manufacture Date
+      if (_manufactureDate != null) {
+        firstDate = _normalizeDate(_manufactureDate!);
+      }
+      // Best Before cannot be after Expiry Date
+      if (_expiryDate != null) {
+        lastDate = _normalizeDate(_expiryDate!);
+      }
+    } else if (type == 'expiry') {
+      currentSelected = _expiryDate;
+      // Expiry cannot be before Best Before Date or Manufacture Date
+      if (_bestBeforeDate != null) {
+        firstDate = _normalizeDate(_bestBeforeDate!);
+      } else if (_manufactureDate != null) {
+        firstDate = _normalizeDate(_manufactureDate!);
+      }
+    }
+
+    if (firstDate.isAfter(lastDate)) {
+      firstDate = lastDate;
+    }
+
+    DateTime initialDate = currentSelected != null
+        ? _normalizeDate(currentSelected)
+        : _normalizeDate(DateTime.now());
+
+    if (initialDate.isBefore(firstDate)) {
+      initialDate = firstDate;
+    } else if (initialDate.isAfter(lastDate)) {
+      initialDate = lastDate;
+    }
+
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: DateTime.now(),
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2100),
+      initialDate: initialDate,
+      firstDate: firstDate,
+      lastDate: lastDate,
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
@@ -383,16 +481,17 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     );
 
     if (picked != null) {
+      final normalizedPicked = _normalizeDate(picked);
       setState(() {
         switch (type) {
           case 'manufacture':
-            _manufactureDate = picked;
+            _manufactureDate = normalizedPicked;
             break;
           case 'expiry':
-            _expiryDate = picked;
+            _expiryDate = normalizedPicked;
             break;
           case 'bestBefore':
-            _bestBeforeDate = picked;
+            _bestBeforeDate = normalizedPicked;
             break;
         }
       });
@@ -402,14 +501,30 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   Future<void> _saveProduct() async {
     if (!_formKey.currentState!.validate()) return;
 
+    if (_manufactureDate != null && _bestBeforeDate != null) {
+      if (_normalizeDate(_manufactureDate!).isAfter(_normalizeDate(_bestBeforeDate!))) {
+        _showSnackBar('❌ Manufacture date cannot be after Best Before date', isError: true);
+        return;
+      }
+    }
+
+    if (_bestBeforeDate != null && _expiryDate != null) {
+      if (_normalizeDate(_bestBeforeDate!).isAfter(_normalizeDate(_expiryDate!))) {
+        _showSnackBar('❌ Best Before date cannot be after Expiry date', isError: true);
+        return;
+      }
+    }
+
+    if (_manufactureDate != null && _expiryDate != null) {
+      if (_normalizeDate(_manufactureDate!).isAfter(_normalizeDate(_expiryDate!))) {
+        _showSnackBar('❌ Manufacture date cannot be after Expiry date', isError: true);
+        return;
+      }
+    }
+
     setState(() => _isLoading = true);
 
     try {
-      final settingsProvider = Provider.of<SettingsProvider>(
-        context,
-        listen: false,
-      );
-
       final product = Product(
         id: widget.isEditing ? widget.product!.id : '',
         name: _nameController.text.trim(),
@@ -474,6 +589,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
         _showSnackBar('✅ Product added successfully!');
       }
 
+      if (!mounted) return;
       Navigator.pop(context, true);
     } catch (e) {
       _showSnackBar('❌ Error: $e', isError: true);
@@ -527,10 +643,8 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.qr_code_scanner, color: Colors.white),
-            onPressed: () {
-              _showSnackBar('QR Scanner coming soon!');
-            },
-            tooltip: 'Scan QR Code',
+            onPressed: () => _openScanner('barcode'),
+            tooltip: 'Scan Barcode / QR Code',
           ),
           IconButton(
             icon: const Icon(Icons.help_outline, color: Colors.white),
@@ -1441,6 +1555,29 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   }
 
   Widget _buildDateFields(bool isDarkMode) {
+    String? manufactureHelper;
+    if (_bestBeforeDate != null) {
+      manufactureHelper = 'Must be on or before Best Before (${DateFormat('dd/MM/yyyy').format(_bestBeforeDate!)})';
+    } else if (_expiryDate != null) {
+      manufactureHelper = 'Must be on or before Expiry (${DateFormat('dd/MM/yyyy').format(_expiryDate!)})';
+    }
+
+    String? bestBeforeHelper;
+    if (_manufactureDate != null && _expiryDate != null) {
+      bestBeforeHelper = 'Must be between ${DateFormat('dd/MM/yyyy').format(_manufactureDate!)} & ${DateFormat('dd/MM/yyyy').format(_expiryDate!)}';
+    } else if (_manufactureDate != null) {
+      bestBeforeHelper = 'Must be on or after Manufacture (${DateFormat('dd/MM/yyyy').format(_manufactureDate!)})';
+    } else if (_expiryDate != null) {
+      bestBeforeHelper = 'Must be on or before Expiry (${DateFormat('dd/MM/yyyy').format(_expiryDate!)})';
+    }
+
+    String? expiryHelper;
+    if (_bestBeforeDate != null) {
+      expiryHelper = 'Must be on or after Best Before (${DateFormat('dd/MM/yyyy').format(_bestBeforeDate!)})';
+    } else if (_manufactureDate != null) {
+      expiryHelper = 'Must be on or after Manufacture (${DateFormat('dd/MM/yyyy').format(_manufactureDate!)})';
+    }
+
     return Column(
       children: [
         Row(
@@ -1452,6 +1589,8 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                 date: _manufactureDate,
                 icon: Icons.factory,
                 onTap: () => _selectDate(context, 'manufacture'),
+                onClear: () => _clearDate('manufacture'),
+                helperText: manufactureHelper,
                 isDarkMode: isDarkMode,
               ),
             ),
@@ -1464,14 +1603,16 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
           children: [
             Expanded(
               child: _buildDatePicker(
-                label: 'Expiry Date',
-                date: _expiryDate,
-                icon: Icons.warning_amber,
-                onTap: () => _selectDate(context, 'expiry'),
+                label: 'Best Before Date',
+                date: _bestBeforeDate,
+                icon: Icons.calendar_today,
+                onTap: () => _selectDate(context, 'bestBefore'),
+                onClear: () => _clearDate('bestBefore'),
+                helperText: bestBeforeHelper,
                 isDarkMode: isDarkMode,
               ),
             ),
-            const InfoIconWidget(info: FieldInfo.expiryDate),
+            const InfoIconWidget(info: FieldInfo.bestBeforeDate),
           ],
         ),
         const SizedBox(height: 12),
@@ -1480,14 +1621,16 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
           children: [
             Expanded(
               child: _buildDatePicker(
-                label: 'Best Before Date',
-                date: _bestBeforeDate,
-                icon: Icons.calendar_today,
-                onTap: () => _selectDate(context, 'bestBefore'),
+                label: 'Expiry Date',
+                date: _expiryDate,
+                icon: Icons.warning_amber,
+                onTap: () => _selectDate(context, 'expiry'),
+                onClear: () => _clearDate('expiry'),
+                helperText: expiryHelper,
                 isDarkMode: isDarkMode,
               ),
             ),
-            const InfoIconWidget(info: FieldInfo.bestBeforeDate),
+            const InfoIconWidget(info: FieldInfo.expiryDate),
           ],
         ),
       ],
@@ -1499,48 +1642,85 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     required DateTime? date,
     required IconData icon,
     required VoidCallback onTap,
+    VoidCallback? onClear,
+    String? helperText,
     required bool isDarkMode,
   }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          border: Border.all(
-            color: isDarkMode ? Colors.grey.shade600 : Colors.grey.shade300,
-          ),
-          borderRadius: BorderRadius.circular(12),
-          color: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
-        ),
-        child: Row(
-          children: [
-            Icon(
-              icon,
-              color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
-              size: 20,
+    final hasValue = date != null;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        GestureDetector(
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: isDarkMode ? Colors.grey.shade600 : Colors.grey.shade300,
+              ),
+              borderRadius: BorderRadius.circular(12),
+              color: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                date != null
-                    ? DateFormat('dd/MM/yyyy').format(date)
-                    : label,
-                style: TextStyle(
-                  color: date != null
-                      ? (isDarkMode ? Colors.white : Colors.black)
-                      : (isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600),
-                  fontWeight: date != null ? FontWeight.w500 : FontWeight.normal,
+            child: Row(
+              children: [
+                Icon(
+                  icon,
+                  color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+                  size: 20,
                 ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    hasValue
+                        ? DateFormat('dd/MM/yyyy').format(date)
+                        : label,
+                    style: TextStyle(
+                      color: hasValue
+                          ? (isDarkMode ? Colors.white : Colors.black)
+                          : (isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600),
+                      fontWeight: hasValue ? FontWeight.w500 : FontWeight.normal,
+                    ),
+                  ),
+                ),
+                if (hasValue && onClear != null)
+                  InkWell(
+                    onTap: onClear,
+                    borderRadius: BorderRadius.circular(12),
+                    child: Padding(
+                      padding: const EdgeInsets.all(4.0),
+                      child: Icon(
+                        Icons.cancel,
+                        size: 18,
+                        color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                      ),
+                    ),
+                  )
+                else
+                  Icon(
+                    Icons.calendar_today,
+                    size: 18,
+                    color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                  ),
+              ],
+            ),
+          ),
+        ),
+        if (helperText != null && helperText.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsets.only(left: 4),
+            child: Text(
+              helperText,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                color: isDarkMode ? Colors.blue.shade300 : Colors.blue.shade700,
               ),
             ),
-            Icon(
-              Icons.calendar_today,
-              size: 18,
-              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-            ),
-          ],
-        ),
-      ),
+          ),
+        ],
+      ],
     );
   }
 
@@ -1555,10 +1735,18 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                 controller: _barcodeController,
                 decoration: InputDecoration(
                   labelText: 'Barcode',
-                  hintText: 'Enter barcode',
+                  hintText: 'Enter or scan barcode',
                   prefixIcon: Icon(
                     Icons.barcode_reader,
                     color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                  ),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      Icons.qr_code_scanner,
+                      color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+                    ),
+                    onPressed: () => _openScanner('barcode'),
+                    tooltip: 'Scan Barcode',
                   ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -1582,10 +1770,18 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                 controller: _qrCodeController,
                 decoration: InputDecoration(
                   labelText: 'QR Code',
-                  hintText: 'Enter QR code',
+                  hintText: 'Enter or scan QR code',
                   prefixIcon: Icon(
                     Icons.qr_code,
                     color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                  ),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      Icons.qr_code_scanner,
+                      color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+                    ),
+                    onPressed: () => _openScanner('qr'),
+                    tooltip: 'Scan QR Code',
                   ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),

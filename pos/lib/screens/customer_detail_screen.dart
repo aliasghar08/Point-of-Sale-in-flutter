@@ -114,16 +114,21 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
                     ],
                   ),
                 )
-              : SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
-                      _buildCustomerInfo(isDarkMode),
-                      const SizedBox(height: 16),
-                      _buildStats(currencySymbol, isDarkMode),
-                      const SizedBox(height: 16),
-                      _buildSalesHistory(currencySymbol, isDarkMode),
-                    ],
+              : Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 1000),
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        children: [
+                          _buildCustomerInfo(isDarkMode),
+                          const SizedBox(height: 16),
+                          _buildStats(currencySymbol, isDarkMode),
+                          const SizedBox(height: 16),
+                          _buildSalesHistory(currencySymbol, isDarkMode),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
     );
@@ -265,21 +270,27 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
 
   Widget _buildStatRow(String label, String value, bool isDarkMode, {Color? valueColor}) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
             label,
             style: TextStyle(
+              fontSize: 13,
               color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
             ),
           ),
-          Text(
-            value,
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: valueColor ?? (isDarkMode ? Colors.white : Colors.black),
+          const SizedBox(width: 12),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: valueColor ?? (isDarkMode ? Colors.white : Colors.black),
+              ),
             ),
           ),
         ],
@@ -326,7 +337,6 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
                 Text(
                   'Total: $currencySymbol${_sales.fold(0.0, (sum, doc) {
                     final data = doc.data() as Map<String, dynamic>;
-                    // ✅ CHANGED: Safe number parsing for the fold sum
                     return sum + ((data['total'] ?? 0) as num).toDouble();
                   }).toStringAsFixed(2)}',
                   style: TextStyle(
@@ -353,7 +363,6 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
             else
               ..._sales.take(20).map((doc) {
                 final data = doc.data() as Map<String, dynamic>;
-                // ✅ CHANGED: Safe Timestamp and Number casting inside the map
                 final date = (data['saleDate'] as Timestamp?)?.toDate();
                 final productName = data['productName'] ?? 'Unknown Product';
                 final quantity = ((data['quantity'] ?? 0) as num).toInt();
@@ -361,7 +370,7 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
                 final receiptNumber = data['receiptNumber'] ?? 'N/A';
 
                 return Container(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
                   decoration: BoxDecoration(
                     border: Border(
                       bottom: BorderSide(
@@ -370,71 +379,82 @@ class _CustomerDetailsScreenState extends State<CustomerDetailsScreen> {
                       ),
                     ),
                   ),
-                  child: Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: isDarkMode ? Colors.blue.shade900 : Colors.blue.shade50,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(
-                          Icons.receipt_long,
-                          size: 16,
-                          color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
+                      // Top Row: Product Name + Total Amount
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
                               productName,
                               style: TextStyle(
-                                fontWeight: FontWeight.w500,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
                                 color: isDarkMode ? Colors.white : Colors.black,
                               ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            Row(
-                              children: [
-                                Text(
-                                  'Qty: $quantity',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Text(
-                                  'Receipt: $receiptNumber',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
+                          ),
+                          const SizedBox(width: 8),
                           Text(
                             '$currencySymbol${total.toStringAsFixed(2)}',
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
+                              fontSize: 15,
                               color: isDarkMode ? Colors.green.shade400 : Colors.green.shade700,
                             ),
                           ),
-                          if (date != null)
-                            Text(
-                              DateFormat('dd MMM yy').format(date),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+
+                      // Bottom Row: Receipt Badge + Qty + Date/Time
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: isDarkMode ? Colors.blue.shade900 : Colors.blue.shade50,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              '# $receiptNumber',
                               style: TextStyle(
-                                fontSize: 10,
-                                color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: isDarkMode ? Colors.blue.shade300 : Colors.blue.shade700,
                               ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Qty: $quantity',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                            ),
+                          ),
+                          const Spacer(),
+                          if (date != null)
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.access_time,
+                                  size: 12,
+                                  color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  DateFormat('dd MMM yyyy • hh:mm a').format(date),
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                                  ),
+                                ),
+                              ],
                             ),
                         ],
                       ),

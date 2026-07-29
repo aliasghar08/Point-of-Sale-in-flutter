@@ -284,31 +284,36 @@ class _ReportsScreenState extends State<ReportsScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  _buildPeriodSelector(isDarkMode),
-                  const SizedBox(height: 16),
-                  _buildSummaryCards(currencySymbol, isDarkMode),
-                  const SizedBox(height: 16),
-                  _buildCustomerSummary(currencySymbol, isDarkMode),
-                  const SizedBox(height: 16),
-                  if (_dailySales.isNotEmpty && _selectedPeriod != 'All')
-                    _buildSalesChart(currencySymbol, isDarkMode),
-                  const SizedBox(height: 16),
-                  if (_paymentBreakdown.isNotEmpty)
-                    _buildPaymentBreakdown(currencySymbol, isDarkMode),
-                  const SizedBox(height: 16),
-                  if (_topProducts.isNotEmpty)
-                    _buildTopProducts(currencySymbol, isDarkMode),
-                  const SizedBox(height: 16),
-                  if (_topCustomers.isNotEmpty)
-                    _buildTopCustomers(currencySymbol, isDarkMode),
-                  const SizedBox(height: 16),
-                  if (_totalTransactions > 0)
-                    _buildDetailedStats(currencySymbol, isDarkMode),
-                ],
+          : Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1200),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      _buildPeriodSelector(isDarkMode),
+                      const SizedBox(height: 16),
+                      _buildSummaryCards(currencySymbol, isDarkMode),
+                      const SizedBox(height: 16),
+                      _buildCustomerSummary(currencySymbol, isDarkMode),
+                      const SizedBox(height: 16),
+                      if (_dailySales.isNotEmpty && _selectedPeriod != 'All')
+                        _buildSalesChart(currencySymbol, isDarkMode),
+                      const SizedBox(height: 16),
+                      if (_paymentBreakdown.isNotEmpty)
+                        _buildPaymentBreakdown(currencySymbol, isDarkMode),
+                      const SizedBox(height: 16),
+                      if (_topProducts.isNotEmpty)
+                        _buildTopProducts(currencySymbol, isDarkMode),
+                      const SizedBox(height: 16),
+                      if (_topCustomers.isNotEmpty)
+                        _buildTopCustomers(currencySymbol, isDarkMode),
+                      const SizedBox(height: 16),
+                      if (_totalTransactions > 0)
+                        _buildDetailedStats(currencySymbol, isDarkMode),
+                    ],
+                  ),
+                ),
               ),
             ),
     );

@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 import 'package:email_validator/email_validator.dart';
 import 'package:pos/providers/auth_provider.dart';
 import 'package:pos/providers/settings_provider.dart';
-import 'package:pos/providers/theme_provider.dart';
 
 
 class LoginScreen extends StatefulWidget {
@@ -33,7 +32,6 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
     final settingsProvider = Provider.of<SettingsProvider>(context);
-    final themeProvider = Provider.of<ThemeProvider>(context);
     final currencySymbol = settingsProvider.currencySymbol;
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
@@ -157,11 +155,15 @@ class _LoginScreenState extends State<LoginScreen> {
                       keyboardType: TextInputType.emailAddress,
                       autovalidateMode: AutovalidateMode.onUserInteraction,
                       validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter your email';
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Please enter your email address';
                         }
-                        if (!EmailValidator.validate(value)) {
-                          return 'Please enter a valid email';
+                        final trimmed = value.trim();
+                        final emailRegex = RegExp(
+                          r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
+                        );
+                        if (!EmailValidator.validate(trimmed) || !emailRegex.hasMatch(trimmed)) {
+                          return 'Please enter a valid email address (e.g. name@example.com)';
                         }
                         return null;
                       },

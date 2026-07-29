@@ -4,6 +4,7 @@ import 'package:pos/providers/auth_provider.dart';
 import 'package:pos/screens/home.dart';
 import 'package:pos/screens/inventory_screen.dart';
 import 'package:pos/screens/login_screen.dart';
+import 'package:pos/screens/sales_history_screen.dart';
 import 'package:pos/screens/user_management_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:pos/utils/drawer.dart';
@@ -71,15 +72,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
-          // Optional: Add global actions here
           IconButton(
             icon: const Icon(Icons.history),
+            tooltip: 'Sales History',
             onPressed: () {
-              // Show sales history
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Sales History'),
-                  behavior: SnackBarBehavior.floating,
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const SalesHistoryScreen(),
                 ),
               );
             },
