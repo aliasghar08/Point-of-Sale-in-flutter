@@ -1,14 +1,23 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:pos/screens/product_form_screen.dart';
 import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:pos/models/product.dart';
 import 'package:pos/services/firebase_service.dart';
+import 'package:pos/services/cache_service.dart';
+import 'package:pos/services/format_service.dart';
+import 'package:pos/services/feedback_service.dart';
+import 'package:pos/services/export_service.dart';
+import 'package:pos/services/sample_data_service.dart';
 import 'package:pos/providers/settings_provider.dart';
-import 'package:pos/widgets/qr_scanner.dart';
-import 'package:pos/widgets/barcode_scanner.dart';
-import 'package:pos/widgets/voice_input.dart';
+import 'package:pos/theme/app_colors.dart';
+import 'package:pos/widgets/pos_card.dart';
+import 'package:pos/widgets/stat_badge.dart';
+import 'package:pos/widgets/category_pill.dart';
+import 'package:pos/widgets/empty_state_view.dart';
+import 'package:pos/screens/product_form_screen.dart';
 
+/// Modern Inventory & Stock Management Screen.
 class InventoryScreen extends StatefulWidget {
   const InventoryScreen({super.key});
 
@@ -18,291 +27,362 @@ class InventoryScreen extends StatefulWidget {
 
 class _InventoryScreenState extends State<InventoryScreen> {
   final FirebaseService _firebaseService = FirebaseService();
-  String _searchQuery = '';
-  bool _isScanning = false;
+  final CacheService _cache = CacheService();
 
-  @override
-  void initState() {
-    super.initState();
-  }
+  final TextEditingController _searchController = TextEditingController();
+  Timer? _debounceTimer;
+
+  String _searchQuery = '';
+  String _selectedCategory = 'All';
+  String _stockFilter = 'all'; // 'all', 'low', 'out'
+  bool _isGridView = false;
+  bool _isSeeding = false;
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
+    _searchController.dispose();
     super.dispose();
+  }
+
+  void _onSearchChanged(String val) {
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 150), () {
+      setState(() => _searchQuery = val);
+    });
+  }
+
+  Future<void> _seedSampleCatalog() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Seed Demo Products?'),
+        content: const Text(
+          'This will add 12+ realistic sample products with categories, barcodes, SKUs, and stock to your catalog.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Load Demo Products')),
+        ],
+      ),
+    );
+
+    if (confirm != true || !mounted) return;
+
+    setState(() => _isSeeding = true);
+    try {
+      final count = await SampleDataService.seedSampleProducts();
+      FeedbackService.success();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Successfully loaded $count demo products!'),
+            backgroundColor: AppColors.success,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      FeedbackService.error();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading demo products: $e'), backgroundColor: AppColors.error, behavior: SnackBarBehavior.floating),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSeeding = false);
+    }
+  }
+
+  void _exportCatalog(List<Product> products) {
+    final csv = ExportService.exportProductsToCsv(products);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Exported Inventory CSV'),
+        content: SizedBox(
+          width: double.maxFinite,
+          height: 300,
+          child: SingleChildScrollView(
+            child: SelectableText(
+              csv,
+              style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('CSV ready! You can copy text from the dialog.'), behavior: SnackBarBehavior.floating),
+              );
+            },
+            icon: const Icon(Icons.copy),
+            label: const Text('Done'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _adjustStock(Product product, int delta) async {
+    final newStock = (product.stock + delta).clamp(0, 99999);
+    try {
+      await _firebaseService.updateProductStock(product.id, newStock);
+      _cache.upsertProduct(product.copyWith(stock: newStock));
+      FeedbackService.lightTap();
+    } catch (e) {
+      FeedbackService.error();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update stock: $e'), backgroundColor: AppColors.error),
+        );
+      }
+    }
+  }
+
+  Future<void> _deleteProduct(Product product) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Product'),
+        content: Text('Are you sure you want to delete "${product.name}"?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      try {
+        await _firebaseService.deleteProduct(product.id);
+        _cache.removeProduct(product.id);
+        FeedbackService.success();
+      } catch (e) {
+        FeedbackService.error();
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final settingsProvider = Provider.of<SettingsProvider>(context);
     final currencySymbol = settingsProvider.currencySymbol;
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final isWide = constraints.maxWidth >= 800;
-          return Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 1200),
-              child: Column(
-                children: [
-                  _buildSearchBar(isDarkMode),
-                  _buildStatsSummary(isDarkMode),
-                  Expanded(
-                    child: StreamBuilder<QuerySnapshot>(
-                      stream: _firebaseService.productsStream(),
-                      builder: (context, snapshot) {
-                        // Handle loading state
-                        if (snapshot.connectionState == ConnectionState.waiting) {
-                          return const Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                CircularProgressIndicator(),
-                                SizedBox(height: 16),
-                                Text('Loading products...'),
-                              ],
-                            ),
-                          );
-                        }
-
-                        // Handle error state
-                        if (snapshot.hasError) {
-                          return Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.error_outline,
-                                  size: 60,
-                                  color: isDarkMode ? Colors.red.shade400 : Colors.red.shade300,
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  'Error loading products',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    color: isDarkMode ? Colors.white : Colors.grey.shade600,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                                  child: Text(
-                                    snapshot.error.toString(),
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade500,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        }
-
-                        // Check if we have data
-                        if (!snapshot.hasData || snapshot.data == null) {
-                          return _buildEmptyState(isDarkMode);
-                        }
-
-                        if (snapshot.data!.docs.isEmpty) {
-                          return _buildEmptyState(isDarkMode);
-                        }
-
-                        // Parse products
-                        List<Product> products = [];
-                        for (var doc in snapshot.data!.docs) {
-                          try {
-                            final data = doc.data() as Map<String, dynamic>;
-                            if (!data.containsKey('name')) {
-                              continue;
-                            }
-                            final product = Product.fromMap(data, doc.id);
-                            products.add(product);
-                          } catch (e) {
-                            debugPrint('❌ Error parsing product: $e');
-                          }
-                        }
-
-                        // Filter products
-                        List<Product> filteredProducts = _filterProducts(products);
-
-                        if (filteredProducts.isEmpty && products.isNotEmpty) {
-                          return _buildNoResultsState(isDarkMode);
-                        }
-
-                        if (filteredProducts.isEmpty) {
-                          return _buildEmptyState(isDarkMode);
-                        }
-
-                        // Build product list / grid depending on viewport width
-                        if (isWide) {
-                          return GridView.builder(
-                            padding: const EdgeInsets.all(16),
-                            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                              maxCrossAxisExtent: 450,
-                              mainAxisExtent: 110,
-                              crossAxisSpacing: 16,
-                              mainAxisSpacing: 12,
-                            ),
-                            itemCount: filteredProducts.length,
-                            itemBuilder: (context, index) {
-                              final product = filteredProducts[index];
-                              return _buildProductCard(product, currencySymbol, isDarkMode);
-                            },
-                          );
-                        }
-
-                        return ListView.builder(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: filteredProducts.length,
-                          itemBuilder: (context, index) {
-                            final product = filteredProducts[index];
-                            return _buildProductCard(product, currencySymbol, isDarkMode);
-                          },
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ProductFormScreen()),
           );
         },
+        backgroundColor: isDark ? AppColors.primaryLight : AppColors.primary,
+        icon: const Icon(Icons.add, color: Colors.white),
+        label: const Text('Add Product', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _showAddProductScreen,
-        backgroundColor: isDarkMode ? Colors.blue.shade500 : Colors.blue.shade700,
-        child: const Icon(Icons.add, color: Colors.white),
+      body: StreamBuilder<QuerySnapshot>(
+        stream: _firebaseService.productsStream(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting && !_cache.hasValidProductCache) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          List<Product> products = [];
+          if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
+            products = snapshot.data!.docs.map((doc) {
+              return Product.fromMap(doc.data() as Map<String, dynamic>, doc.id);
+            }).toList();
+            _cache.setProducts(products);
+          } else if (_cache.hasValidProductCache) {
+            products = _cache.allProducts;
+          }
+
+          // Calculate Inventory Metrics
+          final totalSkus = products.length;
+          final lowStockCount = products.where((p) => p.stock > 0 && p.stock <= p.minStock).length;
+          final outOfStockCount = products.where((p) => p.stock <= 0).length;
+          final totalValuation = products.fold(0.0, (prev, p) => prev + (p.price * p.stock));
+
+          // Filter Products
+          final filtered = products.where((p) {
+            // Stock state
+            if (_stockFilter == 'low' && (p.stock <= 0 || p.stock > p.minStock)) return false;
+            if (_stockFilter == 'out' && p.stock > 0) return false;
+
+            // Category
+            if (_selectedCategory != 'All' && p.category != _selectedCategory) return false;
+
+            // Search query
+            if (_searchQuery.trim().isNotEmpty) {
+              final q = _searchQuery.trim().toLowerCase();
+              return p.name.toLowerCase().contains(q) ||
+                  p.sku.toLowerCase().contains(q) ||
+                  p.barcode.toLowerCase().contains(q) ||
+                  p.category.toLowerCase().contains(q);
+            }
+            return true;
+          }).toList();
+
+          return Column(
+            children: [
+              // Search & Top Actions
+              _buildTopBar(isDark, products),
+
+              // KPI Stats Banner
+              _buildStatsBar(
+                totalSkus: totalSkus,
+                lowStock: lowStockCount,
+                outOfStock: outOfStockCount,
+                valuation: totalValuation,
+                currencySymbol: currencySymbol,
+                isDark: isDark,
+              ),
+
+              // Filter Chips
+              _buildFilterChips(isDark),
+
+              // Product List / Grid
+              Expanded(
+                child: _isSeeding
+                    ? const Center(child: CircularProgressIndicator())
+                    : filtered.isEmpty
+                        ? EmptyStateView(
+                            icon: Icons.inventory_2_outlined,
+                            title: 'No inventory items match',
+                            description: products.isEmpty
+                                ? 'Your inventory is currently empty. Add your first item or load demo products!'
+                                : 'No products match the selected search and filter criteria.',
+                            actionLabel: products.isEmpty ? 'Load Demo Catalog' : 'Add New Product',
+                            onAction: products.isEmpty
+                                ? _seedSampleCatalog
+                                : () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(builder: (_) => const ProductFormScreen()),
+                                    ),
+                          )
+                        : _isGridView
+                            ? _buildGridView(filtered, currencySymbol, isDark)
+                            : _buildListView(filtered, currencySymbol, isDark),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 
-  // ==================== SEARCH BAR ====================
-  Widget _buildSearchBar(bool isDarkMode) {
+  // ==================== SUB-COMPONENTS ====================
+
+  Widget _buildTopBar(bool isDark, List<Product> allProducts) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        boxShadow: [
-          BoxShadow(
-            color: isDarkMode
-                ? Colors.black.withOpacity(0.3)
-                : Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 5,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
+        border: Border(bottom: BorderSide(color: isDark ? AppColors.darkBorder : AppColors.lightBorder)),
       ),
       child: Row(
         children: [
           Expanded(
             child: TextField(
-              style: TextStyle(
-                color: isDarkMode ? Colors.white : Colors.black,
-              ),
+              controller: _searchController,
+              onChanged: _onSearchChanged,
               decoration: InputDecoration(
-                hintText: 'Search products...',
-                hintStyle: TextStyle(
-                  color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                ),
-                prefixIcon: Icon(
-                  Icons.search,
-                  color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                ),
-                suffixIcon: _searchQuery.isNotEmpty
+                hintText: 'Search products by name, SKU, or barcode...',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: _searchController.text.isNotEmpty
                     ? IconButton(
-                        icon: Icon(
-                          Icons.clear,
-                          color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                        ),
+                        icon: const Icon(Icons.clear, size: 18),
                         onPressed: () {
-                          setState(() => _searchQuery = '');
+                          _searchController.clear();
+                          _onSearchChanged('');
                         },
                       )
                     : null,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-                filled: true,
-                fillColor: isDarkMode
-                    ? Colors.grey.shade800
-                    : Colors.grey.shade50,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               ),
-              onChanged: (value) {
-                setState(() {
-                  _searchQuery = value.toLowerCase().trim();
-                });
-              },
-              onSubmitted: (value) {
-                if (value.isNotEmpty) {
-                  setState(() {
-                    _searchQuery = value.toLowerCase().trim();
-                  });
-                }
-              },
             ),
           ),
           const SizedBox(width: 8),
-          // QR Scanner Button
-          Container(
-            decoration: BoxDecoration(
-              color: isDarkMode
-                  ? Colors.blue.shade900
-                  : Colors.blue.shade50,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: IconButton(
-              icon: Icon(
-                Icons.qr_code_scanner,
-                color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
-              ),
-              onPressed: _scanQRCode,
-              tooltip: 'Scan QR Code',
-            ),
+          IconButton.filledTonal(
+            icon: Icon(_isGridView ? Icons.view_list : Icons.grid_view),
+            tooltip: _isGridView ? 'Switch to List' : 'Switch to Grid',
+            onPressed: () => setState(() => _isGridView = !_isGridView),
           ),
           const SizedBox(width: 4),
-          // Barcode Scanner Button
-          Container(
-            decoration: BoxDecoration(
-              color: isDarkMode
-                  ? Colors.green.shade900
-                  : Colors.green.shade50,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: IconButton(
-              icon: Icon(
-                Icons.barcode_reader,
-                color: isDarkMode ? Colors.green.shade400 : Colors.green.shade700,
-              ),
-              onPressed: _scanBarcode,
-              tooltip: 'Scan Barcode',
-            ),
+          IconButton.filledTonal(
+            icon: const Icon(Icons.file_download_outlined),
+            tooltip: 'Export CSV',
+            onPressed: () => _exportCatalog(allProducts),
           ),
           const SizedBox(width: 4),
-          // Voice Input Button
-          Container(
-            decoration: BoxDecoration(
-              color: isDarkMode
-                  ? Colors.orange.shade900
-                  : Colors.orange.shade50,
-              borderRadius: BorderRadius.circular(8),
+          IconButton.filledTonal(
+            icon: const Icon(Icons.auto_awesome),
+            tooltip: 'Seed Demo Products',
+            onPressed: _seedSampleCatalog,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatsBar({
+    required int totalSkus,
+    required int lowStock,
+    required int outOfStock,
+    required double valuation,
+    required String currencySymbol,
+    required bool isDark,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Row(
+        children: [
+          Expanded(
+            child: _buildMetricTile(
+              label: 'Total SKUs',
+              value: '$totalSkus',
+              color: isDark ? AppColors.primaryLight : AppColors.primary,
+              isDark: isDark,
             ),
-            child: IconButton(
-              icon: Icon(
-                Icons.mic,
-                color: isDarkMode ? Colors.orange.shade400 : Colors.orange.shade700,
-              ),
-              onPressed: _showVoiceInput,
-              tooltip: 'Voice Input',
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: _buildMetricTile(
+              label: 'Low Stock',
+              value: '$lowStock',
+              color: AppColors.warning,
+              isDark: isDark,
+              isSelected: _stockFilter == 'low',
+              onTap: () => setState(() => _stockFilter = _stockFilter == 'low' ? 'all' : 'low'),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: _buildMetricTile(
+              label: 'Out of Stock',
+              value: '$outOfStock',
+              color: AppColors.error,
+              isDark: isDark,
+              isSelected: _stockFilter == 'out',
+              onTap: () => setState(() => _stockFilter = _stockFilter == 'out' ? 'all' : 'out'),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: _buildMetricTile(
+              label: 'Stock Value',
+              value: FormatService.formatCurrency(valuation, symbol: currencySymbol),
+              color: AppColors.success,
+              isDark: isDark,
             ),
           ),
         ],
@@ -310,372 +390,184 @@ class _InventoryScreenState extends State<InventoryScreen> {
     );
   }
 
-  // ==================== VOICE INPUT ====================
-  void _showVoiceInput() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+  Widget _buildMetricTile({
+    required String label,
+    required String value,
+    required Color color,
+    required bool isDark,
+    bool isSelected = false,
+    VoidCallback? onTap,
+  }) {
+    return PosCard(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      onTap: onTap,
+      backgroundColor: isSelected ? color.withValues(alpha: 0.15) : null,
+      border: isSelected ? Border.all(color: color, width: 1.5) : null,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
       ),
-      builder: (context) => VoiceInput(
-        onVoiceRecognized: (text) {
-          setState(() {
-            _searchQuery = text.toLowerCase().trim();
-          });
-          if (text.isNotEmpty) {
-            _handleScanResult(text, 'Voice Input');
-          }
+    );
+  }
+
+  Widget _buildFilterChips(bool isDark) {
+    final categories = _cache.allCategories;
+
+    return Container(
+      height: 44,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        itemCount: categories.length,
+        itemBuilder: (ctx, i) {
+          final cat = categories[i];
+          final isSelected = _selectedCategory == cat;
+          return CategoryPill(
+            title: cat,
+            isSelected: isSelected,
+            onTap: () {
+              setState(() => _selectedCategory = cat);
+              FeedbackService.lightTap();
+            },
+          );
         },
       ),
     );
   }
 
-  // ==================== QR SCANNER ====================
-  void _scanQRCode() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => QRScanner(
-          onScan: (qrCode) {
-            _handleScanResult(qrCode, 'QR Code');
-          },
-        ),
-      ),
-    );
-  }
+  Widget _buildListView(List<Product> products, String currencySymbol, bool isDark) {
+    return ListView.separated(
+      padding: const EdgeInsets.all(16),
+      itemCount: products.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 10),
+      itemBuilder: (ctx, i) {
+        final p = products[i];
 
-  // ==================== BARCODE SCANNER ====================
-  void _scanBarcode() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => BarcodeScanner(
-          expectedType: ScannerExpectedType.barcode,
-          onScan: (barcode) {
-            _handleScanResult(barcode, 'Barcode');
-          },
-        ),
-      ),
-    );
-  }
-
-  // ==================== HANDLE SCAN RESULTS ====================
-  Future<void> _handleScanResult(String code, String scanType) async {
-    if (_isScanning) return;
-    
-    setState(() => _isScanning = true);
-    
-    try {
-      _showSnackBar('🔍 Searching for product...');
-      
-      QuerySnapshot qrResult = await _firebaseService
-          .getProductByQRCode(code);
-      
-      if (qrResult.docs.isNotEmpty) {
-        final data = qrResult.docs.first.data() as Map<String, dynamic>;
-        final product = Product.fromMap(data, qrResult.docs.first.id);
-        _showProductFoundDialog(product, scanType);
-        return;
-      }
-      
-      QuerySnapshot barcodeResult = await _firebaseService
-          .getProductByBarcode(code);
-      
-      if (barcodeResult.docs.isNotEmpty) {
-        final data = barcodeResult.docs.first.data() as Map<String, dynamic>;
-        final product = Product.fromMap(data, barcodeResult.docs.first.id);
-        _showProductFoundDialog(product, 'Barcode');
-        return;
-      }
-      
-      _showProductNotFoundDialog(code);
-      
-    } catch (e) {
-      _showSnackBar('❌ Error: $e', isError: true);
-    } finally {
-      if (mounted) {
-        setState(() => _isScanning = false);
-      }
-    }
-  }
-
-  // ==================== DIALOGS ====================
-  void _showProductFoundDialog(Product product, String scanType) {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final settingsProvider = Provider.of<SettingsProvider>(context, listen: false);
-    final currencySymbol = settingsProvider.currencySymbol;
-    
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(
-              Icons.check_circle,
-              color: isDarkMode ? Colors.green.shade400 : Colors.green.shade700,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'Product Found!',
-              style: TextStyle(
-                color: isDarkMode ? Colors.white : Colors.black,
-              ),
-            ),
-          ],
-        ),
-        backgroundColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Scanned via: $scanType',
-              style: TextStyle(
-                fontSize: 12,
-                color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-              ),
-            ),
-            const Divider(),
-            _buildDetailRow('Name', product.name, isDarkMode),
-            _buildDetailRow('Price', '$currencySymbol${product.price.toStringAsFixed(2)}', isDarkMode),
-            _buildDetailRow('Stock', product.stock.toString(), isDarkMode),
-            _buildDetailRow('Category', product.category, isDarkMode),
-            if (product.barcode.isNotEmpty)
-              _buildDetailRow('Barcode', product.barcode, isDarkMode),
-            if (product.qrCode.isNotEmpty)
-              _buildDetailRow('QR Code', product.qrCode, isDarkMode),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Close',
-              style: TextStyle(
-                color: isDarkMode ? Colors.white : Colors.black,
-              ),
-            ),
-          ),
-          ElevatedButton.icon(
-            onPressed: () {
-              Navigator.pop(context);
-              _showEditProductScreen(product);
-            },
-            icon: const Icon(Icons.edit),
-            label: const Text('Edit'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
-              foregroundColor: Colors.white,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showProductNotFoundDialog(String code) {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(
-              Icons.error_outline,
-              color: isDarkMode ? Colors.orange.shade400 : Colors.orange.shade700,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'Product Not Found',
-              style: TextStyle(
-                color: isDarkMode ? Colors.white : Colors.black,
-              ),
-            ),
-          ],
-        ),
-        backgroundColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'No product found with this search:',
-              style: TextStyle(
-                color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                code,
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: isDarkMode ? Colors.white : Colors.black,
+        return PosCard(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              // Product Avatar
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? AppColors.primaryLight.withValues(alpha: 0.12)
+                      : AppColors.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.inventory_2_outlined,
+                  color: isDark ? AppColors.primaryLight : AppColors.primary,
+                  size: 24,
                 ),
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Would you like to add this product?',
-              style: TextStyle(
-                color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+              const SizedBox(width: 12),
+
+              // Details
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            p.name,
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        StatBadge.stock(stock: p.stock, minStock: p.minStock),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${p.category} • SKU: ${p.sku.isNotEmpty ? p.sku : '-'} • Price: ${FormatService.formatCurrency(p.price, symbol: currencySymbol)}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Cancel',
-              style: TextStyle(
-                color: isDarkMode ? Colors.white : Colors.black,
-              ),
-            ),
-          ),
-          ElevatedButton.icon(
-            onPressed: () {
-              Navigator.pop(context);
-              _showAddProductScreenWithCode(code);
-            },
-            icon: const Icon(Icons.add),
-            label: const Text('Add Product'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
-              foregroundColor: Colors.white,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
-  // ==================== NAVIGATION ====================
-  void _showAddProductScreen() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const ProductFormScreen(
-          isEditing: false,
-        ),
-      ),
-    ).then((result) {
-      if (result == true && mounted) {
-        _showSnackBar('✅ Product added successfully!');
-        setState(() {});
-      }
-    });
-  }
-
-  void _showAddProductScreenWithCode(String code) {
-    final product = Product(
-      id: '',
-      name: '',
-      price: 0,
-      costPrice: 0,
-      stock: 0,
-      minStock: 0,
-      category: 'Uncategorized',
-      barcode: code.isNotEmpty ? code : '',
-      qrCode: '',
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-    );
-    
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => ProductFormScreen(
-          product: product,
-          isEditing: false,
-        ),
-      ),
-    ).then((result) {
-      if (result == true && mounted) {
-        _showSnackBar('✅ Product added successfully!');
-        setState(() {});
-      }
-    });
-  }
-
-  void _showEditProductScreen(Product product) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => ProductFormScreen(
-          product: product,
-          isEditing: true,
-        ),
-      ),
-    ).then((result) {
-      if (result == true && mounted) {
-        _showSnackBar('✅ Product updated successfully!');
-        setState(() {});
-      }
-    });
-  }
-
-  // ==================== STATS SUMMARY ====================
-  Widget _buildStatsSummary(bool isDarkMode) {
-    return StreamBuilder<QuerySnapshot>(
-      stream: _firebaseService.productsStream(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return const SizedBox.shrink();
-        }
-
-        int totalProducts = snapshot.data!.docs.length;
-        int lowStockCount = 0;
-        int totalStock = 0;
-
-        for (var doc in snapshot.data!.docs) {
-          var data = doc.data() as Map<String, dynamic>;
-          int stock = (data['stock'] ?? 0).toInt();
-          int minStock = (data['minStock'] ?? 0).toInt();
-          totalStock += stock;
-          if (stock <= minStock) {
-            lowStockCount++;
-          }
-        }
-
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          color: isDarkMode
-              ? Colors.grey.shade900
-              : Colors.grey.shade50,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildStatItem(
-                icon: Icons.inventory_2,
-                label: 'Products',
-                value: totalProducts.toString(),
-                color: isDarkMode ? Colors.blue.shade400 : Colors.blue,
-                isDarkMode: isDarkMode,
-              ),
-              _buildStatItem(
-                icon: Icons.shopping_bag,
-                label: 'Total Stock',
-                value: totalStock.toString(),
-                color: isDarkMode ? Colors.green.shade400 : Colors.green,
-                isDarkMode: isDarkMode,
-              ),
-              _buildStatItem(
-                icon: Icons.warning_amber,
-                label: 'Low Stock',
-                value: lowStockCount.toString(),
-                color: lowStockCount > 0
-                    ? (isDarkMode ? Colors.red.shade400 : Colors.red)
-                    : (isDarkMode ? Colors.grey.shade400 : Colors.grey),
-                isDarkMode: isDarkMode,
+              // Inline Stock Adjust Buttons
+              const SizedBox(width: 8),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.remove_circle_outline, size: 20),
+                    tooltip: 'Decrease Stock',
+                    onPressed: () => _adjustStock(p, -1),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: isDark ? AppColors.darkBackground : AppColors.lightBackground,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      '${p.stock}',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.add_circle_outline, size: 20),
+                    tooltip: 'Increase Stock',
+                    onPressed: () => _adjustStock(p, 1),
+                  ),
+                  PopupMenuButton<String>(
+                    icon: const Icon(Icons.more_vert),
+                    onSelected: (val) {
+                      if (val == 'edit') {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => ProductFormScreen(product: p)),
+                        );
+                      } else if (val == 'delete') {
+                        _deleteProduct(p);
+                      } else if (val == 'add5') {
+                        _adjustStock(p, 5);
+                      }
+                    },
+                    itemBuilder: (_) => [
+                      const PopupMenuItem(value: 'add5', child: Text('Add +5 Units')),
+                      const PopupMenuItem(value: 'edit', child: Text('Edit Product')),
+                      const PopupMenuItem(
+                        value: 'delete',
+                        child: Text('Delete', style: TextStyle(color: AppColors.error)),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ],
           ),
@@ -684,538 +576,94 @@ class _InventoryScreenState extends State<InventoryScreen> {
     );
   }
 
-  Widget _buildStatItem({
-    required IconData icon,
-    required String label,
-    required String value,
-    required Color color,
-    required bool isDarkMode,
-  }) {
-    return Row(
-      children: [
-        Icon(icon, size: 20, color: color),
-        const SizedBox(width: 8),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              value,
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-                color: color,
-              ),
-            ),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  // ==================== PRODUCT CARD ====================
-  Widget _buildProductCard(Product product, String currencySymbol, bool isDarkMode) {
-    bool isLowStock = product.stock <= product.minStock;
-    bool isOutOfStock = product.stock <= 0;
-
-    return Card(
-      elevation: 2,
-      margin: const EdgeInsets.only(bottom: 12),
-      color: isDarkMode ? Colors.grey.shade800 : Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: isOutOfStock
-            ? BorderSide(color: isDarkMode ? Colors.red.shade400 : Colors.red.shade300, width: 1)
-            : isLowStock
-                ? BorderSide(color: isDarkMode ? Colors.orange.shade400 : Colors.orange.shade300, width: 1)
-                : BorderSide.none,
+  Widget _buildGridView(List<Product> products, String currencySymbol, bool isDark) {
+    return GridView.builder(
+      padding: const EdgeInsets.all(16),
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 260,
+        mainAxisSpacing: 14,
+        crossAxisSpacing: 14,
+        childAspectRatio: 0.85,
       ),
-      child: InkWell(
-        onTap: () => _showProductDetails(product, currencySymbol, isDarkMode),
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
+      itemCount: products.length,
+      itemBuilder: (ctx, i) {
+        final p = products[i];
+
+        return PosCard(
           padding: const EdgeInsets.all(12),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 50,
-                height: 50,
-                decoration: BoxDecoration(
-                  color: isOutOfStock
-                      ? (isDarkMode ? Colors.red.shade900 : Colors.red.shade100)
-                      : isLowStock
-                          ? (isDarkMode ? Colors.orange.shade900 : Colors.orange.shade100)
-                          : (isDarkMode ? Colors.green.shade900 : Colors.green.shade100),
-                  shape: BoxShape.circle,
-                ),
-                child: Center(
-                  child: Text(
-                    product.stock.toString(),
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                      color: isOutOfStock
-                          ? (isDarkMode ? Colors.red.shade400 : Colors.red)
-                          : isLowStock
-                              ? (isDarkMode ? Colors.orange.shade400 : Colors.orange)
-                              : (isDarkMode ? Colors.green.shade400 : Colors.green),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      product.name,
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      p.category,
                       style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                        color: isDarkMode ? Colors.white : Colors.black,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Text(
-                          '$currencySymbol${product.price.toStringAsFixed(2)}',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            color: isDarkMode ? Colors.green.shade400 : Colors.green.shade700,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Cost: $currencySymbol${product.costPrice.toStringAsFixed(2)}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    if (product.barcode.isNotEmpty)
-                      Text(
-                        'Barcode: ${product.barcode}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade500,
-                        ),
-                      ),
-                  ],
+                  ),
+                  StatBadge.stock(stock: p.stock, minStock: p.minStock),
+                ],
+              ),
+              const Spacer(),
+              Text(
+                p.name,
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                FormatService.formatCurrency(p.price, symbol: currencySymbol),
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? AppColors.success : AppColors.primaryDark,
                 ),
               ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
+              const Spacer(),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  if (isOutOfStock)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isDarkMode ? Colors.red.shade900 : Colors.red.shade100,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        'Out of Stock',
-                        style: TextStyle(
-                          color: isDarkMode ? Colors.red.shade400 : Colors.red.shade900,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    )
-                  else if (isLowStock)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isDarkMode ? Colors.orange.shade900 : Colors.orange.shade100,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        'Low Stock',
-                        style: TextStyle(
-                          color: isDarkMode ? Colors.orange.shade400 : Colors.orange.shade900,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  const SizedBox(height: 8),
                   Row(
-                    mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
-                        icon: Icon(
-                          Icons.edit,
-                          size: 20,
-                          color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
-                        ),
-                        onPressed: () => _showEditProductScreen(product),
-                        tooltip: 'Edit Product',
+                        icon: const Icon(Icons.remove, size: 16),
+                        onPressed: () => _adjustStock(p, -1),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
                       ),
+                      Text('${p.stock}', style: const TextStyle(fontWeight: FontWeight.bold)),
                       IconButton(
-                        icon: Icon(
-                          Icons.delete_outline,
-                          size: 20,
-                          color: isDarkMode ? Colors.red.shade400 : Colors.red.shade700,
-                        ),
-                        onPressed: () => _deleteProduct(product),
-                        tooltip: 'Delete Product',
+                        icon: const Icon(Icons.add, size: 16),
+                        onPressed: () => _adjustStock(p, 1),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
                       ),
                     ],
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.edit_outlined, size: 18),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => ProductFormScreen(product: p)),
+                      );
+                    },
                   ),
                 ],
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  // ==================== EMPTY STATE ====================
-  Widget _buildEmptyState(bool isDarkMode) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.inventory_2_outlined,
-            size: 100,
-            color: isDarkMode ? Colors.grey.shade600 : Colors.grey.shade300,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'No Products Found',
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: isDarkMode ? Colors.white : Colors.grey.shade600,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Start by adding your first product',
-            style: TextStyle(
-              fontSize: 14,
-              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade500,
-            ),
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton.icon(
-            onPressed: _showAddProductScreen,
-            icon: const Icon(Icons.add),
-            label: const Text('Add Product'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ==================== NO RESULTS STATE ====================
-  Widget _buildNoResultsState(bool isDarkMode) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.search_off,
-            size: 80,
-            color: isDarkMode ? Colors.grey.shade600 : Colors.grey.shade300,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'No Results Found',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: isDarkMode ? Colors.white : Colors.grey.shade600,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Try adjusting your search query',
-            style: TextStyle(
-              fontSize: 14,
-              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade500,
-            ),
-          ),
-          const SizedBox(height: 16),
-          TextButton(
-            onPressed: () {
-              setState(() => _searchQuery = '');
-            },
-            child: Text(
-              'Clear Search',
-              style: TextStyle(
-                color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ==================== PRODUCT DETAILS ====================
-  void _showProductDetails(Product product, String currencySymbol, bool isDarkMode) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: isDarkMode ? Colors.grey.shade900 : Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 60,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: isDarkMode ? Colors.grey.shade600 : Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                CircleAvatar(
-                  radius: 30,
-                  backgroundColor: isDarkMode
-                      ? Colors.blue.shade900
-                      : Colors.blue.shade100,
-                  child: Text(
-                    product.stock.toString(),
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        product.name,
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: isDarkMode ? Colors.white : Colors.black,
-                        ),
-                      ),
-                      Text(
-                        'Category: ${product.category}',
-                        style: TextStyle(
-                          color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const Divider(),
-            const SizedBox(height: 8),
-            _buildDetailRow('Price', '$currencySymbol${product.price.toStringAsFixed(2)}', isDarkMode),
-            _buildDetailRow('Cost Price', '$currencySymbol${product.costPrice.toStringAsFixed(2)}', isDarkMode),
-            _buildDetailRow('Profit', '$currencySymbol${(product.price - product.costPrice).toStringAsFixed(2)}', isDarkMode),
-            _buildDetailRow('Stock', product.stock.toString(), isDarkMode),
-            _buildDetailRow('Minimum Stock', product.minStock.toString(), isDarkMode),
-            _buildDetailRow('Barcode', product.barcode.isNotEmpty ? product.barcode : 'N/A', isDarkMode),
-            _buildDetailRow('QR Code', product.qrCode.isNotEmpty ? product.qrCode : 'N/A', isDarkMode),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _showEditProductScreen(product);
-                    },
-                    icon: const Icon(Icons.edit),
-                    label: const Text('Edit'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
-                      foregroundColor: Colors.white,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _deleteProduct(product);
-                    },
-                    icon: const Icon(Icons.delete),
-                    label: const Text('Delete'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: isDarkMode ? Colors.red.shade400 : Colors.red.shade700,
-                      foregroundColor: Colors.white,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDetailRow(String label, String value, bool isDarkMode) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-              fontSize: 14,
-            ),
-          ),
-          Text(
-            value,
-            style: TextStyle(
-              fontWeight: FontWeight.w500,
-              fontSize: 14,
-              color: isDarkMode ? Colors.white : Colors.black,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ==================== DELETE PRODUCT ====================
-  Future<void> _deleteProduct(Product product) async {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    
-    bool confirm = await showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(
-          'Delete Product',
-          style: TextStyle(
-            color: isDarkMode ? Colors.white : Colors.black,
-          ),
-        ),
-        backgroundColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
-        content: Text(
-          'Are you sure you want to delete "${product.name}"?\n\n'
-          'This action cannot be undone.',
-          style: TextStyle(
-            color: isDarkMode ? Colors.white : Colors.black,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(
-              'Cancel',
-              style: TextStyle(
-                color: isDarkMode ? Colors.white : Colors.black,
-              ),
-            ),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: isDarkMode ? Colors.red.shade400 : Colors.red.shade700,
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    ) ?? false;
-
-    if (confirm) {
-      try {
-        await _firebaseService.deleteProduct(product.id);
-        if (mounted) {
-          _showSnackBar('✅ Product deleted successfully!');
-          setState(() {});
-        }
-      } catch (e) {
-        if (mounted) {
-          _showSnackBar('❌ Error deleting product: $e', isError: true);
-        }
-      }
-    }
-  }
-
-  // ==================== FILTER PRODUCTS ====================
-  List<Product> _filterProducts(List<Product> products) {
-    if (_searchQuery.isEmpty) return products;
-    
-    return products.where((product) {
-      return product.name.toLowerCase().contains(_searchQuery) ||
-          product.barcode.toLowerCase().contains(_searchQuery) ||
-          product.qrCode.toLowerCase().contains(_searchQuery) ||
-          product.category.toLowerCase().contains(_searchQuery) ||
-          product.price.toString().contains(_searchQuery);
-    }).toList();
-  }
-
-  // ==================== SNACKBAR ====================
-  void _showSnackBar(String message, {bool isError = false}) {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          message,
-          style: TextStyle(
-            color: isDarkMode ? Colors.white : Colors.black,
-          ),
-        ),
-        backgroundColor: isError
-            ? (isDarkMode ? Colors.red.shade400 : Colors.red.shade700)
-            : (isDarkMode ? Colors.green.shade400 : Colors.green.shade700),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
-        duration: const Duration(seconds: 3),
-      ),
+        );
+      },
     );
   }
 }

@@ -256,8 +256,6 @@ class InfoIconWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-
     return GestureDetector(
       onTap: () => _showInfoDialog(context),
       child: Container(
@@ -265,7 +263,7 @@ class InfoIconWidget extends StatelessWidget {
         padding: const EdgeInsets.all(2),
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: Colors.blue.withOpacity(0.1),
+          color: Colors.blue.withValues(alpha: 0.1),
         ),
         child: Icon(Icons.info_outline, size: 18, color: Colors.blue.shade600),
       ),

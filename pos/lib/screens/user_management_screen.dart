@@ -4,7 +4,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:pos/providers/auth_provider.dart';
 import 'package:intl/intl.dart';
-import 'package:pos/providers/settings_provider.dart';
 import 'package:pos/services/auth_service.dart';
 import 'package:pos/widgets/role_guard.dart';
 import 'package:pos/models/user.dart';
@@ -23,7 +22,7 @@ class UserManagementScreen extends StatelessWidget {
 }
 
 class _UserManagementContent extends StatefulWidget {
-  const _UserManagementContent({super.key});
+  const _UserManagementContent();
 
   @override
   State<_UserManagementContent> createState() => _UserManagementContentState();
@@ -145,7 +144,6 @@ class _UserManagementContentState extends State<_UserManagementContent> {
 
   @override
   Widget build(BuildContext context) {
-    final settingsProvider = Provider.of<SettingsProvider>(context);
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
@@ -428,7 +426,7 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: _getRoleColor(user.role, isDarkMode).withOpacity(0.2),
+                          color: _getRoleColor(user.role, isDarkMode).withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
@@ -448,8 +446,8 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                           ),
                           decoration: BoxDecoration(
                             color: isDarkMode
-                                ? Colors.red.shade900.withOpacity(0.5)
-                                : Colors.red.withOpacity(0.2),
+                                ? Colors.red.shade900.withValues(alpha: 0.5)
+                                : Colors.red.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
@@ -469,8 +467,8 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                           ),
                           decoration: BoxDecoration(
                             color: isDarkMode
-                                ? Colors.blue.shade900.withOpacity(0.5)
-                                : Colors.blue.withOpacity(0.2),
+                                ? Colors.blue.shade900.withValues(alpha: 0.5)
+                                : Colors.blue.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
@@ -768,15 +766,15 @@ class _UserManagementContentState extends State<_UserManagementContent> {
   // ========== ADD USER DIALOG ==========
   void _showAddUserDialog(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final _formKey = GlobalKey<FormState>();
-    final _nameController = TextEditingController();
-    final _emailController = TextEditingController();
-    final _passwordController = TextEditingController();
-    final _phoneController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    final nameController = TextEditingController();
+    final emailController = TextEditingController();
+    final passwordController = TextEditingController();
+    final phoneController = TextEditingController();
     
     // ✅ Set available roles based on current user's role
     final List<String> availableRoles = _isOwner ? ['worker', 'manager'] : ['worker'];
-    String _selectedRole = availableRoles.first;
+    String selectedRole = availableRoles.first;
 
     showDialog(
       context: context,
@@ -789,12 +787,12 @@ class _UserManagementContentState extends State<_UserManagementContent> {
         backgroundColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
         content: SingleChildScrollView(
           child: Form(
-            key: _formKey,
+            key: formKey,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 TextFormField(
-                  controller: _nameController,
+                  controller: nameController,
                   style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
                   decoration: InputDecoration(
                     labelText: 'Full Name *',
@@ -807,7 +805,7 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
-                  controller: _emailController,
+                  controller: emailController,
                   style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
                   decoration: InputDecoration(
                     labelText: 'Email *',
@@ -825,7 +823,7 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
-                  controller: _passwordController,
+                  controller: passwordController,
                   style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
                   decoration: InputDecoration(
                     labelText: 'Temporary Password *',
@@ -843,7 +841,7 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
-                  controller: _phoneController,
+                  controller: phoneController,
                   style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
                   decoration: InputDecoration(
                     labelText: 'Phone Number',
@@ -856,7 +854,7 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  value: _selectedRole,
+                  initialValue: selectedRole,
                   decoration: const InputDecoration(
                     labelText: 'Role *',
                     border: OutlineInputBorder(),
@@ -869,7 +867,7 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                       child: Text(role[0].toUpperCase() + role.substring(1)), // Capitalize
                     );
                   }).toList(),
-                  onChanged: (value) => _selectedRole = value!,
+                  onChanged: (value) => selectedRole = value!,
                 ),
               ],
             ),
@@ -885,23 +883,25 @@ class _UserManagementContentState extends State<_UserManagementContent> {
           ),
           ElevatedButton(
             onPressed: () async {
-              if (_formKey.currentState?.validate() ?? false) {
+              if (formKey.currentState?.validate() ?? false) {
                 try {
                   // ✅ Generate a valid ID so Firestore doesn't crash on document('')
                   final newUserId = FirebaseFirestore.instance.collection('users').doc().id;
-                  
+                  final nav = Navigator.of(context);
                   await _firebaseService.addUserToBusiness(
                     userId: newUserId,
-                    email: _emailController.text.trim(),
-                    name: _nameController.text.trim(),
-                    role: _selectedRole,
-                    phone: _phoneController.text.trim(),
+                    email: emailController.text.trim(),
+                    name: nameController.text.trim(),
+                    role: selectedRole,
+                    phone: phoneController.text.trim(),
                     businessId: _businessId!,
                   );
                   
-                  Navigator.pop(context);
-                  _showSnackBar('✅ User added successfully! They must use the temporary password to log in.', isError: false);
-                  _loadBusinessUsers();
+                  if (mounted) {
+                    nav.pop();
+                    _showSnackBar('✅ User added successfully! They must use the temporary password to log in.', isError: false);
+                    _loadBusinessUsers();
+                  }
                 } catch (e) {
                   _showSnackBar('Error: ${e.toString().replaceFirst('Exception: ', '')}', isError: true);
                 }
@@ -955,7 +955,7 @@ class _UserManagementContentState extends State<_UserManagementContent> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
-              value: selectedRole,
+              initialValue: selectedRole,
               decoration: const InputDecoration(
                 labelText: 'Role',
                 border: OutlineInputBorder(),
@@ -986,15 +986,18 @@ class _UserManagementContentState extends State<_UserManagementContent> {
           ElevatedButton(
             onPressed: () async {
               try {
+                final nav = Navigator.of(context);
                 await _firebaseService.updateUserRoleInBusiness(
                   businessId: _businessId!,
                   userId: user.id,
                   newRole: selectedRole,
                 );
                 
-                Navigator.pop(context);
-                _showSnackBar('✅ User role updated successfully!', isError: false);
-                _loadBusinessUsers();
+                if (mounted) {
+                  nav.pop();
+                  _showSnackBar('✅ User role updated successfully!', isError: false);
+                  _loadBusinessUsers();
+                }
               } catch (e) {
                 _showSnackBar('Error: ${e.toString().replaceFirst('Exception: ', '')}', isError: true);
               }
@@ -1039,20 +1042,23 @@ class _UserManagementContentState extends State<_UserManagementContent> {
           ElevatedButton(
             onPressed: () async {
               try {
+                final nav = Navigator.of(context);
                 await _firebaseService.toggleUserActiveInBusiness(
                   businessId: _businessId!,
                   userId: user.id,
                   isActive: !user.isActive,
                 );
                 
-                Navigator.pop(context);
-                _showSnackBar(
-                  user.isActive 
-                      ? '✅ User deactivated successfully!' 
-                      : '✅ User activated successfully!',
-                  isError: false,
-                );
-                _loadBusinessUsers();
+                if (mounted) {
+                  nav.pop();
+                  _showSnackBar(
+                    user.isActive 
+                        ? '✅ User deactivated successfully!' 
+                        : '✅ User activated successfully!',
+                    isError: false,
+                  );
+                  _loadBusinessUsers();
+                }
               } catch (e) {
                 _showSnackBar('Error: ${e.toString().replaceFirst('Exception: ', '')}', isError: true);
               }
@@ -1097,14 +1103,17 @@ class _UserManagementContentState extends State<_UserManagementContent> {
           ElevatedButton(
             onPressed: () async {
               try {
+                final nav = Navigator.of(context);
                 await _firebaseService.removeUserFromBusiness(
                   businessId: _businessId!,
                   userId: user.id,
                 );
                 
-                Navigator.pop(context);
-                _showSnackBar('✅ User deleted successfully!', isError: false);
-                _loadBusinessUsers();
+                if (mounted) {
+                  nav.pop();
+                  _showSnackBar('✅ User deleted successfully!', isError: false);
+                  _loadBusinessUsers();
+                }
               } catch (e) {
                 _showSnackBar('Error: ${e.toString().replaceFirst('Exception: ', '')}', isError: true);
               }

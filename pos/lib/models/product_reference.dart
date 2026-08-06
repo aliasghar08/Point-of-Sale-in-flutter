@@ -785,9 +785,9 @@ class ProductReference {
   /// Get all products across all categories
   static List<String> getAllProducts() {
     final List<String> allProducts = [];
-    productNamesByCategory.values.forEach((products) {
+    for (var products in productNamesByCategory.values) {
       allProducts.addAll(products);
-    });
+    }
     return allProducts;
   }
 

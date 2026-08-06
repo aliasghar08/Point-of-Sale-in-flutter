@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:pos/utils/dashboard_screen.dart';
-import 'package:pos/screens/signup_screen.dart';
 import 'package:provider/provider.dart';
-import 'package:email_validator/email_validator.dart';
 import 'package:pos/providers/auth_provider.dart';
-import 'package:pos/providers/settings_provider.dart';
+import 'package:pos/services/validation_service.dart';
+import 'package:pos/services/feedback_service.dart';
+import 'package:pos/theme/app_colors.dart';
+import 'package:pos/widgets/pos_card.dart';
+import 'package:pos/screens/dashboard_screen.dart';
+import 'package:pos/screens/signup_screen.dart';
 
-
+/// Modern authentication login screen.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -19,7 +21,6 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
-  bool _rememberMe = false;
 
   @override
   void dispose() {
@@ -28,409 +29,160 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  Future<void> _handleLogin() async {
+    if (!_formKey.currentState!.validate()) {
+      FeedbackService.error();
+      return;
+    }
+
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final success = await authProvider.signIn(
+      email: _emailController.text.trim(),
+      password: _passwordController.text,
+    );
+
+    if (success && mounted) {
+      FeedbackService.success();
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const DashboardScreen()),
+      );
+    } else if (mounted) {
+      FeedbackService.error();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(authProvider.error ?? 'Authentication failed'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
-    final settingsProvider = Provider.of<SettingsProvider>(context);
-    final currencySymbol = settingsProvider.currencySymbol;
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDarkMode ? Colors.grey.shade900 : Colors.white,
-      body: SafeArea(
+      body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const SizedBox(height: 40),
-              // App Logo
-              Container(
-                width: 100,
-                height: 100,
-                decoration: BoxDecoration(
-                  color: isDarkMode ? Colors.blue.shade800 : Colors.blue.shade700,
-                  borderRadius: BorderRadius.circular(25),
-                  boxShadow: [
-                    BoxShadow(
-                      color: isDarkMode
-                          ? Colors.blue.shade900.withOpacity(0.5)
-                          : Colors.blue.shade200,
-                      blurRadius: 20,
-                      spreadRadius: 5,
-                    ),
-                  ],
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 440),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Brand Icon
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    gradient: AppColors.primaryGradient,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primary.withValues(alpha: 0.35),
+                        blurRadius: 16,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(Icons.point_of_sale, size: 44, color: Colors.white),
                 ),
-                child: const Icon(
-                  Icons.storefront,
-                  size: 60,
-                  color: Colors.white,
+                const SizedBox(height: 20),
+                const Text(
+                  'Enterprise POS',
+                  style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
                 ),
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'POS System',
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                  color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Sign in to continue',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                ),
-              ),
-              const SizedBox(height: 8),
-              // Show current currency
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: isDarkMode
-                      ? Colors.blue.shade900.withOpacity(0.5)
-                      : Colors.blue.shade50,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: isDarkMode
-                        ? Colors.blue.shade700
-                        : Colors.blue.shade200,
+                const SizedBox(height: 6),
+                Text(
+                  'Sign in to access your register and inventory',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
                   ),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.currency_exchange,
-                      size: 16,
-                      color: isDarkMode ? Colors.blue.shade400 : Colors.blue,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Currency: $currencySymbol',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 32),
-              // Login Form
-              Form(
-                key: _formKey,
-                child: Column(
-                  children: [
-                    TextFormField(
-                      controller: _emailController,
-                      style: TextStyle(
-                        color: isDarkMode ? Colors.white : Colors.black,
-                      ),
-                      decoration: InputDecoration(
-                        labelText: 'Email',
-                        labelStyle: TextStyle(
-                          color: isDarkMode ? Colors.white : Colors.black,
-                        ),
-                        hintText: 'Enter your email',
-                        hintStyle: TextStyle(
-                          color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                        ),
-                        prefixIcon: Icon(
-                          Icons.email,
-                          color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
-                        ),
-                        filled: true,
-                        fillColor: isDarkMode
-                            ? Colors.grey.shade800
-                            : Colors.grey.shade50,
-                      ),
-                      keyboardType: TextInputType.emailAddress,
-                      autovalidateMode: AutovalidateMode.onUserInteraction,
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Please enter your email address';
-                        }
-                        final trimmed = value.trim();
-                        final emailRegex = RegExp(
-                          r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
-                        );
-                        if (!EmailValidator.validate(trimmed) || !emailRegex.hasMatch(trimmed)) {
-                          return 'Please enter a valid email address (e.g. name@example.com)';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _passwordController,
-                      obscureText: _obscurePassword,
-                      style: TextStyle(
-                        color: isDarkMode ? Colors.white : Colors.black,
-                      ),
-                      decoration: InputDecoration(
-                        labelText: 'Password',
-                        labelStyle: TextStyle(
-                          color: isDarkMode ? Colors.white : Colors.black,
-                        ),
-                        hintText: 'Enter your password',
-                        hintStyle: TextStyle(
-                          color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                        ),
-                        prefixIcon: Icon(
-                          Icons.lock,
-                          color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                        ),
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _obscurePassword
-                                ? Icons.visibility_off
-                                : Icons.visibility,
-                            color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              _obscurePassword = !_obscurePassword;
-                            });
-                          },
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
-                        ),
-                        filled: true,
-                        fillColor: isDarkMode
-                            ? Colors.grey.shade800
-                            : Colors.grey.shade50,
-                      ),
-                      autovalidateMode: AutovalidateMode.onUserInteraction,
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter your password';
-                        }
-                        if (value.length < 6) {
-                          return 'Password must be at least 6 characters';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                const SizedBox(height: 28),
+
+                // Login Form Card
+                PosCard(
+                  padding: const EdgeInsets.all(24),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Row(
-                          children: [
-                            Checkbox(
-                              value: _rememberMe,
-                              onChanged: (value) {
-                                setState(() {
-                                  _rememberMe = value!;
-                                });
-                              },
-                              activeColor: isDarkMode
-                                  ? Colors.blue.shade400
-                                  : Colors.blue.shade700,
-                              checkColor: Colors.white,
-                              side: BorderSide(
-                                color: isDarkMode
-                                    ? Colors.grey.shade400
-                                    : Colors.grey.shade600,
-                              ),
-                            ),
-                            Text(
-                              'Remember me',
-                              style: TextStyle(
-                                color: isDarkMode ? Colors.white : Colors.black,
-                              ),
-                            ),
-                          ],
+                        TextFormField(
+                          controller: _emailController,
+                          keyboardType: TextInputType.emailAddress,
+                          decoration: const InputDecoration(
+                            labelText: 'Email Address',
+                            prefixIcon: Icon(Icons.email_outlined),
+                          ),
+                          validator: (v) => ValidationService.isValidEmail(v)
+                              ? null
+                              : 'Please enter a valid email address',
                         ),
-                        TextButton(
-                          onPressed: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  'Forgot password feature coming soon!',
-                                  style: TextStyle(
-                                    color: isDarkMode ? Colors.white : Colors.black,
-                                  ),
-                                ),
-                                behavior: SnackBarBehavior.floating,
-                                backgroundColor: isDarkMode
-                                    ? Colors.grey.shade800
-                                    : Colors.white,
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _passwordController,
+                          obscureText: _obscurePassword,
+                          decoration: InputDecoration(
+                            labelText: 'Password',
+                            prefixIcon: const Icon(Icons.lock_outline),
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                                size: 20,
                               ),
-                            );
-                          },
-                          child: Text(
-                            'Forgot Password?',
-                            style: TextStyle(
-                              color: isDarkMode
-                                  ? Colors.blue.shade400
-                                  : Colors.blue.shade700,
+                              onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                             ),
                           ),
+                          validator: (v) => ValidationService.validateRequired(v, fieldName: 'Password'),
+                        ),
+                        const SizedBox(height: 24),
+                        ElevatedButton(
+                          onPressed: authProvider.isLoading ? null : _handleLogin,
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                          child: authProvider.isLoading
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                )
+                              : const Text('Sign In Terminal', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 24),
-                    if (authProvider.error != null)
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: isDarkMode
-                              ? Colors.red.shade900.withOpacity(0.5)
-                              : Colors.red.shade50,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: isDarkMode
-                                ? Colors.red.shade700
-                                : Colors.red.shade200,
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.error_outline,
-                              color: isDarkMode
-                                  ? Colors.red.shade400
-                                  : Colors.red.shade700,
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                authProvider.error!,
-                                style: TextStyle(
-                                  color: isDarkMode
-                                      ? Colors.red.shade400
-                                      : Colors.red.shade700,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ),
-                            IconButton(
-                              icon: Icon(
-                                Icons.close,
-                                size: 20,
-                                color: isDarkMode
-                                    ? Colors.red.shade400
-                                    : Colors.red.shade700,
-                              ),
-                              onPressed: () {
-                                authProvider.clearError();
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton(
-                        onPressed: authProvider.isLoading
-                            ? null
-                            : () async {
-                                if (_formKey.currentState?.validate() ?? false) {
-                                  bool success = await authProvider.signIn(
-                                    email: _emailController.text.trim(),
-                                    password: _passwordController.text.trim(),
-                                  );
+                  ),
+                ),
+                const SizedBox(height: 16),
 
-                                  if (success && context.mounted) {
-                                    Navigator.pushReplacement(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => const DashboardScreen(),
-                                      ),
-                                    );
-                                  }
-                                }
-                              },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: isDarkMode
-                              ? Colors.blue.shade400
-                              : Colors.blue.shade700,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          disabledBackgroundColor: isDarkMode
-                              ? Colors.grey.shade700
-                              : Colors.grey.shade300,
-                        ),
-                        child: authProvider.isLoading
-                            ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    Colors.white,
-                                  ),
-                                ),
-                              )
-                            : const Text(
-                                'Sign In',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
+                // Register Link
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      "Don't have an account? ",
+                      style: TextStyle(
+                        color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
                       ),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const SignupScreen()),
+                        );
+                      },
+                      child: const Text('Create Account'),
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 24),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    "Don't have an account?",
-                    style: TextStyle(
-                      color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const SignupScreen(),
-                        ),
-                      );
-                    },
-                    child: Text(
-                      'Sign Up',
-                      style: TextStyle(
-                        color: isDarkMode
-                            ? Colors.blue.shade400
-                            : Colors.blue.shade700,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              // Version info
-              Text(
-                'Version 1.0.0',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: isDarkMode ? Colors.grey.shade500 : Colors.grey.shade400,
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

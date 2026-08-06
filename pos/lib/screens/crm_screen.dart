@@ -1,11 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:pos/screens/customer_detail_screen.dart';
 import 'package:provider/provider.dart';
-import 'package:intl/intl.dart';
-import 'package:pos/services/firebase_service.dart';
+import 'package:pos/models/customer.dart';
+import 'package:pos/services/customer_service.dart';
+import 'package:pos/services/format_service.dart';
+import 'package:pos/services/export_service.dart';
+import 'package:pos/services/feedback_service.dart';
+import 'package:pos/services/validation_service.dart';
 import 'package:pos/providers/settings_provider.dart';
+import 'package:pos/theme/app_colors.dart';
+import 'package:pos/widgets/pos_card.dart';
+import 'package:pos/widgets/stat_badge.dart';
+import 'package:pos/widgets/empty_state_view.dart';
+import 'package:pos/screens/customer_detail_screen.dart';
 
+/// Modern Customer Relationship Management (CRM) & Loyalty Directory.
 class CrmScreen extends StatefulWidget {
   const CrmScreen({super.key});
 
@@ -14,23 +22,14 @@ class CrmScreen extends StatefulWidget {
 }
 
 class _CrmScreenState extends State<CrmScreen> {
-  final FirebaseService _firebaseService = FirebaseService();
+  final CustomerService _customerService = CustomerService();
   final TextEditingController _searchController = TextEditingController();
 
   bool _isLoading = true;
-  List<Map<String, dynamic>> _customers = [];
-  List<Map<String, dynamic>> _filteredCustomers = [];
+  List<Customer> _customers = [];
+  List<Customer> _filteredCustomers = [];
   String _searchQuery = '';
-  String _selectedFilter =
-      'All'; // All, High Value, Medium Value, Low Value, New
-
-  final List<String> _filterOptions = [
-    'All',
-    'High Value',
-    'Medium Value',
-    'Low Value',
-    'New Customers',
-  ];
+  String _selectedTier = 'All';
 
   @override
   void initState() {
@@ -44,86 +43,144 @@ class _CrmScreenState extends State<CrmScreen> {
     super.dispose();
   }
 
-  Future<void> _loadCustomers() async {
+  Future<void> _loadCustomers({bool force = false}) async {
     setState(() => _isLoading = true);
     try {
-      final customers = await _firebaseService.getCustomers();
+      final list = await _customerService.getAllCustomers(forceRefresh: force);
       setState(() {
-        _customers = customers
-          ..sort((a, b) {
-            final spentA = ((a['totalSpent'] ?? 0) as num).toDouble();
-            final spentB = ((b['totalSpent'] ?? 0) as num).toDouble();
-            return spentB.compareTo(spentA);
-          });
+        _customers = list;
         _applyFilters();
         _isLoading = false;
       });
     } catch (e) {
       setState(() => _isLoading = false);
-      _showSnackBar('Error loading customers: $e', isError: true);
+      FeedbackService.error();
     }
   }
 
   void _applyFilters() {
-    List<Map<String, dynamic>> filtered = List.from(_customers);
+    List<Customer> list = List.from(_customers);
 
-    // Apply search filter
-    if (_searchQuery.isNotEmpty) {
-      final query = _searchQuery.toLowerCase().trim();
-      filtered = filtered.where((customer) {
-        final cName = (customer['name'] ?? customer['customerName'] ?? '')
-            .toString()
-            .toLowerCase();
-        final cPhone = (customer['phone'] ?? customer['customerPhone'] ?? '')
-            .toString();
-        final cEmail = (customer['email'] ?? customer['customerEmail'] ?? '')
-            .toString()
-            .toLowerCase();
+    if (_selectedTier != 'All') {
+      list = list.where((c) => c.customerValueCategory.contains(_selectedTier)).toList();
+    }
 
-        return cName.contains(query) ||
-            cPhone.contains(query) ||
-            cEmail.contains(query);
+    if (_searchQuery.trim().isNotEmpty) {
+      final q = _searchQuery.trim().toLowerCase();
+      list = list.where((c) {
+        return c.name.toLowerCase().contains(q) ||
+            c.phone.toLowerCase().contains(q) ||
+            c.email.toLowerCase().contains(q);
       }).toList();
     }
 
-    // Apply value filter
-    if (_selectedFilter != 'All') {
-      filtered = filtered.where((customer) {
-        final spent = ((customer['totalSpent'] ?? 0) as num).toDouble();
-
-        switch (_selectedFilter) {
-          case 'High Value':
-            return spent >= 10000;
-          case 'Medium Value':
-            return spent >= 5000 && spent < 10000;
-          case 'Low Value':
-            return spent >= 1000 && spent < 5000;
-          case 'New Customers':
-            return spent < 1000;
-          default:
-            return true;
-        }
-      }).toList();
-    }
-
-    setState(() {
-      _filteredCustomers = filtered;
-    });
+    setState(() => _filteredCustomers = list);
   }
 
-  void _showSnackBar(String message, {bool isError = false}) {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          message,
-          style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+  void _exportCustomers() {
+    final csv = ExportService.exportCustomersToCsv(_filteredCustomers);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Exported Customers CRM (CSV)'),
+        content: SizedBox(
+          width: double.maxFinite,
+          height: 320,
+          child: SingleChildScrollView(
+            child: SelectableText(
+              csv,
+              style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+            ),
+          ),
         ),
-        backgroundColor: isError
-            ? (isDarkMode ? Colors.red.shade400 : Colors.red.shade700)
-            : (isDarkMode ? Colors.green.shade400 : Colors.green.shade700),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Customer directory ready!'), behavior: SnackBarBehavior.floating),
+              );
+            },
+            icon: const Icon(Icons.check),
+            label: const Text('Done'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAddCustomerModal() {
+    final nameCtrl = TextEditingController();
+    final phoneCtrl = TextEditingController();
+    final emailCtrl = TextEditingController();
+    final addrCtrl = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Register New Customer'),
+        content: Form(
+          key: formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: nameCtrl,
+                  decoration: const InputDecoration(labelText: 'Customer Full Name *', prefixIcon: Icon(Icons.person)),
+                  validator: (v) => ValidationService.validateRequired(v, fieldName: 'Full Name'),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: phoneCtrl,
+                  keyboardType: TextInputType.phone,
+                  decoration: const InputDecoration(labelText: 'Phone Number *', prefixIcon: Icon(Icons.phone)),
+                  validator: (v) => ValidationService.isValidPhone(v) ? null : 'Enter valid phone number',
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: emailCtrl,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: const InputDecoration(labelText: 'Email Address (Optional)', prefixIcon: Icon(Icons.email)),
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) return null;
+                    return ValidationService.isValidEmail(v) ? null : 'Enter valid email';
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: addrCtrl,
+                  decoration: const InputDecoration(labelText: 'Address (Optional)', prefixIcon: Icon(Icons.home)),
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              if (formKey.currentState!.validate()) {
+                Navigator.pop(ctx);
+                try {
+                  await _customerService.addCustomer(
+                    name: nameCtrl.text.trim(),
+                    phone: phoneCtrl.text.trim(),
+                    email: emailCtrl.text.trim(),
+                    address: addrCtrl.text.trim(),
+                  );
+                  FeedbackService.success();
+                  _loadCustomers(force: true);
+                } catch (e) {
+                  FeedbackService.error();
+                }
+              }
+            },
+            child: const Text('Register'),
+          ),
+        ],
       ),
     );
   }
@@ -132,726 +189,279 @@ class _CrmScreenState extends State<CrmScreen> {
   Widget build(BuildContext context) {
     final settingsProvider = Provider.of<SettingsProvider>(context);
     final currencySymbol = settingsProvider.currencySymbol;
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final totalSpent = _customers.fold(0.0, (sum, c) => sum + c.totalSpent);
+    final avgSpend = _customers.isEmpty ? 0.0 : totalSpent / _customers.length;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Customer Relationship Management',
-          style: TextStyle(color: Colors.white),
-        ),
-        backgroundColor: isDarkMode
-            ? Colors.blue.shade800
-            : Colors.blue.shade700,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.white),
-            onPressed: _loadCustomers,
-            tooltip: 'Refresh',
-          ),
-          IconButton(
-            icon: const Icon(Icons.download, color: Colors.white),
-            onPressed: () {
-              _showSnackBar('Export feature coming soon!');
-            },
-            tooltip: 'Export',
-          ),
-        ],
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _showAddCustomerModal,
+        icon: const Icon(Icons.person_add, color: Colors.white),
+        label: const Text('Add Customer', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        backgroundColor: isDark ? AppColors.primaryLight : AppColors.primary,
       ),
       body: Column(
         children: [
-          _buildSearchAndFilter(isDarkMode),
-          _buildSummaryStats(currencySymbol, isDarkMode),
+          // Top Search & Actions
+          _buildTopBar(isDark),
+
+          // Overview Metrics Bar
+          _buildMetricsBar(
+            totalCustomers: _customers.length,
+            totalSpent: totalSpent,
+            avgSpend: avgSpend,
+            currencySymbol: currencySymbol,
+            isDark: isDark,
+          ),
+
+          // Tier Filter Chips
+          _buildTierFilter(isDark),
+
+          // Customers List
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : _filteredCustomers.isEmpty
-                ? _buildEmptyState(isDarkMode)
-                : _buildCustomerList(currencySymbol, isDarkMode),
+                    ? EmptyStateView(
+                        icon: Icons.people_outline,
+                        title: 'No customers found',
+                        description: _customers.isEmpty
+                            ? 'Your customer directory is empty. Register your first customer!'
+                            : 'No customer matches your search criteria.',
+                        actionLabel: 'Add New Customer',
+                        onAction: _showAddCustomerModal,
+                      )
+                    : ListView.separated(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: _filteredCustomers.length,
+                        separatorBuilder: (_, _) => const SizedBox(height: 10),
+                        itemBuilder: (ctx, i) => _buildCustomerCard(_filteredCustomers[i], currencySymbol, isDark),
+                      ),
           ),
         ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          _showAddCustomerDialog(context);
-        },
-        backgroundColor: isDarkMode
-            ? Colors.blue.shade400
-            : Colors.blue.shade700,
-        child: const Icon(Icons.add, color: Colors.white),
-        tooltip: 'Add Customer',
       ),
     );
   }
 
-  Widget _buildSearchAndFilter(bool isDarkMode) {
+  Widget _buildTopBar(bool isDark) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        boxShadow: [
-          BoxShadow(
-            color: isDarkMode
-                ? Colors.black.withOpacity(0.3)
-                : Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 5,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
+        border: Border(bottom: BorderSide(color: isDark ? AppColors.darkBorder : AppColors.lightBorder)),
       ),
-      child: Column(
-        children: [
-          // Search Bar
-          TextField(
-            controller: _searchController,
-            style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
-            decoration: InputDecoration(
-              hintText: 'Search customers by name, phone, or email...',
-              hintStyle: TextStyle(
-                color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-              ),
-              prefixIcon: Icon(
-                Icons.search,
-                color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-              ),
-              suffixIcon: _searchQuery.isNotEmpty
-                  ? IconButton(
-                      icon: Icon(
-                        Icons.clear,
-                        color: isDarkMode
-                            ? Colors.grey.shade400
-                            : Colors.grey.shade600,
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          _searchQuery = '';
-                          _searchController.clear();
-                          _applyFilters();
-                        });
-                      },
-                    )
-                  : null,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
-              ),
-              filled: true,
-              fillColor: isDarkMode
-                  ? Colors.grey.shade800
-                  : Colors.grey.shade50,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-            ),
-            onChanged: (value) {
-              setState(() {
-                _searchQuery = value;
-                _applyFilters();
-              });
-            },
-          ),
-          const SizedBox(height: 12),
-          // Filter Chips
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: _filterOptions.map((filter) {
-                bool isSelected = _selectedFilter == filter;
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: FilterChip(
-                    label: Text(
-                      filter,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: isSelected
-                            ? (isDarkMode
-                                  ? Colors.blue.shade400
-                                  : Colors.blue.shade700)
-                            : (isDarkMode ? Colors.white : Colors.black),
-                      ),
-                    ),
-                    selected: isSelected,
-                    onSelected: (_) {
-                      setState(() {
-                        _selectedFilter = filter;
-                        _applyFilters();
-                      });
-                    },
-                    backgroundColor: isDarkMode
-                        ? Colors.grey.shade800
-                        : Colors.white,
-                    selectedColor: isDarkMode
-                        ? Colors.blue.shade800
-                        : Colors.blue.shade100,
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSummaryStats(String currencySymbol, bool isDarkMode) {
-    if (_filteredCustomers.isEmpty) return const SizedBox.shrink();
-
-    int totalCustomers = _filteredCustomers.length;
-    double totalRevenue = 0;
-    int totalOrders = 0;
-
-    for (var customer in _filteredCustomers) {
-      totalRevenue += ((customer['totalSpent'] ?? 0) as num).toDouble();
-      totalOrders += ((customer['totalOrders'] ?? 0) as num).toInt();
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      color: isDarkMode ? Colors.grey.shade900 : Colors.grey.shade50,
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _buildStatItem(
-            label: 'Customers',
-            value: totalCustomers.toString(),
-            icon: Icons.people,
-            color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
-            isDarkMode: isDarkMode,
+          Expanded(
+            child: TextField(
+              controller: _searchController,
+              onChanged: (val) {
+                _searchQuery = val;
+                _applyFilters();
+              },
+              decoration: const InputDecoration(
+                hintText: 'Search customers by name, phone, or email...',
+                prefixIcon: Icon(Icons.search),
+                contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              ),
+            ),
           ),
-          _buildStatItem(
-            label: 'Revenue',
-            value: '$currencySymbol${totalRevenue.toStringAsFixed(0)}',
-            icon: Icons.attach_money,
-            color: isDarkMode ? Colors.green.shade400 : Colors.green.shade700,
-            isDarkMode: isDarkMode,
+          const SizedBox(width: 8),
+          IconButton.filledTonal(
+            icon: const Icon(Icons.file_download_outlined),
+            tooltip: 'Export CSV',
+            onPressed: _exportCustomers,
           ),
-          _buildStatItem(
-            label: 'Avg per Customer',
-            value: totalCustomers > 0
-                ? '$currencySymbol${(totalRevenue / totalCustomers).toStringAsFixed(0)}'
-                : '0',
-            icon: Icons.trending_up,
-            color: isDarkMode ? Colors.orange.shade400 : Colors.orange.shade700,
-            isDarkMode: isDarkMode,
-          ),
-          _buildStatItem(
-            label: 'Total Orders',
-            value: totalOrders.toString(),
-            icon: Icons.shopping_cart,
-            color: isDarkMode ? Colors.purple.shade400 : Colors.purple.shade700,
-            isDarkMode: isDarkMode,
+          const SizedBox(width: 4),
+          IconButton.filledTonal(
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Refresh',
+            onPressed: () => _loadCustomers(force: true),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildStatItem({
-    required String label,
-    required String value,
-    required IconData icon,
-    required Color color,
-    required bool isDarkMode,
+  Widget _buildMetricsBar({
+    required int totalCustomers,
+    required double totalSpent,
+    required double avgSpend,
+    required String currencySymbol,
+    required bool isDark,
   }) {
-    return Column(
-      children: [
-        Row(
-          children: [
-            Icon(icon, size: 16, color: color),
-            const SizedBox(width: 4),
-            Text(
-              value,
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-                color: isDarkMode ? Colors.white : Colors.black,
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Row(
+        children: [
+          Expanded(
+            child: PosCard(
+              padding: const EdgeInsets.all(10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Directory', style: TextStyle(fontSize: 11, color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary)),
+                  const SizedBox(height: 2),
+                  Text('$totalCustomers Clients', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                ],
               ),
             ),
-          ],
-        ),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 10,
-            color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
           ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildCustomerList(String currencySymbol, bool isDarkMode) {
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      itemCount: _filteredCustomers.length,
-      itemBuilder: (context, index) {
-        final customer = _filteredCustomers[index];
-        return _buildCustomerCard(customer, currencySymbol, isDarkMode);
-      },
-    );
-  }
-
-  Widget _buildCustomerCard(
-    Map<String, dynamic> customer,
-    String currencySymbol,
-    bool isDarkMode,
-  ) {
-    final rawName = customer['name'] ?? customer['customerName'];
-    final name = (rawName == null || rawName.toString().trim().isEmpty)
-        ? 'Unknown Customer'
-        : rawName.toString().trim();
-
-    final phone = (customer['phone'] ?? customer['customerPhone'] ?? '')
-        .toString().trim();
-    final email = (customer['email'] ?? customer['customerEmail'] ?? '')
-        .toString().trim();
-
-    final totalSpent = ((customer['totalSpent'] ?? 0) as num).toDouble();
-    final totalOrders = ((customer['totalOrders'] ?? 0) as num).toInt();
-
-    final lastPurchase = (customer['lastPurchaseDate'] as Timestamp?)?.toDate();
-
-    final initials = name.isNotEmpty
-        ? name
-              .split(' ')
-              .map((e) => e.isNotEmpty ? e[0] : '')
-              .take(2)
-              .join()
-              .toUpperCase()
-        : '?';
-
-    // Determine customer value category
-    String valueBadge;
-    Color badgeColor;
-    if (totalSpent >= 10000) {
-      valueBadge = '🏆 High Value';
-      badgeColor = isDarkMode ? Colors.green.shade400 : Colors.green.shade700;
-    } else if (totalSpent >= 5000) {
-      valueBadge = '⭐ Medium Value';
-      badgeColor = isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700;
-    } else if (totalSpent >= 1000) {
-      valueBadge = '💫 Low Value';
-      badgeColor = isDarkMode ? Colors.orange.shade400 : Colors.orange.shade700;
-    } else {
-      valueBadge = '🆕 New Customer';
-      badgeColor = isDarkMode ? Colors.purple.shade400 : Colors.purple.shade700;
-    }
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 10),
-      color: isDarkMode ? Colors.grey.shade800 : Colors.white,
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: () {
-          if (customer['id'] != null) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => CustomerDetailsScreen(
-                  customerId: customer['id'],
-                  customerName: name,
-                ),
-              ),
-            );
-          }
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              // Avatar
-              CircleAvatar(
-                radius: 26,
-                backgroundColor: isDarkMode ? Colors.blue.shade900 : Colors.blue.shade100,
-                child: Text(
-                  initials,
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-
-              // Details
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            name,
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: isDarkMode ? Colors.white : Colors.black,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: badgeColor.withOpacity(0.15),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            valueBadge,
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: badgeColor,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        if (phone.isNotEmpty) ...[
-                          Icon(
-                            Icons.phone,
-                            size: 14,
-                            color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            phone,
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: isDarkMode ? Colors.grey.shade300 : Colors.grey.shade700,
-                            ),
-                          ),
-                        ],
-                        if (phone.isNotEmpty && email.isNotEmpty) ...[
-                          Text(
-                            ' • ',
-                            style: TextStyle(
-                              color: isDarkMode ? Colors.grey.shade500 : Colors.grey.shade400,
-                            ),
-                          ),
-                        ],
-                        if (email.isNotEmpty) ...[
-                          Icon(
-                            Icons.email,
-                            size: 14,
-                            color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                          ),
-                          const SizedBox(width: 4),
-                          Flexible(
-                            child: Text(
-                              email,
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: isDarkMode ? Colors.grey.shade300 : Colors.grey.shade700,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                    if (lastPurchase != null) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        'Last Purchase: ${DateFormat('dd MMM yyyy').format(lastPurchase)}',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(width: 16),
-
-              // Total Spent & Orders
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
+          const SizedBox(width: 8),
+          Expanded(
+            child: PosCard(
+              padding: const EdgeInsets.all(10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    '$currencySymbol${totalSpent.toStringAsFixed(2)}',
-                    style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.bold,
-                      color: isDarkMode ? Colors.green.shade400 : Colors.green.shade700,
-                    ),
-                  ),
+                  Text('LTV Revenue', style: TextStyle(fontSize: 11, color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary)),
                   const SizedBox(height: 2),
                   Text(
-                    '$totalOrders ${totalOrders == 1 ? 'order' : 'orders'}',
+                    FormatService.formatCurrency(totalSpent, symbol: currencySymbol),
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.success),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: PosCard(
+              padding: const EdgeInsets.all(10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Avg Value', style: TextStyle(fontSize: 11, color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary)),
+                  const SizedBox(height: 2),
+                  Text(
+                    FormatService.formatCurrency(avgSpend, symbol: currencySymbol),
                     style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: isDark ? AppColors.primaryLight : AppColors.primary,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(width: 8),
-              Icon(
-                Icons.chevron_right,
-                color: isDarkMode ? Colors.grey.shade500 : Colors.grey.shade400,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEmptyState(bool isDarkMode) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.people_outline,
-            size: 80,
-            color: isDarkMode ? Colors.grey.shade600 : Colors.grey.shade300,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            _searchQuery.isNotEmpty || _selectedFilter != 'All'
-                ? 'No matching customers found'
-                : 'No customers yet',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: isDarkMode ? Colors.white : Colors.grey.shade700,
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            _searchQuery.isNotEmpty || _selectedFilter != 'All'
-                ? 'Try adjusting your search or filters'
-                : 'Add a customer to get started',
-            style: TextStyle(
-              fontSize: 14,
-              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade500,
-            ),
-          ),
-          if (_searchQuery.isNotEmpty || _selectedFilter != 'All') ...[
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: () {
-                setState(() {
-                  _searchQuery = '';
-                  _searchController.clear();
-                  _selectedFilter = 'All';
-                  _applyFilters();
-                });
-              },
-              icon: const Icon(Icons.clear),
-              label: const Text('Clear All Filters'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: isDarkMode
-                    ? Colors.blue.shade400
-                    : Colors.blue.shade700,
-                foregroundColor: Colors.white,
-              ),
-            ),
-          ],
         ],
       ),
     );
   }
 
-  void _showAddCustomerDialog(BuildContext context) {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final _formKey = GlobalKey<FormState>();
-    final _nameController = TextEditingController();
-    final _phoneController = TextEditingController();
-    final _emailController = TextEditingController();
-    final _addressController = TextEditingController();
+  Widget _buildTierFilter(bool isDark) {
+    final tiers = ['All', 'High Value', 'Medium Value', 'Low Value'];
 
-    bool _isSaving = false;
+    return Container(
+      height: 44,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        itemCount: tiers.length,
+        itemBuilder: (ctx, i) {
+          final t = tiers[i];
+          final isSelected = _selectedTier == t;
+          final primaryColor = isDark ? AppColors.primaryLight : AppColors.primary;
 
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          return AlertDialog(
-            title: Text(
-              'Add New Customer',
-              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: FilterChip(
+              label: Text(t),
+              selected: isSelected,
+              selectedColor: primaryColor.withValues(alpha: 0.2),
+              checkmarkColor: primaryColor,
+              labelStyle: TextStyle(
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                color: isSelected ? primaryColor : null,
+              ),
+              onSelected: (_) {
+                setState(() {
+                  _selectedTier = t;
+                  _applyFilters();
+                });
+                FeedbackService.lightTap();
+              },
             ),
-            backgroundColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
-            content: SingleChildScrollView(
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextFormField(
-                      controller: _nameController,
-                      style: TextStyle(
-                        color: isDarkMode ? Colors.white : Colors.black,
-                      ),
-                      decoration: InputDecoration(
-                        labelText: 'Full Name *',
-                        labelStyle: TextStyle(
-                          color: isDarkMode ? Colors.white : Colors.black,
-                        ),
-                        border: const OutlineInputBorder(),
-                        fillColor: isDarkMode
-                            ? Colors.grey.shade700
-                            : Colors.white,
-                        filled: true,
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter name';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _phoneController,
-                      style: TextStyle(
-                        color: isDarkMode ? Colors.white : Colors.black,
-                      ),
-                      decoration: InputDecoration(
-                        labelText: 'Phone Number *',
-                        labelStyle: TextStyle(
-                          color: isDarkMode ? Colors.white : Colors.black,
-                        ),
-                        border: const OutlineInputBorder(),
-                        fillColor: isDarkMode
-                            ? Colors.grey.shade700
-                            : Colors.white,
-                        filled: true,
-                      ),
-                      keyboardType: TextInputType.phone,
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter phone number';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _emailController,
-                      style: TextStyle(
-                        color: isDarkMode ? Colors.white : Colors.black,
-                      ),
-                      decoration: InputDecoration(
-                        labelText: 'Email',
-                        labelStyle: TextStyle(
-                          color: isDarkMode ? Colors.white : Colors.black,
-                        ),
-                        border: const OutlineInputBorder(),
-                        fillColor: isDarkMode
-                            ? Colors.grey.shade700
-                            : Colors.white,
-                        filled: true,
-                      ),
-                      keyboardType: TextInputType.emailAddress,
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _addressController,
-                      style: TextStyle(
-                        color: isDarkMode ? Colors.white : Colors.black,
-                      ),
-                      decoration: InputDecoration(
-                        labelText: 'Address',
-                        labelStyle: TextStyle(
-                          color: isDarkMode ? Colors.white : Colors.black,
-                        ),
-                        border: const OutlineInputBorder(),
-                        fillColor: isDarkMode
-                            ? Colors.grey.shade700
-                            : Colors.white,
-                        filled: true,
-                      ),
-                      maxLines: 2,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: _isSaving
-                    ? null
-                    : () {
-                        Navigator.pop(context);
-                      },
-                child: Text(
-                  'Cancel',
-                  style: TextStyle(
-                    color: _isSaving
-                        ? Colors.grey
-                        : (isDarkMode ? Colors.white : Colors.black),
-                  ),
-                ),
-              ),
-              ElevatedButton(
-                onPressed: _isSaving
-                    ? null
-                    : () async {
-                        if (_formKey.currentState?.validate() ?? false) {
-                          setDialogState(() => _isSaving = true);
-
-                          try {
-                            await _firebaseService.addCustomer({
-                              'name': _nameController.text.trim(),
-                              'phone': _phoneController.text.trim(),
-                              'email': _emailController.text.trim(),
-                              'address': _addressController.text.trim(),
-                              'isGuestCustomer': false,
-                            });
-
-                            if (context.mounted) {
-                              Navigator.pop(context);
-                              _showSnackBar('Customer added successfully!');
-                              _loadCustomers();
-                            }
-                          } catch (e) {
-                            setDialogState(() => _isSaving = false);
-                            _showSnackBar(
-                              'Failed to add customer: $e',
-                              isError: true,
-                            );
-                          }
-                        }
-                      },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: isDarkMode
-                      ? Colors.blue.shade400
-                      : Colors.blue.shade700,
-                  foregroundColor: Colors.white,
-                ),
-                child: _isSaving
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2,
-                        ),
-                      )
-                    : const Text('Add Customer'),
-              ),
-            ],
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildCustomerCard(Customer c, String currencySymbol, bool isDark) {
+    return PosCard(
+      padding: const EdgeInsets.all(14),
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => CustomerDetailScreen(
+              customer: {
+                'id': c.id,
+                'name': c.name,
+                'phone': c.phone,
+                'email': c.email,
+                'address': c.address,
+                'totalSpent': c.totalSpent,
+                'totalOrders': c.totalOrders,
+                'averageOrderValue': c.averageOrderValue,
+                'lastPurchaseDate': c.lastPurchaseDate?.toIso8601String(),
+              },
+            ),
+          ),
+        );
+      },
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 22,
+            backgroundColor: (isDark ? AppColors.primaryLight : AppColors.primary).withValues(alpha: 0.15),
+            child: Text(
+              c.name.isNotEmpty ? c.name[0].toUpperCase() : 'C',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+                color: isDark ? AppColors.primaryLight : AppColors.primary,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        c.name,
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    StatBadge.tier(c.customerValueCategory),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${c.phone} • ${c.totalOrders} Orders • Lifetime: ${FormatService.formatCurrency(c.totalSpent, symbol: currencySymbol)}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 6),
+          Icon(
+            Icons.chevron_right,
+            color: isDark ? AppColors.darkTextMuted : AppColors.lightTextMuted,
+          ),
+        ],
       ),
     );
   }

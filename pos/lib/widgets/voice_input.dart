@@ -26,19 +26,19 @@ class _VoiceInputState extends State<VoiceInput> {
     try {
       bool available = await _speech.initialize(
         onStatus: (status) {
-          print('Speech status: $status');
+          debugPrint('Speech status: $status');
           if (status == 'notListening') {
-            setState(() => _isListening = false);
-            if (_text.isNotEmpty) {
+            if (mounted) setState(() => _isListening = false);
+            if (_text.isNotEmpty && mounted) {
               widget.onVoiceRecognized(_text);
               Navigator.pop(context);
             }
           }
         },
         onError: (error) {
-          print('Speech error: $error');
-          setState(() => _isListening = false);
+          debugPrint('Speech error: $error');
           if (mounted) {
+            setState(() => _isListening = false);
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text('Speech error: $error')),
             );
@@ -46,16 +46,18 @@ class _VoiceInputState extends State<VoiceInput> {
         },
       );
       
-      setState(() {
-        _isInitialized = available;
-      });
+      if (mounted) {
+        setState(() {
+          _isInitialized = available;
+        });
+      }
       
       if (available) {
         // Auto-start listening
         _startListening();
       }
     } catch (e) {
-      print('Error initializing speech: $e');
+      debugPrint('Error initializing speech: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error: $e')),
@@ -68,14 +70,16 @@ class _VoiceInputState extends State<VoiceInput> {
     if (_isInitialized && !_isListening) {
       _speech.listen(
         onResult: (result) {
-          setState(() {
-            _text = result.recognizedWords;
-          });
+          if (mounted) {
+            setState(() {
+              _text = result.recognizedWords;
+            });
+          }
         },
-        listenFor: const Duration(seconds: 10),
-        pauseFor: const Duration(seconds: 5),
-        partialResults: true,
-        localeId: 'en_US',
+        listenOptions: stt.SpeechListenOptions(
+          listenMode: stt.ListenMode.dictation,
+          partialResults: true,
+        ),
       );
       setState(() => _isListening = true);
     }
@@ -104,7 +108,7 @@ class _VoiceInputState extends State<VoiceInput> {
         borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 10,
             spreadRadius: 5,
           ),
@@ -144,7 +148,7 @@ class _VoiceInputState extends State<VoiceInput> {
                 boxShadow: [
                   BoxShadow(
                     color: (_isListening ? Colors.red : Colors.blue)
-                        .withOpacity(0.5),
+                        .withValues(alpha: 0.5),
                     blurRadius: 20,
                     spreadRadius: 5,
                   ),

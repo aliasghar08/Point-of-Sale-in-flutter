@@ -48,6 +48,8 @@ class Customer {
     return '🆕 New Customer';
   }
 
+  int get loyaltyPoints => (totalSpent / 10).floor();
+
   Customer copyWith({
     String? id,
     String? name,

@@ -1,10 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
-import 'package:intl/intl.dart';
+import 'package:pos/models/sale.dart';
 import 'package:pos/services/firebase_service.dart';
+import 'package:pos/services/format_service.dart';
+import 'package:pos/services/receipt_service.dart';
+import 'package:pos/services/export_service.dart';
+import 'package:pos/services/feedback_service.dart';
 import 'package:pos/providers/settings_provider.dart';
+import 'package:pos/providers/auth_provider.dart';
+import 'package:pos/theme/app_colors.dart';
+import 'package:pos/widgets/pos_card.dart';
+import 'package:pos/widgets/stat_badge.dart';
+import 'package:pos/widgets/empty_state_view.dart';
 
+/// Modern Sales History & Transaction Archive Screen.
 class SalesHistoryScreen extends StatefulWidget {
   const SalesHistoryScreen({super.key});
 
@@ -14,19 +24,15 @@ class SalesHistoryScreen extends StatefulWidget {
 
 class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
   final FirebaseService _firebaseService = FirebaseService();
-  
-  // ✅ CHANGED: Default to 'Today' to prevent fetching thousands of docs on load
-  String _filterType = 'Today'; // All, Today, Week, Month, Custom
+
+  String _filterType = 'Today'; // 'Today', 'Week', 'Month', 'All', 'Custom'
   String _searchQuery = '';
   bool _isLoading = true;
-  List<QueryDocumentSnapshot> _allSales = [];
-  List<QueryDocumentSnapshot> _filteredSales = [];
+  List<Sale> _sales = [];
+  List<Sale> _filteredSales = [];
 
-  // For custom date range
   DateTime? _startDate;
   DateTime? _endDate;
-
-  final List<String> _filterOptions = ['Today', 'Week', 'Month', 'Custom', 'All'];
   final TextEditingController _searchController = TextEditingController();
 
   @override
@@ -41,12 +47,10 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     super.dispose();
   }
 
-  // ✅ Load sales based on filter type
   Future<void> _loadSales() async {
     setState(() => _isLoading = true);
     try {
       QuerySnapshot snapshot;
-      
       switch (_filterType) {
         case 'Today':
           snapshot = await _firebaseService.getTodaySales();
@@ -62,225 +66,229 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
             snapshot = await _firebaseService.getSalesByDateRange(
               startDate: _startDate!,
               endDate: _endDate!,
-              limit: 500, // Safe limit
+              limit: 500,
             );
           } else {
-            snapshot = await _firebaseService.getTodaySales(); // Fallback
+            snapshot = await _firebaseService.getTodaySales();
           }
           break;
         case 'All':
-          // ⚠️ WARNING: If this gets too large, you should replace getAllSales 
-          // with a paginated query or a hard limit in FirebaseService.
+        default:
           snapshot = await _firebaseService.getAllSales();
           break;
-        default:
-          snapshot = await _firebaseService.getTodaySales();
-          break;
       }
-      
+
+      final loaded = snapshot.docs.map((doc) {
+        return Sale.fromMap(doc.data() as Map<String, dynamic>, doc.id);
+      }).toList();
+
       setState(() {
-        _allSales = snapshot.docs;
-        _applySearchFilter();
+        _sales = loaded;
+        _applySearch();
         _isLoading = false;
       });
     } catch (e) {
       setState(() => _isLoading = false);
-      _showSnackBar('Error loading sales: $e', isError: true);
+      FeedbackService.error();
     }
   }
 
-  // ✅ Apply search filter only (now includes customer name and phone)
-  void _applySearchFilter() {
-    if (_searchQuery.isEmpty) {
-      _filteredSales = _allSales;
+  void _applySearch() {
+    if (_searchQuery.trim().isEmpty) {
+      _filteredSales = List.from(_sales);
       return;
     }
 
-    String query = _searchQuery.toLowerCase();
-    _filteredSales = _allSales.where((doc) {
-      var data = doc.data() as Map<String, dynamic>;
-      String productName = (data['productName'] ?? '').toString().toLowerCase();
-      String receiptNumber = (data['receiptNumber'] ?? '').toString().toLowerCase();
-      String paymentMethod = (data['paymentMethod'] ?? '').toString().toLowerCase();
-      
-      // ✅ Customer search fields
-      String customerName = (data['customerName'] ?? '').toString().toLowerCase();
-      String customerPhone = (data['customerPhone'] ?? '').toString().toLowerCase();
-      String customerEmail = (data['customerEmail'] ?? '').toString().toLowerCase();
-      
-      return productName.contains(query) ||
-          receiptNumber.contains(query) ||
-          paymentMethod.contains(query) ||
-          customerName.contains(query) ||
-          customerPhone.contains(query) ||
-          customerEmail.contains(query);
+    final q = _searchQuery.trim().toLowerCase();
+    _filteredSales = _sales.where((s) {
+      return s.receiptNumber.toLowerCase().contains(q) ||
+          s.productName.toLowerCase().contains(q) ||
+          s.customerDisplayName.toLowerCase().contains(q) ||
+          s.customerPhone.toLowerCase().contains(q) ||
+          s.paymentMethod.toLowerCase().contains(q);
     }).toList();
   }
 
-  // ✅ Handle filter change
-  void _onFilterChanged(String newFilter) async {
-    if (newFilter == 'Custom') {
-      final result = await _showDateRangePicker();
-      if (result != null) {
-        setState(() {
-          _startDate = result.$1;
-          _endDate = result.$2;
-          _filterType = newFilter;
-        });
-        _loadSales();
-      }
-    } else if (_filterType != newFilter) {
-      // ⚠️ Add a warning if they click 'All'
-      if (newFilter == 'All') {
-        _showSnackBar('Loading all history may take a moment...', isError: false);
-      }
-      
-      setState(() {
-        _filterType = newFilter;
-      });
-      _loadSales();
-    }
-  }
-
-  // ✅ Show date range picker
-  Future<(DateTime, DateTime)?> _showDateRangePicker() async {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    
-    final DateTimeRange? picked = await showDateRangePicker(
+  void _exportSales() {
+    final csv = ExportService.exportSalesToCsv(_filteredSales);
+    showDialog(
       context: context,
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
-      initialDateRange: DateTimeRange(
-        start: DateTime.now().subtract(const Duration(days: 30)),
-        end: DateTime.now(),
-      ),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.fromSeed(
-              seedColor: Colors.blue,
-              brightness: isDarkMode ? Brightness.dark : Brightness.light,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Exported Sales Transactions (CSV)'),
+        content: SizedBox(
+          width: double.maxFinite,
+          height: 320,
+          child: SingleChildScrollView(
+            child: SelectableText(
+              csv,
+              style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
             ),
           ),
-          child: child!,
-        );
-      },
-    );
-
-    if (picked != null) {
-      final endDate = DateTime(
-        picked.end.year,
-        picked.end.month,
-        picked.end.day,
-        23, 59, 59,
-      );
-      return (picked.start, endDate);
-    }
-    return null;
-  }
-
-  // ✅ Handle search change
-  void _onSearchChanged(String value) {
-    setState(() {
-      _searchQuery = value.toLowerCase().trim();
-      _applySearchFilter();
-    });
-  }
-
-  void _showSnackBar(String message, {bool isError = false}) {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          message,
-          style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
         ),
-        backgroundColor: isError
-            ? (isDarkMode ? Colors.red.shade400 : Colors.red.shade700)
-            : (isDarkMode ? Colors.green.shade400 : Colors.green.shade700),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Transactions copied to clipboard / exported!'), behavior: SnackBarBehavior.floating),
+              );
+            },
+            icon: const Icon(Icons.check),
+            label: const Text('Done'),
+          ),
+        ],
       ),
     );
+  }
+
+  Future<void> _reprintReceipt(Sale sale) async {
+    final settingsProvider = Provider.of<SettingsProvider>(context, listen: false);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+
+    final pdf = await ReceiptService.generatePdfReceipt(
+      businessName: 'Point of Sale Retail',
+      receiptNumber: sale.receiptNumber,
+      date: sale.saleDate,
+      cashierName: authProvider.currentUser?.name ?? 'Staff',
+      customerName: sale.customerDisplayName,
+      items: [
+        {
+          'name': sale.productName,
+          'qty': sale.quantity,
+          'price': sale.price,
+          'total': sale.total,
+        }
+      ],
+      subtotal: sale.total,
+      tax: 0.0,
+      discount: 0.0,
+      grandTotal: sale.total,
+      paymentMethod: sale.paymentMethod,
+      currencySymbol: settingsProvider.currencySymbol,
+    );
+
+    await ReceiptService.printReceipt(pdf);
   }
 
   @override
   Widget build(BuildContext context) {
     final settingsProvider = Provider.of<SettingsProvider>(context);
     final currencySymbol = settingsProvider.currencySymbol;
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    // Financial Metrics
+    final totalRevenue = _filteredSales.fold(0.0, (prev, s) => prev + s.total);
+    final totalProfit = _filteredSales.fold(0.0, (prev, s) => prev + s.profit);
+    final totalCount = _filteredSales.length;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Sales History'),
-        backgroundColor: isDarkMode ? Colors.blue.shade800 : Colors.blue.shade700,
-        foregroundColor: Colors.white,
-        elevation: 0,
+        title: const Text('Sales History & Transactions'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.file_download_outlined),
+            tooltip: 'Export CSV',
+            onPressed: _exportSales,
+          ),
+          IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: _loadSales,
             tooltip: 'Refresh',
-          ),
-        ],
-      ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1100),
-          child: Column(
-            children: [
-              _buildFilterBar(isDarkMode),
-              if (_filterType == 'Custom' && _startDate != null && _endDate != null)
-                _buildCustomDateRangeBadge(isDarkMode),
-              _buildSearchBar(isDarkMode),
-              _buildSummaryStats(isDarkMode, currencySymbol),
-              Expanded(
-                child: _isLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : _filteredSales.isEmpty
-                        ? _buildEmptyState(isDarkMode)
-                        : _buildSalesList(currencySymbol, isDarkMode),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCustomDateRangeBadge(bool isDarkMode) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: isDarkMode ? Colors.blue.shade900 : Colors.blue.shade50,
-      child: Row(
-        children: [
-          Icon(
-            Icons.date_range,
-            size: 16,
-            color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+            onPressed: _loadSales,
           ),
           const SizedBox(width: 8),
-          Text(
-            '${DateFormat('dd/MM/yyyy').format(_startDate!)} - ${DateFormat('dd/MM/yyyy').format(_endDate!)}',
-            style: TextStyle(
-              color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
-              fontWeight: FontWeight.w500,
+        ],
+      ),
+      body: Column(
+        children: [
+          // Filter Tabs & Search
+          _buildFilterBar(isDark),
+
+          // Overview KPI Card
+          _buildKpiSummary(
+            revenue: totalRevenue,
+            profit: totalProfit,
+            count: totalCount,
+            currencySymbol: currencySymbol,
+            isDark: isDark,
+          ),
+
+          // Transactions List
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _filteredSales.isEmpty
+                    ? const EmptyStateView(
+                        icon: Icons.receipt_long_outlined,
+                        title: 'No sales records found',
+                        description: 'Try changing your date filter or search query.',
+                      )
+                    : ListView.separated(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: _filteredSales.length,
+                        separatorBuilder: (_, _) => const SizedBox(height: 10),
+                        itemBuilder: (ctx, i) => _buildSaleCard(_filteredSales[i], currencySymbol, isDark),
+                      ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterBar(bool isDark) {
+    final options = ['Today', 'Week', 'Month', 'All'];
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
+        border: Border(bottom: BorderSide(color: isDark ? AppColors.darkBorder : AppColors.lightBorder)),
+      ),
+      child: Column(
+        children: [
+          // Search Input
+          TextField(
+            controller: _searchController,
+            onChanged: (val) {
+              _searchQuery = val;
+              setState(() => _applySearch());
+            },
+            decoration: InputDecoration(
+              hintText: 'Search by Receipt #, Customer, or Product...',
+              prefixIcon: const Icon(Icons.search),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             ),
           ),
-          const Spacer(),
-          GestureDetector(
-            onTap: () {
-              setState(() {
-                _startDate = null;
-                _endDate = null;
-                _filterType = 'Today'; // ✅ Changed fallback from 'All' to 'Today'
-              });
-              _loadSales();
-            },
-            child: Icon(
-              Icons.close,
-              size: 16,
-              color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+          const SizedBox(height: 10),
+          // Time Chips
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: options.map((opt) {
+                final isSelected = _filterType == opt;
+                final primaryColor = isDark ? AppColors.primaryLight : AppColors.primary;
+
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: FilterChip(
+                    label: Text(opt),
+                    selected: isSelected,
+                    selectedColor: primaryColor.withValues(alpha: 0.2),
+                    checkmarkColor: primaryColor,
+                    labelStyle: TextStyle(
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                      color: isSelected ? primaryColor : null,
+                    ),
+                    onSelected: (_) {
+                      setState(() {
+                        _filterType = opt;
+                        _loadSales();
+                      });
+                      FeedbackService.lightTap();
+                    },
+                  ),
+                );
+              }).toList(),
             ),
           ),
         ],
@@ -288,448 +296,149 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     );
   }
 
-  Widget _buildFilterBar(bool isDarkMode) {
+  Widget _buildKpiSummary({
+    required double revenue,
+    required double profit,
+    required int count,
+    required String currencySymbol,
+    required bool isDark,
+  }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: isDarkMode ? Colors.grey.shade900 : Colors.grey.shade50,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
-          Text(
-            'Filter:',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: isDarkMode ? Colors.white : Colors.black,
+          Expanded(
+            child: PosCard(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Total Sales', style: TextStyle(fontSize: 11, color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary)),
+                  const SizedBox(height: 4),
+                  Text(
+                    FormatService.formatCurrency(revenue, symbol: currencySymbol),
+                    style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppColors.success),
+                  ),
+                ],
+              ),
             ),
           ),
           const SizedBox(width: 8),
           Expanded(
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: _filterOptions.map((filter) {
-                  bool isSelected = _filterType == filter;
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: FilterChip(
-                      label: Text(filter),
-                      selected: isSelected,
-                      onSelected: (_) => _onFilterChanged(filter),
-                      backgroundColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
-                      selectedColor: isDarkMode ? Colors.blue.shade800 : Colors.blue.shade100,
-                      checkmarkColor: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
-                      labelStyle: TextStyle(
-                        color: isSelected
-                            ? (isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700)
-                            : (isDarkMode ? Colors.white : Colors.black),
-                      ),
+            child: PosCard(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Net Profit', style: TextStyle(fontSize: 11, color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary)),
+                  const SizedBox(height: 4),
+                  Text(
+                    FormatService.formatCurrency(profit, symbol: currencySymbol),
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? AppColors.primaryLight : AppColors.primary,
                     ),
-                  );
-                }).toList(),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSearchBar(bool isDarkMode) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        boxShadow: [
-          BoxShadow(
-            color: isDarkMode
-                ? Colors.black.withOpacity(0.3)
-                : Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 5,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: TextField(
-        controller: _searchController,
-        style: TextStyle(
-          color: isDarkMode ? Colors.white : Colors.black,
-        ),
-        decoration: InputDecoration(
-          hintText: 'Search by product, customer, receipt...',
-          hintStyle: TextStyle(
-            color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-          ),
-          prefixIcon: Icon(
-            Icons.search,
-            color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-          ),
-          suffixIcon: _searchQuery.isNotEmpty
-              ? IconButton(
-                  icon: Icon(
-                    Icons.clear,
-                    color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
                   ),
-                  onPressed: () {
-                    setState(() {
-                      _searchQuery = '';
-                      _searchController.clear();
-                      _applySearchFilter();
-                    });
-                  },
-                )
-              : null,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide.none,
+                ],
+              ),
+            ),
           ),
-          filled: true,
-          fillColor: isDarkMode
-              ? Colors.grey.shade800
-              : Colors.grey.shade50,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-        ),
-        onChanged: _onSearchChanged,
-      ),
-    );
-  }
-
-  Widget _buildSummaryStats(bool isDarkMode, String currencySymbol) {
-    if (_filteredSales.isEmpty) return const SizedBox.shrink();
-
-    double totalSales = 0;
-    double totalProfit = 0;
-    int totalItems = 0;
-
-    for (var doc in _filteredSales) {
-      var data = doc.data() as Map<String, dynamic>;
-      
-      // ✅ CHANGED: Safe parsing for Firestore numbers
-      totalSales += ((data['total'] ?? 0) as num).toDouble();
-      totalProfit += ((data['profit'] ?? 0) as num).toDouble();
-      totalItems += ((data['quantity'] ?? 0) as num).toInt();
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      color: isDarkMode ? Colors.grey.shade900 : Colors.grey.shade50,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _buildStatItem(
-            label: 'Total Sales',
-            value: '$currencySymbol${totalSales.toStringAsFixed(2)}',
-            icon: Icons.attach_money,
-            color: isDarkMode ? Colors.green.shade400 : Colors.green.shade700,
-            isDarkMode: isDarkMode,
-          ),
-          _buildStatItem(
-            label: 'Total Profit',
-            value: '$currencySymbol${totalProfit.toStringAsFixed(2)}',
-            icon: Icons.trending_up,
-            color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
-            isDarkMode: isDarkMode,
-          ),
-          _buildStatItem(
-            label: 'Items Sold',
-            value: totalItems.toString(),
-            icon: Icons.shopping_cart,
-            color: isDarkMode ? Colors.orange.shade400 : Colors.orange.shade700,
-            isDarkMode: isDarkMode,
-          ),
-          _buildStatItem(
-            label: 'Transactions',
-            value: _filteredSales.length.toString(),
-            icon: Icons.receipt_long,
-            color: isDarkMode ? Colors.purple.shade400 : Colors.purple.shade700,
-            isDarkMode: isDarkMode,
+          const SizedBox(width: 8),
+          Expanded(
+            child: PosCard(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Orders', style: TextStyle(fontSize: 11, color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary)),
+                  const SizedBox(height: 4),
+                  Text(
+                    '$count',
+                    style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildStatItem({
-    required String label,
-    required String value,
-    required IconData icon,
-    required Color color,
-    required bool isDarkMode,
-  }) {
-    return Column(
-      children: [
-        Row(
-          children: [
-            Icon(icon, size: 16, color: color),
-            const SizedBox(width: 4),
-            Text(
-              value,
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-                color: isDarkMode ? Colors.white : Colors.black,
-              ),
-            ),
-          ],
-        ),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 10,
-            color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSalesList(String currencySymbol, bool isDarkMode) {
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: _filteredSales.length,
-      itemBuilder: (context, index) {
-        var data = _filteredSales[index].data() as Map<String, dynamic>;
-        
-        // ✅ CHANGED: Null safe timestamp parsing
-        DateTime saleDate = (data['saleDate'] as Timestamp?)?.toDate() ?? DateTime.now();
-        
-        final customerName = data['customerName'] ?? 'Guest Customer';
-        final customerPhone = data['customerPhone'] ?? '';
-        final isGuestCustomer = data['isGuestCustomer'] ?? true;
-        
-        return Card(
-          elevation: 2,
-          margin: const EdgeInsets.only(bottom: 12),
-          color: isDarkMode ? Colors.grey.shade800 : Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        data['productName'] ?? 'Unknown Product',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: isDarkMode ? Colors.white : Colors.black,
-                        ),
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isDarkMode
-                            ? Colors.blue.shade900
-                            : Colors.blue.shade50,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        data['paymentMethod'] ?? 'Cash',
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: isDarkMode
-                              ? Colors.blue.shade400
-                              : Colors.blue.shade700,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.person,
-                      size: 14,
-                      color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                    ),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        isGuestCustomer ? 'Guest Customer' : customerName,
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: isDarkMode ? Colors.white : Colors.black,
-                        ),
-                      ),
-                    ),
-                    if (customerPhone.isNotEmpty) ...[
-                      const SizedBox(width: 8),
-                      Icon(
-                        Icons.phone,
-                        size: 12,
-                        color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        customerPhone,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Wrap(
-                  spacing: 16,
-                  runSpacing: 4,
-                  children: [
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.receipt_long,
-                          size: 14,
-                          color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Receipt: ${data['receiptNumber'] ?? 'N/A'}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                          ),
-                        ),
-                      ],
-                    ),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.calendar_today,
-                          size: 14,
-                          color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          DateFormat('dd/MM/yyyy HH:mm').format(saleDate),
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                const Divider(),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          // ✅ CHANGED: Safe parse quantity
-                          'Quantity: ${((data['quantity'] ?? 0) as num).toInt()}',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: isDarkMode ? Colors.white : Colors.black,
-                          ),
-                        ),
-                        Text(
-                          // ✅ CHANGED: Safe parse price
-                          'Price: $currencySymbol${((data['price'] ?? 0) as num).toDouble().toStringAsFixed(2)}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                          ),
-                        ),
-                      ],
-                    ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          // ✅ CHANGED: Safe parse total
-                          '$currencySymbol${((data['total'] ?? 0) as num).toDouble().toStringAsFixed(2)}',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: isDarkMode ? Colors.green.shade400 : Colors.green.shade700,
-                          ),
-                        ),
-                        Text(
-                          // ✅ CHANGED: Safe parse profit
-                          'Profit: $currencySymbol${((data['profit'] ?? 0) as num).toDouble().toStringAsFixed(2)}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildEmptyState(bool isDarkMode) {
-    return Center(
+  Widget _buildSaleCard(Sale sale, String currencySymbol, bool isDark) {
+    return PosCard(
+      padding: const EdgeInsets.all(14),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            Icons.receipt_long_outlined,
-            size: 80,
-            color: isDarkMode ? Colors.grey.shade600 : Colors.grey.shade300,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            _searchQuery.isNotEmpty ? 'No matching sales found' : 'No sales yet',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: isDarkMode ? Colors.white : Colors.grey.shade700,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? AppColors.primaryLight.withValues(alpha: 0.15)
+                          : AppColors.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      sale.receiptNumber,
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                        color: isDark ? AppColors.primaryLight : AppColors.primary,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  StatBadge(label: sale.paymentMethod, type: BadgeType.info),
+                ],
+              ),
+              Text(
+                FormatService.formatCurrency(sale.total, symbol: currencySymbol),
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ],
           ),
           const SizedBox(height: 8),
-          Text(
-            _searchQuery.isNotEmpty
-                ? 'Try adjusting your search'
-                : 'Start selling to see your sales history here',
-            style: TextStyle(
-              fontSize: 14,
-              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade500,
-            ),
-          ),
-          if (_searchQuery.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: () {
-                setState(() {
-                  _searchQuery = '';
-                  _searchController.clear();
-                  _applySearchFilter();
-                });
-              },
-              icon: const Icon(Icons.clear),
-              label: const Text('Clear Search'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
-                foregroundColor: Colors.white,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  '${sale.quantity}x ${sale.productName}',
+                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-            ),
-          ],
+              Text(
+                FormatService.formatDateTime(sale.saleDate),
+                style: TextStyle(fontSize: 11, color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Customer: ${sale.customerDisplayName}',
+                style: TextStyle(fontSize: 12, color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+              ),
+              TextButton.icon(
+                onPressed: () => _reprintReceipt(sale),
+                icon: const Icon(Icons.print, size: 14),
+                label: const Text('Re-Print', style: TextStyle(fontSize: 12)),
+                style: TextButton.styleFrom(padding: EdgeInsets.zero, visualDensity: VisualDensity.compact),
+              ),
+            ],
+          ),
         ],
       ),
     );

@@ -204,7 +204,7 @@ class AppDrawer extends StatelessWidget {
           Text(
             user.email,
             style: TextStyle(
-              color: Colors.white.withOpacity(0.8),
+              color: Colors.white.withValues(alpha: 0.8),
               fontSize: 14,
             ),
           ),
@@ -217,7 +217,7 @@ class AppDrawer extends StatelessWidget {
                   vertical: 4,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
+                  color: Colors.white.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
@@ -232,7 +232,7 @@ class AppDrawer extends StatelessWidget {
                   vertical: 4,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
+                  color: Colors.white.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
@@ -309,7 +309,7 @@ class AppDrawer extends StatelessWidget {
           onPressed: () => _showLogoutDialog(context, authProvider, isDarkMode),
           style: ElevatedButton.styleFrom(
             backgroundColor: isDarkMode
-                ? Colors.red.shade900.withOpacity(0.5)
+                ? Colors.red.shade900.withValues(alpha: 0.5)
                 : Colors.red.shade50,
             foregroundColor: isDarkMode ? Colors.red.shade400 : Colors.red.shade700,
             elevation: 0,

@@ -1,18 +1,29 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:pos/widgets/barcode_scanner.dart';
-import 'package:pos/widgets/qr_scanner.dart';
-import 'package:pos/widgets/voice_input.dart';
-import 'package:pos/models/product.dart';
-import 'package:pos/services/firebase_service.dart';
-import 'package:pos/providers/settings_provider.dart';
 import 'package:provider/provider.dart';
-import 'package:pos/models/product_reference.dart';
-import 'package:pos/widgets/product_autocomplete.dart';
-import 'package:pos/widgets/receipt_dialog.dart';
+import 'package:pos/models/product.dart';
+import 'package:pos/models/cart_item.dart';
+import 'package:pos/models/held_order.dart';
+import 'package:pos/models/customer.dart';
+import 'package:pos/services/firebase_service.dart';
+import 'package:pos/services/cache_service.dart';
+import 'package:pos/services/format_service.dart';
+import 'package:pos/services/feedback_service.dart';
+import 'package:pos/services/receipt_service.dart';
+import 'package:pos/services/customer_service.dart';
+import 'package:pos/providers/settings_provider.dart';
+import 'package:pos/providers/auth_provider.dart';
+import 'package:pos/theme/app_colors.dart';
+import 'package:pos/widgets/pos_card.dart';
+import 'package:pos/widgets/stat_badge.dart';
+import 'package:pos/widgets/category_pill.dart';
+import 'package:pos/widgets/empty_state_view.dart';
+import 'package:pos/widgets/qr_scanner.dart';
+import 'package:pos/widgets/barcode_scanner.dart';
+import 'package:pos/widgets/voice_input.dart';
 import 'package:pos/widgets/customer_selection_dialog.dart';
 
-
+/// Modern, High-Performance Point of Sale (POS) Cashier Register Screen.
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -22,1117 +33,336 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final FirebaseService _firebaseService = FirebaseService();
+  final CacheService _cache = CacheService();
+  final CustomerService _customerService = CustomerService();
+
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
+  Timer? _debounceTimer;
 
-  List<Product> _cartItems = [];
-  double _totalAmount = 0.0;
-  double _totalProfit = 0.0;
-  bool _isLoading = false;
-  String _selectedPaymentMethod = 'Cash';
+  // POS State
+  List<Product> _filteredProducts = [];
+  final List<CartItem> _cart = [];
+  final List<HeldOrder> _heldOrders = [];
+  bool _isLoading = true;
 
-  // Customer Info for checkout
-  String _customerId = 'guest';
-  String _customerName = 'Guest Customer';
-  String _customerPhone = '';
-  String? _customerEmail;
-  String? _customerAddress;
-  bool _isGuestCustomer = true;
+  String _selectedCategory = 'All';
+  String _searchQuery = '';
 
-  final List<String> _paymentMethods = [
-    'Cash',
-    'Card',
-    'Mobile Payment',
-    'Credit',
-  ];
+  // Order Details
+  Customer? _selectedCustomer;
+  double _orderDiscountPercent = 0.0;
+  double _orderDiscountAmount = 0.0;
+  final double _taxRate = 0.0; // configurable or 0 by default
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCatalog();
+  }
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
     _searchController.dispose();
     _searchFocusNode.dispose();
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final settingsProvider = Provider.of<SettingsProvider>(context);
-    final currencySymbol = settingsProvider.currencySymbol;
-    final showProfit = settingsProvider.showProfitInPOS;
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-
-    return Scaffold(
-      body: _buildMainLayout(currencySymbol, showProfit, isDarkMode),
-    );
+  Future<void> _loadCatalog({bool force = false}) async {
+    setState(() => _isLoading = true);
+    try {
+      if (!force && _cache.hasValidProductCache) {
+        // Cached products available
+      } else {
+        final products = await _firebaseService.getProducts();
+        _cache.setProducts(products);
+      }
+      _applyFilters();
+    } catch (e) {
+      debugPrint('Error loading catalog: $e');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
-  // ==================== MAIN POS LAYOUT ====================
-  Widget _buildMainLayout(String currencySymbol, bool showProfit, bool isDarkMode) {
-    return Column(
-      children: [
-        _buildSearchSection(isDarkMode),
-        Expanded(
-          flex: 1,
-          child: _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : _cartItems.isEmpty
-                  ? _buildEmptyCartPrompt(isDarkMode)
-                  : _buildCartList(currencySymbol, isDarkMode),
+  void _applyFilters() {
+    _filteredProducts = _cache.searchProducts(
+      _searchQuery,
+      category: _selectedCategory == 'All' ? null : _selectedCategory,
+    );
+    setState(() {});
+  }
+
+  void _onSearchChanged(String query) {
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 150), () {
+      _searchQuery = query;
+      _applyFilters();
+    });
+  }
+
+  // ==================== CART ACTIONS ====================
+
+  void _addToCart(Product product) {
+    if (product.stock <= 0) {
+      FeedbackService.error();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${product.name} is currently out of stock!'),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
         ),
-        _buildCheckoutSection(currencySymbol, showProfit, isDarkMode),
-      ],
-    );
-  }
-
-  // ==================== SEARCH SECTION ====================
-  Widget _buildSearchSection(bool isDarkMode) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        boxShadow: [
-          BoxShadow(
-            color: isDarkMode
-                ? Colors.black.withOpacity(0.3)
-                : Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 5,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          // Search Input
-          Row(
-            children: [
-              Expanded(
-                child: ProductAutocomplete(
-                  focusNode: _searchFocusNode, // ✅ PASSED FOCUS NODE HERE
-                  onProductSelected: (productName) {
-                    _searchProduct(productName);
-                  },
-                  hintText: 'Search product by name...',
-                ),
-              ),
-              const SizedBox(width: 8),
-              // QR Scanner Button
-              Container(
-                decoration: BoxDecoration(
-                  color: isDarkMode
-                      ? Colors.blue.shade900
-                      : Colors.blue.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: IconButton(
-                  icon: Icon(
-                    Icons.qr_code_scanner,
-                    color: isDarkMode
-                        ? Colors.blue.shade400
-                        : Colors.blue.shade700,
-                  ),
-                  onPressed: _showQRScanner,
-                  tooltip: 'Scan QR Code',
-                  iconSize: 24,
-                ),
-              ),
-              const SizedBox(width: 4),
-              // Barcode Scanner Button
-              Container(
-                decoration: BoxDecoration(
-                  color: isDarkMode
-                      ? Colors.green.shade900
-                      : Colors.green.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: IconButton(
-                  icon: Icon(
-                    Icons.barcode_reader,
-                    color: isDarkMode
-                        ? Colors.green.shade400
-                        : Colors.green.shade700,
-                  ),
-                  onPressed: _showBarcodeScanner,
-                  tooltip: 'Scan Barcode',
-                  iconSize: 24,
-                ),
-              ),
-              const SizedBox(width: 4),
-              // Voice Input Button
-              Container(
-                decoration: BoxDecoration(
-                  color: isDarkMode
-                      ? Colors.orange.shade900
-                      : Colors.orange.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: IconButton(
-                  icon: Icon(
-                    Icons.mic,
-                    color: isDarkMode
-                        ? Colors.orange.shade400
-                        : Colors.orange.shade700,
-                  ),
-                  onPressed: _showVoiceInput,
-                  tooltip: 'Voice Input',
-                  iconSize: 24,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          // Category Quick Filters
-          SizedBox(
-            height: 36,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              children: [
-                _buildCategoryChip('All', null, isDarkMode),
-                ...ProductReference.getCategories().map(
-                  (category) =>
-                      _buildCategoryChip(category, category, isDarkMode),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCategoryChip(String label, String? category, bool isDarkMode) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: FilterChip(
-        label: Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            color: isDarkMode ? Colors.white : Colors.black,
-          ),
-        ),
-        selected: false,
-        onSelected: (selected) {
-          // Category filtering can be implemented here
-        },
-        backgroundColor: isDarkMode
-            ? Colors.grey.shade800
-            : Colors.grey.shade100,
-        selectedColor: isDarkMode ? Colors.blue.shade900 : Colors.blue.shade100,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-          side: BorderSide(
-            color: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade300,
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ==================== CART LIST ====================
-  Widget _buildCartList(String currencySymbol, bool isDarkMode) {
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: _cartItems.length,
-      itemBuilder: (context, index) {
-        final product = _cartItems[index];
-        final itemTotal = product.price * product.stock;
-
-        return Dismissible(
-          key: Key(product.id),
-          direction: DismissDirection.endToStart,
-          onDismissed: (_) {
-            setState(() {
-              _cartItems.removeAt(index);
-              _updateTotals();
-            });
-            _showSnackBar('${product.name} removed from cart');
-          },
-          background: Container(
-            alignment: Alignment.centerRight,
-            padding: const EdgeInsets.only(right: 20),
-            decoration: BoxDecoration(
-              color: isDarkMode ? Colors.red.shade400 : Colors.red,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Icon(
-              Icons.delete_outline,
-              color: Colors.white,
-              size: 30,
-            ),
-          ),
-          child: Card(
-            elevation: 2,
-            margin: const EdgeInsets.only(bottom: 8),
-            color: isDarkMode ? Colors.grey.shade800 : Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Material(
-              color: Colors.transparent,
-              child: ListTile(
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 4,
-                ),
-                leading: CircleAvatar(
-                  backgroundColor: isDarkMode
-                      ? Colors.blue.shade900
-                      : Colors.blue.shade100,
-                  child: Text(
-                    product.stock.toString(),
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: isDarkMode ? Colors.blue.shade400 : Colors.blue,
-                    ),
-                  ),
-                ),
-                title: Text(
-                  product.name,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    color: isDarkMode ? Colors.white : Colors.black,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                subtitle: Text(
-                  '$currencySymbol${product.price.toStringAsFixed(2)} × ${product.stock}',
-                  style: TextStyle(
-                    color: isDarkMode
-                        ? Colors.grey.shade400
-                        : Colors.grey.shade600,
-                  ),
-                ),
-                trailing: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      '$currencySymbol${itemTotal.toStringAsFixed(2)}',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: isDarkMode ? Colors.green.shade400 : Colors.green,
-                        fontSize: 16,
-                      ),
-                    ),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: Icon(
-                            Icons.remove_circle_outline,
-                            color: isDarkMode
-                                ? Colors.red.shade400
-                                : Colors.red.shade300,
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              if (product.stock > 1) {
-                                _updateCartQuantity(product, -1);
-                              } else {
-                                _cartItems.removeAt(index);
-                                _updateTotals();
-                              }
-                            });
-                          },
-                          iconSize: 20,
-                        ),
-                        IconButton(
-                          icon: Icon(
-                            Icons.add_circle_outline,
-                            color: isDarkMode
-                                ? Colors.green.shade400
-                                : Colors.green.shade300,
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              _updateCartQuantity(product, 1);
-                            });
-                          },
-                          iconSize: 20,
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  // ==================== EMPTY STATES ====================
-  
-  // Big prompt (Used on Mobile when empty, and Desktop Left Panel)
-  Widget _buildEmptyCartPrompt(bool isDarkMode) {
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(vertical: 40),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.shopping_cart_outlined,
-              size: 80,
-              color: isDarkMode ? Colors.grey.shade600 : Colors.grey.shade300,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Add Items to Order',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: isDarkMode ? Colors.white : Colors.grey.shade600,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 40),
-              child: Text(
-                'Add products using barcode, QR, voice, or search',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: isDarkMode
-                      ? Colors.grey.shade400
-                      : Colors.grey.shade500,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: () {
-                _searchFocusNode.requestFocus(); // ✅ Now this actually works!
-              },
-              icon: const Icon(Icons.search),
-              label: const Text('Start Searching'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: isDarkMode
-                    ? Colors.blue.shade400
-                    : Colors.blue.shade700,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 12,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // Small hint (Used on Desktop Right Panel when cart is empty)
-  Widget _buildSmallEmptyCartHint(bool isDarkMode) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.shopping_basket_outlined, size: 48, color: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade300),
-          const SizedBox(height: 16),
-          Text(
-            'Cart is empty',
-            style: TextStyle(
-              fontSize: 16,
-              color: isDarkMode ? Colors.grey.shade500 : Colors.grey.shade600,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ==================== CHECKOUT SECTION ====================
-  Widget _buildCheckoutSection(
-    String currencySymbol,
-    bool showProfit,
-    bool isDarkMode,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        boxShadow: [
-          BoxShadow(
-            color: isDarkMode
-                ? Colors.black.withOpacity(0.3)
-                : Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 5,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Total:',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: isDarkMode ? Colors.white : Colors.black,
-                ),
-              ),
-              Text(
-                '$currencySymbol${_totalAmount.toStringAsFixed(2)}',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: isDarkMode
-                      ? Colors.green.shade400
-                      : Colors.green.shade700,
-                ),
-              ),
-            ],
-          ),
-          if (showProfit) ...[
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Total Profit:',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: isDarkMode ? Colors.white : Colors.black,
-                  ),
-                ),
-                Text(
-                  '$currencySymbol${_totalProfit.toStringAsFixed(2)}',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: isDarkMode
-                        ? Colors.blue.shade400
-                        : Colors.blue.shade700,
-                  ),
-                ),
-              ],
-            ),
-          ],
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                flex: 2,
-                child: DropdownButtonFormField<String>(
-                  value: _selectedPaymentMethod,
-                  decoration: InputDecoration(
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide.none,
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                    filled: true,
-                    fillColor: isDarkMode
-                        ? Colors.grey.shade800
-                        : Colors.grey.shade50,
-                  ),
-                  dropdownColor: isDarkMode
-                      ? Colors.grey.shade800
-                      : Colors.white,
-                  style: TextStyle(
-                    color: isDarkMode ? Colors.white : Colors.black,
-                  ),
-                  items: _paymentMethods.map((method) {
-                    return DropdownMenuItem(
-                      value: method,
-                      child: Text(
-                        method,
-                        style: TextStyle(
-                          color: isDarkMode ? Colors.white : Colors.black,
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedPaymentMethod = value!;
-                    });
-                  },
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                flex: 3,
-                child: ElevatedButton(
-                  onPressed: _cartItems.isEmpty || _isLoading
-                      ? null
-                      : _processCheckout,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: isDarkMode
-                        ? Colors.green.shade400
-                        : Colors.green.shade700,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  child: _isLoading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              Colors.white,
-                            ),
-                          ),
-                        )
-                      : const Text(
-                          'Checkout',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ==================== SEARCH LOGIC ====================
-  void _searchProduct(String query) async {
-    if (query.isEmpty) {
-      _showSnackBar('Please enter a search term');
+      );
       return;
     }
 
+    FeedbackService.selection();
+    final index = _cart.indexWhere((item) => item.productId == product.id);
+
     setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      final results = await Future.wait([
-        _firebaseService.getProductByBarcode(query),
-        _firebaseService.getProductByQRCode(query),
-      ]);
-
-      if (results[0].docs.isNotEmpty) {
-        _addProductToCart(results[0].docs.first);
-        if (mounted) setState(() => _isLoading = false);
-        return;
-      }
-
-      if (results[1].docs.isNotEmpty) {
-        _addProductToCart(results[1].docs.first);
-        if (mounted) setState(() => _isLoading = false);
-        return;
-      }
-
-      // Search by name using FirebaseService
-      try {
-        final nameResult = await _firebaseService.getProductByName(query);
-        if (nameResult.docs.isNotEmpty) {
-          _showProductSelection(nameResult);
-          if (mounted) setState(() => _isLoading = false);
-          return;
+      if (index >= 0) {
+        if (_cart[index].quantity < product.stock) {
+          _cart[index].quantity += 1;
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Cannot add more. Max stock is ${product.stock}.'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
         }
-      } catch (e) {
-        debugPrint('Name search failed: $e');
-      }
-
-      final suggestions = ProductReference.searchProducts(
-        query: query,
-        limit: 10,
-      );
-
-      if (suggestions.isNotEmpty) {
-        _showSuggestionDialog(suggestions, query);
       } else {
-        _showSnackBar('No product found. Try adding it to inventory first.');
+        _cart.add(CartItem.fromProduct(product, quantity: 1));
       }
-    } catch (e) {
-      _showSnackBar('Error: $e');
-      debugPrint('Search error: $e');
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+    });
+  }
+
+  void _incrementQty(int index) {
+    final item = _cart[index];
+    if (item.quantity < item.maxStock) {
+      FeedbackService.lightTap();
+      setState(() => item.quantity += 1);
+    } else {
+      FeedbackService.error();
     }
   }
 
-  void _showSuggestionDialog(List<String> suggestions, String query) {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(
-          'Product Suggestions',
-          style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
-        ),
-        backgroundColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
-        content: SizedBox(
-          width: double.maxFinite,
-          height: MediaQuery.of(context).size.height * 0.4,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'No product found in inventory for "$query".',
-                style: TextStyle(
-                  color: isDarkMode
-                      ? Colors.grey.shade400
-                      : Colors.grey.shade600,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Would you like to add one of these?',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: isDarkMode ? Colors.white : Colors.black,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Expanded(
-                child: ListView.builder(
-                  itemCount: suggestions.length,
-                  itemBuilder: (context, index) {
-                    final productName = suggestions[index];
-                    return Material(
-                      color: Colors.transparent,
-                      borderRadius: BorderRadius.circular(8),
-                      child: ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: isDarkMode
-                              ? Colors.blue.shade900
-                              : Colors.blue.shade100,
-                          child: Text(
-                            productName.substring(0, 1).toUpperCase(),
-                            style: TextStyle(
-                              color: isDarkMode
-                                  ? Colors.blue.shade400
-                                  : Colors.blue.shade700,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        title: Text(
-                          productName,
-                          style: TextStyle(
-                            color: isDarkMode ? Colors.white : Colors.black,
-                          ),
-                        ),
-                        trailing: IconButton(
-                          icon: Icon(
-                            Icons.add_circle,
-                            color: isDarkMode
-                                ? Colors.green.shade400
-                                : Colors.green,
-                          ),
-                          onPressed: () {
-                            Navigator.pop(context);
-                            _showAddProductDialog(productName);
-                          },
-                        ),
-                        onTap: () {
-                          Navigator.pop(context);
-                          _showAddProductDialog(productName);
-                        },
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Close',
-              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
-            ),
-          ),
-        ],
-      ),
-    );
+  void _decrementQty(int index) {
+    FeedbackService.lightTap();
+    setState(() {
+      if (_cart[index].quantity > 1) {
+        _cart[index].quantity -= 1;
+      } else {
+        _cart.removeAt(index);
+      }
+    });
   }
 
-  void _showAddProductDialog(String productName) {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final priceController = TextEditingController();
-    final costController = TextEditingController();
-    final stockController = TextEditingController();
-    final barcodeController = TextEditingController();
+  void _removeFromCart(int index) {
+    FeedbackService.lightTap();
+    setState(() => _cart.removeAt(index));
+  }
 
+  void _clearCart() {
+    if (_cart.isEmpty) return;
+    setState(() {
+      _cart.clear();
+      _selectedCustomer = null;
+      _orderDiscountPercent = 0.0;
+      _orderDiscountAmount = 0.0;
+    });
+    FeedbackService.selection();
+  }
+
+  // ==================== TOTALS CALCULATIONS ====================
+
+  double get _cartSubtotal => _cart.fold(0.0, (sum, item) => sum + item.subtotal);
+  double get _itemsDiscountTotal => _cart.fold(0.0, (sum, item) => sum + item.calculatedDiscount);
+  double get _orderDiscountTotal {
+    if (_orderDiscountAmount > 0) return _orderDiscountAmount;
+    if (_orderDiscountPercent > 0) return (_cartSubtotal - _itemsDiscountTotal) * (_orderDiscountPercent / 100);
+    return 0.0;
+  }
+  double get _totalDiscount => _itemsDiscountTotal + _orderDiscountTotal;
+  double get _totalTax => (_cartSubtotal - _totalDiscount) * (_taxRate / 100);
+  double get _grandTotal => (_cartSubtotal - _totalDiscount + _totalTax).clamp(0.0, double.infinity);
+  double get _totalProfit => _cart.fold(0.0, (sum, item) => sum + item.profit);
+
+  // ==================== PARK / HOLD SALE ====================
+
+  void _parkActiveSale() {
+    if (_cart.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Cart is empty. Nothing to hold.'), behavior: SnackBarBehavior.floating),
+      );
+      return;
+    }
+
+    final noteController = TextEditingController();
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(
-          'Add New Product',
-          style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
-        ),
-        backgroundColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                productName,
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                  color: isDarkMode ? Colors.white : Colors.black,
-                ),
+      builder: (ctx) => AlertDialog(
+        title: const Text('Hold / Park Sale'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Hold ${_cart.length} items for customer "${_selectedCustomer?.name ?? 'Guest'}"?'),
+            const SizedBox(height: 14),
+            TextField(
+              controller: noteController,
+              decoration: const InputDecoration(
+                labelText: 'Order Note / Reference (Optional)',
+                hintText: 'e.g., Table 4, Waiting for wallet',
               ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: priceController,
-                decoration: const InputDecoration(
-                  labelText: 'Selling Price',
-                  prefixIcon: Icon(Icons.attach_money),
-                  border: OutlineInputBorder(),
-                ),
-                keyboardType: TextInputType.number,
-                style: TextStyle(
-                  color: isDarkMode ? Colors.white : Colors.black,
-                ),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: costController,
-                decoration: const InputDecoration(
-                  labelText: 'Cost Price',
-                  prefixIcon: Icon(Icons.money_off),
-                  border: OutlineInputBorder(),
-                ),
-                keyboardType: TextInputType.number,
-                style: TextStyle(
-                  color: isDarkMode ? Colors.white : Colors.black,
-                ),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: stockController,
-                decoration: const InputDecoration(
-                  labelText: 'Stock Quantity',
-                  prefixIcon: Icon(Icons.inventory),
-                  border: OutlineInputBorder(),
-                ),
-                keyboardType: TextInputType.number,
-                style: TextStyle(
-                  color: isDarkMode ? Colors.white : Colors.black,
-                ),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: barcodeController,
-                decoration: const InputDecoration(
-                  labelText: 'Barcode (optional)',
-                  prefixIcon: Icon(Icons.barcode_reader),
-                  border: OutlineInputBorder(),
-                ),
-                style: TextStyle(
-                  color: isDarkMode ? Colors.white : Colors.black,
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
         actions: [
-          TextButton(
-            onPressed: () {
-              priceController.dispose();
-              costController.dispose();
-              stockController.dispose();
-              barcodeController.dispose();
-              Navigator.pop(context);
-            },
-            child: Text(
-              'Cancel',
-              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
-            ),
-          ),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () {
-              final price = double.tryParse(priceController.text);
-              final cost = double.tryParse(costController.text);
-              final stock = int.tryParse(stockController.text);
+              final heldOrder = HeldOrder(
+                id: 'HELD-${DateTime.now().millisecondsSinceEpoch}',
+                customerId: _selectedCustomer?.id ?? 'guest',
+                customerName: _selectedCustomer?.name ?? 'Guest Customer',
+                customerPhone: _selectedCustomer?.phone,
+                items: List.from(_cart),
+                heldAt: DateTime.now(),
+                note: noteController.text.trim(),
+                discountPercent: _orderDiscountPercent,
+                discountAmount: _orderDiscountAmount,
+              );
 
-              if (price == null || cost == null || stock == null || stock < 0) {
-                _showSnackBar('Please enter valid values');
-                return;
-              }
+              setState(() {
+                _heldOrders.add(heldOrder);
+                _cart.clear();
+                _selectedCustomer = null;
+                _orderDiscountPercent = 0.0;
+                _orderDiscountAmount = 0.0;
+              });
 
-              priceController.dispose();
-              costController.dispose();
-              stockController.dispose();
-              barcodeController.dispose();
-              Navigator.pop(context);
-              _createAndAddProduct(
-                productName,
-                price,
-                cost,
-                stock,
-                barcodeController.text,
+              Navigator.pop(ctx);
+              FeedbackService.success();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Order "${heldOrder.id}" parked successfully!'),
+                  backgroundColor: AppColors.primary,
+                  behavior: SnackBarBehavior.floating,
+                ),
               );
             },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: isDarkMode
-                  ? Colors.green.shade400
-                  : Colors.green.shade700,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Add Product'),
+            child: const Text('Hold Order'),
           ),
         ],
       ),
     );
   }
 
-  void _createAndAddProduct(
-    String name,
-    double price,
-    double cost,
-    int stock,
-    String barcode,
-  ) async {
-    if (!mounted) return;
-    setState(() => _isLoading = true);
-
-    try {
-      final now = DateTime.now();
-      final product = Product(
-        id: '',
-        name: name,
-        price: price,
-        costPrice: cost,
-        stock: stock,
-        minStock: 0,
-        createdAt: now,
-        updatedAt: now,
-        barcode: barcode.isNotEmpty ? barcode : '',
+  void _showHeldOrdersModal() {
+    if (_heldOrders.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No held orders found.'), behavior: SnackBarBehavior.floating),
       );
-
-      final docRef = await _firebaseService.addProduct(product.toMap());
-      final newProduct = product.copyWith(id: docRef.id);
-
-      if (mounted) {
-        setState(() {
-          _cartItems.add(newProduct.copyWith(stock: 1));
-          _updateTotals();
-        });
-      }
-
-      _showSnackBar('✅ ${newProduct.name} added to inventory and cart');
-    } catch (e) {
-      _showSnackBar('Error adding product: $e');
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      return;
     }
-  }
 
-  void _addProductToCart(QueryDocumentSnapshot doc) {
-    try {
-      var data = doc.data() as Map<String, dynamic>;
-      Product product = Product.fromMap(data, doc.id);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final currencySymbol = Provider.of<SettingsProvider>(context, listen: false).currencySymbol;
 
-      var existingIndex = _cartItems.indexWhere(
-        (item) => item.id == product.id,
-      );
-
-      setState(() {
-        if (existingIndex != -1) {
-          var existing = _cartItems[existingIndex];
-          _cartItems[existingIndex] = existing.copyWith(
-            stock: existing.stock + 1,
-          );
-        } else {
-          _cartItems.add(product.copyWith(stock: 1));
-        }
-        _updateTotals();
-      });
-
-      _showSnackBar('${product.name} added to cart');
-    } catch (e) {
-      _showSnackBar('Error adding product: $e');
-    }
-  }
-
-  void _addProductToCartFromModel(Product product) {
-    var existingIndex = _cartItems.indexWhere(
-      (item) => item.id == product.id,
-    );
-
-    setState(() {
-      if (existingIndex != -1) {
-        var existing = _cartItems[existingIndex];
-        _cartItems[existingIndex] = existing.copyWith(
-          stock: existing.stock + 1,
-        );
-      } else {
-        _cartItems.add(product.copyWith(stock: 1));
-      }
-      _updateTotals();
-    });
-
-    _showSnackBar('${product.name} added to cart');
-  }
-
-  Widget _buildDesktopProductCatalog(String currencySymbol, bool isDarkMode) {
-    return StreamBuilder<QuerySnapshot>(
-      stream: _firebaseService.productsStream(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        if (!snapshot.hasData || snapshot.data == null || snapshot.data!.docs.isEmpty) {
-          return _buildEmptyCartPrompt(isDarkMode);
-        }
-
-        List<Product> products = [];
-        for (var doc in snapshot.data!.docs) {
-          try {
-            final data = doc.data() as Map<String, dynamic>;
-            if (!data.containsKey('name')) continue;
-            products.add(Product.fromMap(data, doc.id));
-          } catch (e) {
-            debugPrint('Error parsing product: $e');
-          }
-        }
-
-        if (products.isEmpty) {
-          return _buildEmptyCartPrompt(isDarkMode);
-        }
-
-        return Padding(
-          padding: const EdgeInsets.all(16),
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: isDark ? AppColors.darkSurface : AppColors.lightSurface,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => Container(
+          padding: const EdgeInsets.all(20),
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.75),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Text(
-                  'Product Catalog (${products.length} Items)',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: isDarkMode ? Colors.white : Colors.grey.shade800,
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Held Orders (${_heldOrders.length})',
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
-                ),
+                  IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                ],
               ),
+              const Divider(height: 20),
               Expanded(
-                child: GridView.builder(
-                  gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                    maxCrossAxisExtent: 220,
-                    childAspectRatio: 1.1,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                  ),
-                  itemCount: products.length,
-                  itemBuilder: (context, index) {
-                    final product = products[index];
-                    return Card(
-                      elevation: 2,
-                      color: isDarkMode ? Colors.grey.shade800 : Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(12),
-                        onTap: () => _addProductToCartFromModel(product),
-                        child: Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                child: ListView.separated(
+                  itemCount: _heldOrders.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 10),
+                  itemBuilder: (ctx, i) {
+                    final order = _heldOrders[i];
+                    return PosCard(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Row(
-                                children: [
-                                  CircleAvatar(
-                                    radius: 18,
-                                    backgroundColor: isDarkMode ? Colors.blue.shade900 : Colors.blue.shade100,
-                                    child: Text(
-                                      product.name.isNotEmpty ? product.name.substring(0, 1).toUpperCase() : 'P',
-                                      style: TextStyle(
-                                        color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      product.name,
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 14,
-                                        color: isDarkMode ? Colors.white : Colors.black,
-                                      ),
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ],
+                              Text(
+                                order.customerName,
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                               ),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        '$currencySymbol${product.price.toStringAsFixed(2)}',
-                                        style: TextStyle(
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.bold,
-                                          color: isDarkMode ? Colors.green.shade400 : Colors.green.shade700,
-                                        ),
-                                      ),
-                                      Text(
-                                        'Stock: ${product.stock}',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          color: product.stock <= product.minStock
-                                              ? Colors.red
-                                              : (isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  Container(
-                                    padding: const EdgeInsets.all(6),
-                                    decoration: BoxDecoration(
-                                      color: isDarkMode ? Colors.blue.shade900 : Colors.blue.shade50,
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Icon(
-                                      Icons.add_shopping_cart,
-                                      size: 18,
-                                      color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
-                                    ),
-                                  ),
-                                ],
+                              Text(
+                                FormatService.formatCurrency(order.totalAmount, symbol: currencySymbol),
+                                style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.success),
                               ),
                             ],
                           ),
-                        ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${order.totalItems} items • Held ${FormatService.timeAgo(order.heldAt)}${order.note.isNotEmpty ? ' • "${order.note}"' : ''}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              TextButton.icon(
+                                onPressed: () {
+                                  setState(() => _heldOrders.removeAt(i));
+                                  setSheetState(() {});
+                                  FeedbackService.lightTap();
+                                },
+                                icon: const Icon(Icons.delete_outline, size: 16, color: AppColors.error),
+                                label: const Text('Discard', style: TextStyle(color: AppColors.error)),
+                              ),
+                              const SizedBox(width: 8),
+                              ElevatedButton.icon(
+                                onPressed: () {
+                                  if (_cart.isNotEmpty) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('Please clear or hold active cart before restoring.'), behavior: SnackBarBehavior.floating),
+                                    );
+                                    return;
+                                  }
+                                  setState(() {
+                                    _cart.addAll(order.items);
+                                    _orderDiscountPercent = order.discountPercent;
+                                    _orderDiscountAmount = order.discountAmount;
+                                    _heldOrders.removeAt(i);
+                                  });
+                                  Navigator.pop(ctx);
+                                  FeedbackService.success();
+                                },
+                                icon: const Icon(Icons.restore, size: 16),
+                                label: const Text('Resume'),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     );
                   },
@@ -1140,283 +370,470 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
           ),
-        );
-      },
-    );
-  }
-
-  void _updateCartQuantity(Product product, int change) {
-    int index = _cartItems.indexOf(product);
-    if (index != -1) {
-      int newQuantity = product.stock + change;
-      if (newQuantity > 0) {
-        _cartItems[index] = product.copyWith(stock: newQuantity);
-      } else {
-        _cartItems.removeAt(index);
-      }
-      _updateTotals();
-    }
-  }
-
-  void _updateTotals() {
-    _totalAmount = _cartItems.fold(0.0, (sum, item) => sum + (item.price * item.stock));
-    _totalProfit = _cartItems.fold(0.0, (sum, item) => sum + ((item.price - item.costPrice) * item.stock));
-  }
-
-  Future<bool> _showCustomerDialog() async {
-    final result = await showDialog<CustomerDetails>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => CustomerSelectionDialog(
-        initialName: _customerName,
-        initialPhone: _customerPhone,
-        initialEmail: _customerEmail,
-        initialAddress: _customerAddress,
-      ),
-    );
-
-    if (result == null) {
-      return false;
-    }
-
-    setState(() {
-      _customerId = result.id;
-      _customerName = result.name;
-      _customerPhone = result.phone;
-      _customerEmail = result.email;
-      _customerAddress = result.address;
-      _isGuestCustomer = result.isGuest;
-    });
-
-    return true;
-  }
-
-  void _processCheckout() async {
-    if (_cartItems.isEmpty) return;
-
-    final customerSet = await _showCustomerDialog();
-    if (!customerSet) {
-      return;
-    }
-
-    setState(() => _isLoading = true);
-
-    try {
-      final productIds = _cartItems.map((item) => item.id).toList();
-
-      final productDocs = await _firebaseService.getProductsByIds(productIds);
-      
-      for (var item in _cartItems) {
-        final doc = productDocs[item.id];
-        if (doc == null || !doc.exists) {
-          _showSnackBar('❌ Product "${item.name}" not found in inventory');
-          setState(() => _isLoading = false);
-          return;
-        }
-        
-        final data = doc.data() as Map<String, dynamic>;
-        final availableStock = ((data['stock'] ?? 0) as num).toInt(); // ✅ Safe parsing
-        
-        if (availableStock < item.stock) {
-          _showSnackBar(
-            '❌ Insufficient stock for ${item.name}. Available: $availableStock'
-          );
-          setState(() => _isLoading = false);
-          return;
-        }
-      }
-
-      final confirm = await _showConfirmationDialog();
-      if (!confirm) {
-        setState(() => _isLoading = false);
-        return;
-      }
-
-      final receiptNumber = 'RCP-${DateTime.now().millisecondsSinceEpoch}';
-      final receiptCartItems = List<Product>.from(_cartItems);
-      final receiptTotalAmount = _totalAmount;
-      final receiptTotalProfit = _totalProfit;
-      final receiptPaymentMethod = _selectedPaymentMethod;
-
-      final salesData = _cartItems.map((item) {
-        return {
-          'productId': item.id,
-          'productName': item.name,
-          'quantity': item.stock,
-          'price': item.price,
-          'costPrice': item.costPrice,
-          'total': item.price * item.stock,
-          'profit': (item.price - item.costPrice) * item.stock,
-          'saleDate': DateTime.now(),
-          'paymentMethod': _selectedPaymentMethod,
-          'receiptNumber': receiptNumber,
-          'customerId': _customerId,
-          'customerName': _customerName,
-          'customerPhone': _customerPhone,
-          'customerEmail': _customerEmail,
-          'customerAddress': _customerAddress,
-          'isGuestCustomer': _isGuestCustomer,
-        };
-      }).toList();
-
-      final stockUpdates = <String, int>{};
-      for (var item in _cartItems) {
-        stockUpdates[item.id] = -item.stock;
-      }
-
-      await Future.wait([
-        _firebaseService.addMultipleSales(salesData),
-        _firebaseService.updateMultipleProductsStock(stockUpdates),
-      ]);
-
-      setState(() {
-        _cartItems.clear();
-        _updateTotals();
-        _isLoading = false;
-        
-        // Reset customer for next order
-        _customerId = 'guest';
-        _customerName = 'Guest Customer';
-        _customerPhone = '';
-        _customerEmail = null;
-        _isGuestCustomer = true;
-      });
-
-      _showSnackBar('✅ Sale completed! Receipt #$receiptNumber');
-
-      _showReceiptDialog(
-        cartItems: receiptCartItems,
-        totalAmount: receiptTotalAmount,
-        totalProfit: receiptTotalProfit,
-        paymentMethod: receiptPaymentMethod,
-        receiptNumber: receiptNumber,
-        customerName: _customerName,
-        customerPhone: _customerPhone,
-        customerEmail: _customerEmail,
-        isGuestCustomer: _isGuestCustomer,
-      );
-      
-    } catch (e) {
-      _showSnackBar('❌ Checkout failed: $e');
-      debugPrint('Checkout error: $e');
-      setState(() => _isLoading = false);
-    }
-  }
-
-  void _showReceiptDialog({
-    required List<Product> cartItems,
-    required double totalAmount,
-    required double totalProfit,
-    required String paymentMethod,
-    required String receiptNumber,
-    String customerName = 'Guest Customer',
-    String customerPhone = '',
-    String? customerEmail,
-    bool isGuestCustomer = true,
-  }) {
-    showDialog(
-      context: context,
-      builder: (context) => ReceiptDialog(
-        cartItems: cartItems,
-        totalAmount: totalAmount,
-        totalProfit: totalProfit,
-        selectedPaymentMethod: paymentMethod,
-        receiptNumber: receiptNumber,
-        customerName: customerName,
-        customerPhone: customerPhone,
-        customerEmail: customerEmail,
-        isGuestCustomer: isGuestCustomer,
-      ),
-    );
-  }
-
-  void _showProductSelection(QuerySnapshot snapshot) {
-    final settingsProvider = Provider.of<SettingsProvider>(context, listen: false);
-    final currencySymbol = settingsProvider.currencySymbol;
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-
-    if (snapshot.docs.isEmpty) {
-      _showSnackBar('No products found in inventory');
-      return;
-    }
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(
-          'Select Product',
-          style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
         ),
-        backgroundColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
-        content: SizedBox(
-          width: double.maxFinite,
-          height: 350,
-          child: ListView.builder(
-            itemCount: snapshot.docs.length,
-            itemBuilder: (context, index) {
-              var data = snapshot.docs[index].data() as Map<String, dynamic>;
-              return Material(
-                color: Colors.transparent,
-                borderRadius: BorderRadius.circular(8),
-                child: ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: isDarkMode ? Colors.blue.shade900 : Colors.blue.shade100,
-                    child: Text(
-                      (data['stock'] ?? 0).toString(),
-                      style: TextStyle(
-                        color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  title: Text(
-                    data['name'] ?? '',
-                    style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
-                  ),
-                  subtitle: Text(
-                    'Price: $currencySymbol${data['price']} | Stock: ${data['stock']}',
-                    style: TextStyle(
-                      color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                    ),
-                  ),
-                  trailing: IconButton(
-                    icon: Icon(
-                      Icons.add_circle,
-                      color: isDarkMode ? Colors.green.shade400 : Colors.green,
-                    ),
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _addProductToCart(snapshot.docs[index]);
-                    },
-                  ),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _addProductToCart(snapshot.docs[index]);
-                  },
-                ),
-              );
-            },
+      ),
+    );
+  }
+
+  // ==================== QUICK CUSTOM ITEM ====================
+
+  void _showQuickCustomItemModal() {
+    final nameCtrl = TextEditingController();
+    final priceCtrl = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Add Custom / Misc Item'),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: nameCtrl,
+                autofocus: true,
+                decoration: const InputDecoration(labelText: 'Item Name / Description', hintText: 'e.g. Custom Repair, Service'),
+                validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter item name' : null,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: priceCtrl,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(labelText: 'Price', prefixText: '\$ '),
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return 'Enter price';
+                  if (double.tryParse(v.trim()) == null) return 'Enter valid number';
+                  return null;
+                },
+              ),
+            ],
           ),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Close',
-              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
-            ),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () {
+              if (formKey.currentState!.validate()) {
+                final price = double.parse(priceCtrl.text.trim());
+                final item = CartItem.custom(name: nameCtrl.text.trim(), price: price);
+                setState(() => _cart.add(item));
+                Navigator.pop(ctx);
+                FeedbackService.selection();
+              }
+            },
+            child: const Text('Add to Cart'),
           ),
         ],
       ),
     );
   }
+
+  // ==================== CHECKOUT & PAYMENT MODAL ====================
+
+  void _openCheckoutModal() {
+    if (_cart.isEmpty) return;
+
+    final settingsProvider = Provider.of<SettingsProvider>(context, listen: false);
+    final currencySymbol = settingsProvider.currencySymbol;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    String selectedMethod = 'Cash';
+    final cashController = TextEditingController(text: _grandTotal.toStringAsFixed(2));
+    double tenderedCash = _grandTotal;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: isDark ? AppColors.darkSurface : AppColors.lightSurface,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) {
+          final changeDue = (tenderedCash - _grandTotal).clamp(0.0, double.infinity);
+
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(ctx).viewInsets.bottom,
+              top: 20,
+              left: 20,
+              right: 20,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Title & Total
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Complete Checkout', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                      IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  PosCard(
+                    gradient: isDark ? AppColors.darkCardGradient : AppColors.primaryGradient,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Total Amount Due',
+                              style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 13),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              FormatService.formatCurrency(_grandTotal, symbol: currencySymbol),
+                              style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            '${_cart.length} Items',
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Payment Method Selector
+                  const Text('Payment Method', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: ['Cash', 'Card', 'Mobile', 'Credit'].map((method) {
+                      final isSelected = selectedMethod == method;
+                      return Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 3),
+                          child: OutlinedButton(
+                            style: OutlinedButton.styleFrom(
+                              backgroundColor: isSelected
+                                  ? (isDark ? AppColors.primaryLight : AppColors.primary)
+                                  : null,
+                              foregroundColor: isSelected ? Colors.white : null,
+                              side: BorderSide(
+                                color: isSelected
+                                    ? (isDark ? AppColors.primaryLight : AppColors.primary)
+                                    : (isDark ? AppColors.darkBorder : AppColors.lightBorder),
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                            onPressed: () {
+                              setModalState(() => selectedMethod = method);
+                              FeedbackService.lightTap();
+                            },
+                            child: Text(method, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Cash Denomination Helpers (When Cash is selected)
+                  if (selectedMethod == 'Cash') ...[
+                    const Text('Cash Tendered & Change', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: cashController,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      decoration: InputDecoration(
+                        labelText: 'Received Amount',
+                        prefixText: '$currencySymbol ',
+                      ),
+                      onChanged: (val) {
+                        setModalState(() {
+                          tenderedCash = double.tryParse(val) ?? _grandTotal;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _buildTenderChip('Exact', _grandTotal, (amt) {
+                          setModalState(() {
+                            tenderedCash = amt;
+                            cashController.text = amt.toStringAsFixed(2);
+                          });
+                        }),
+                        ...[5, 10, 20, 50, 100, 500].where((d) => d >= _grandTotal).take(4).map(
+                          (denom) => _buildTenderChip('$currencySymbol $denom', denom.toDouble(), (amt) {
+                            setModalState(() {
+                              tenderedCash = amt;
+                              cashController.text = amt.toStringAsFixed(2);
+                            });
+                          }),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    PosCard(
+                      backgroundColor: isDark ? AppColors.darkBackground : AppColors.lightBackground,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Change to Return:', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                          Text(
+                            FormatService.formatCurrency(changeDue, symbol: currencySymbol),
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: changeDue > 0 ? AppColors.success : (isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+
+                  const SizedBox(height: 20),
+                  // Process Button
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: ElevatedButton(
+                      onPressed: () => _processCompletedSale(
+                        paymentMethod: selectedMethod,
+                        cashTendered: selectedMethod == 'Cash' ? tenderedCash : _grandTotal,
+                        changeDue: selectedMethod == 'Cash' ? changeDue : 0.0,
+                        modalContext: ctx,
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.success,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      child: const Text(
+                        'Confirm & Complete Sale',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildTenderChip(String label, double amount, Function(double) onSelected) {
+    return ActionChip(
+      label: Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+      onPressed: () => onSelected(amount),
+    );
+  }
+
+  // ==================== PROCESS SALE & SHOW RECEIPT ====================
+
+  Future<void> _processCompletedSale({
+    required String paymentMethod,
+    required double cashTendered,
+    required double changeDue,
+    required BuildContext modalContext,
+  }) async {
+    Navigator.pop(modalContext);
+    setState(() => _isLoading = true);
+
+    try {
+      final receiptNumber = 'REC-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}';
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final settingsProvider = Provider.of<SettingsProvider>(context, listen: false);
+      final currencySymbol = settingsProvider.currencySymbol;
+
+      // 1. Record Sale in Firebase
+      await _firebaseService.processSale(
+        cartItems: _cart.map((c) => Product(
+          id: c.productId,
+          name: c.name,
+          price: c.unitPrice,
+          costPrice: c.costPrice,
+          stock: c.quantity,
+          minStock: 0,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        )).toList(),
+        paymentMethod: paymentMethod,
+        totalAmount: _grandTotal,
+        totalProfit: _totalProfit,
+        receiptNumber: receiptNumber,
+        customerId: _selectedCustomer?.id ?? 'guest',
+        customerName: _selectedCustomer?.name ?? 'Guest Customer',
+        customerPhone: _selectedCustomer?.phone ?? '',
+        customerEmail: _selectedCustomer?.email,
+        customerAddress: _selectedCustomer?.address,
+        isGuestCustomer: _selectedCustomer == null,
+      );
+
+      // 2. Update Customer Lifetime Metrics
+      if (_selectedCustomer != null) {
+        await _customerService.recordSale(
+          customerId: _selectedCustomer!.id,
+          saleAmount: _grandTotal,
+        );
+      }
+
+      // 3. Update Local Product Cache stock
+      for (final cartItem in _cart) {
+        final cached = _cache.getProductById(cartItem.productId);
+        if (cached != null) {
+          final updated = cached.copyWith(stock: (cached.stock - cartItem.quantity).clamp(0, 99999));
+          _cache.upsertProduct(updated);
+        }
+      }
+
+      FeedbackService.success();
+      final capturedCart = List<CartItem>.from(_cart);
+      final customerName = _selectedCustomer?.name ?? 'Guest Customer';
+
+      if (mounted) {
+        setState(() {
+          _cart.clear();
+          _selectedCustomer = null;
+          _orderDiscountPercent = 0.0;
+          _orderDiscountAmount = 0.0;
+          _isLoading = false;
+          _applyFilters();
+        });
+
+        // Show Receipt Success Dialog
+        _showReceiptSuccessDialog(
+          receiptNumber: receiptNumber,
+          items: capturedCart,
+          subtotal: _cartSubtotal,
+          discount: _totalDiscount,
+          tax: _totalTax,
+          grandTotal: _grandTotal,
+          paymentMethod: paymentMethod,
+          cashTendered: cashTendered,
+          changeDue: changeDue,
+          cashierName: authProvider.currentUser?.name ?? 'Cashier',
+          customerName: customerName,
+          currencySymbol: currencySymbol,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        FeedbackService.error();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to process sale: $e'), backgroundColor: AppColors.error, behavior: SnackBarBehavior.floating),
+        );
+      }
+    }
+  }
+
+  void _showReceiptSuccessDialog({
+    required String receiptNumber,
+    required List<CartItem> items,
+    required double subtotal,
+    required double discount,
+    required double tax,
+    required double grandTotal,
+    required String paymentMethod,
+    required double cashTendered,
+    required double changeDue,
+    required String cashierName,
+    required String customerName,
+    required String currencySymbol,
+  }) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.check_circle, color: AppColors.success, size: 28),
+            SizedBox(width: 10),
+            Text('Sale Successful!'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Receipt #: $receiptNumber', style: const TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 6),
+            Text('Total Paid: ${FormatService.formatCurrency(grandTotal, symbol: currencySymbol)} ($paymentMethod)'),
+            if (changeDue > 0) Text('Change Given: ${FormatService.formatCurrency(changeDue, symbol: currencySymbol)}'),
+            const SizedBox(height: 12),
+            const Text('Customer receipt is ready for thermal printing or digital delivery.'),
+          ],
+        ),
+        actions: [
+          TextButton.icon(
+            onPressed: () async {
+              final pdf = await ReceiptService.generatePdfReceipt(
+                businessName: 'Point of Sale Retail',
+                receiptNumber: receiptNumber,
+                date: DateTime.now(),
+                cashierName: cashierName,
+                customerName: customerName,
+                items: items.map((i) => {
+                  'name': i.name,
+                  'qty': i.quantity,
+                  'price': i.unitPrice,
+                  'total': i.total,
+                }).toList(),
+                subtotal: subtotal,
+                tax: tax,
+                discount: discount,
+                grandTotal: grandTotal,
+                paymentMethod: paymentMethod,
+                cashTendered: cashTendered,
+                changeDue: changeDue,
+                currencySymbol: currencySymbol,
+              );
+              await ReceiptService.printReceipt(pdf);
+            },
+            icon: const Icon(Icons.print),
+            label: const Text('Print Receipt'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Next Sale'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==================== SCANNER & VOICE SHORTCUTS ====================
 
   void _showQRScanner() {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => QRScanner(
-          onScan: (qrCode) => _searchProduct(qrCode),
+        builder: (_) => QRScanner(
+          onScan: (code) {
+            final p = _cache.getProductByBarcode(code);
+            if (p != null) {
+              _addToCart(p);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Added ${p.name} to cart!'), behavior: SnackBarBehavior.floating),
+              );
+            } else {
+              _searchController.text = code;
+              _onSearchChanged(code);
+            }
+          },
         ),
       ),
     );
@@ -1426,9 +843,19 @@ class _HomeScreenState extends State<HomeScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => BarcodeScanner(
-          expectedType: ScannerExpectedType.barcode,
-          onScan: (barcode) => _searchProduct(barcode),
+        builder: (_) => BarcodeScanner(
+          onScan: (code) {
+            final p = _cache.getProductByBarcode(code);
+            if (p != null) {
+              _addToCart(p);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Added ${p.name} to cart!'), behavior: SnackBarBehavior.floating),
+              );
+            } else {
+              _searchController.text = code;
+              _onSearchChanged(code);
+            }
+          },
         ),
       ),
     );
@@ -1437,134 +864,593 @@ class _HomeScreenState extends State<HomeScreen> {
   void _showVoiceInput() {
     showModalBottomSheet(
       context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => VoiceInput(
-        onVoiceRecognized: (text) => _searchProduct(text),
+      builder: (_) => VoiceInput(
+        onVoiceRecognized: (text) {
+          _searchController.text = text;
+          _onSearchChanged(text);
+        },
       ),
     );
   }
 
-  void _clearCart() {
-    if (_cartItems.isEmpty) return;
-    
-    showDialog(
+  void _selectCustomer() async {
+    final selected = await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Clear Cart'),
-        content: const Text('Are you sure you want to clear all items from cart?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+      builder: (_) => const CustomerSelectionDialog(),
+    );
+
+    if (selected != null) {
+      setState(() {
+        _selectedCustomer = Customer(
+          id: selected['id'] ?? 'guest',
+          name: selected['name'] ?? selected['customerName'] ?? 'Customer',
+          phone: selected['phone'] ?? selected['customerPhone'] ?? '',
+          email: selected['email'] ?? selected['customerEmail'] ?? '',
+          address: selected['address'] ?? selected['customerAddress'] ?? '',
+          createdAt: DateTime.now(),
+        );
+      });
+      FeedbackService.selection();
+    }
+  }
+
+  // ==================== BUILD UI ====================
+
+  @override
+  Widget build(BuildContext context) {
+    final settingsProvider = Provider.of<SettingsProvider>(context);
+    final currencySymbol = settingsProvider.currencySymbol;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isTablet = MediaQuery.of(context).size.width >= 900;
+
+    return Scaffold(
+      body: isTablet
+          ? Row(
+              children: [
+                // Left catalog pane (60% width)
+                Expanded(
+                  flex: 6,
+                  child: _buildCatalogPane(currencySymbol, isDark),
+                ),
+                // Vertical divider
+                VerticalDivider(
+                  width: 1,
+                  color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+                ),
+                // Right cart pane (40% width)
+                Expanded(
+                  flex: 4,
+                  child: _buildCartPane(currencySymbol, isDark),
+                ),
+              ],
+            )
+          : Column(
+              children: [
+                // Mobile Top Bar
+                _buildSearchBar(isDark),
+                _buildCategoryFilter(isDark),
+                Expanded(child: _buildCatalogGrid(currencySymbol, isDark)),
+                _buildMobileCartBottomBar(currencySymbol, isDark),
+              ],
+            ),
+    );
+  }
+
+  // ==================== CATALOG PANE ====================
+
+  Widget _buildCatalogPane(String currencySymbol, bool isDark) {
+    return Column(
+      children: [
+        _buildSearchBar(isDark),
+        _buildCategoryFilter(isDark),
+        Expanded(child: _buildCatalogGrid(currencySymbol, isDark)),
+      ],
+    );
+  }
+
+  Widget _buildSearchBar(bool isDark) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
+        border: Border(
+          bottom: BorderSide(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _searchController,
+              focusNode: _searchFocusNode,
+              onChanged: _onSearchChanged,
+              decoration: InputDecoration(
+                hintText: 'Search products by name, SKU, or barcode...',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: _searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, size: 18),
+                        onPressed: () {
+                          _searchController.clear();
+                          _onSearchChanged('');
+                        },
+                      )
+                    : null,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              ),
+            ),
           ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              setState(() {
-                _cartItems.clear();
-                _updateTotals();
-              });
-              _showSnackBar('Cart cleared');
-            },
-            child: const Text('Clear All'),
+          const SizedBox(width: 8),
+          IconButton.filledTonal(
+            icon: const Icon(Icons.barcode_reader),
+            tooltip: 'Barcode Scanner',
+            onPressed: _showBarcodeScanner,
+          ),
+          const SizedBox(width: 4),
+          IconButton.filledTonal(
+            icon: const Icon(Icons.qr_code_scanner),
+            tooltip: 'QR Scanner',
+            onPressed: _showQRScanner,
+          ),
+          const SizedBox(width: 4),
+          IconButton.filledTonal(
+            icon: const Icon(Icons.mic),
+            tooltip: 'Voice Search',
+            onPressed: _showVoiceInput,
+          ),
+          const SizedBox(width: 4),
+          IconButton.filled(
+            icon: const Icon(Icons.add_shopping_cart),
+            tooltip: 'Custom Item',
+            onPressed: _showQuickCustomItemModal,
           ),
         ],
       ),
     );
   }
 
-  Future<bool> _showConfirmationDialog() async {
-    final settingsProvider = Provider.of<SettingsProvider>(context, listen: false);
-    final currencySymbol = settingsProvider.currencySymbol;
-    final showProfit = settingsProvider.showProfitInPOS;
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+  Widget _buildCategoryFilter(bool isDark) {
+    final categories = _cache.allCategories;
 
-    return await showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(
-          'Confirm Checkout',
-          style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
-        ),
-        backgroundColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Total items: ${_cartItems.length}',
-              style: TextStyle(
-                fontWeight: FontWeight.w500,
-                color: isDarkMode ? Colors.white : Colors.black,
+    return Container(
+      height: 48,
+      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        itemCount: categories.length,
+        itemBuilder: (ctx, i) {
+          final cat = categories[i];
+          final isSelected = _selectedCategory == cat;
+          return CategoryPill(
+            title: cat,
+            isSelected: isSelected,
+            onTap: () {
+              setState(() {
+                _selectedCategory = cat;
+                _applyFilters();
+              });
+              FeedbackService.lightTap();
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildCatalogGrid(String currencySymbol, bool isDark) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_filteredProducts.isEmpty) {
+      return EmptyStateView(
+        icon: Icons.inventory_2_outlined,
+        title: 'No products found',
+        description: 'Try adjusting your search or category filter.',
+        actionLabel: 'Add Custom Item',
+        onAction: _showQuickCustomItemModal,
+      );
+    }
+
+    return GridView.builder(
+      padding: const EdgeInsets.all(16),
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 220,
+        mainAxisSpacing: 14,
+        crossAxisSpacing: 14,
+        childAspectRatio: 0.82,
+      ),
+      itemCount: _filteredProducts.length,
+      itemBuilder: (ctx, i) {
+        final product = _filteredProducts[i];
+        final inStock = product.stock > 0;
+
+        return PosCard(
+          padding: const EdgeInsets.all(12),
+          onTap: inStock ? () => _addToCart(product) : null,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Category & Stock Badge
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      product.category,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  StatBadge.stock(stock: product.stock, minStock: product.minStock),
+                ],
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Total amount: $currencySymbol${_totalAmount.toStringAsFixed(2)}',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: isDarkMode ? Colors.green.shade400 : Colors.green,
+              const Spacer(),
+              // Icon Placeholder / Thumbnail
+              Center(
+                child: Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? AppColors.primaryLight.withValues(alpha: 0.1)
+                        : AppColors.primary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(
+                    Icons.shopping_bag_outlined,
+                    color: isDark ? AppColors.primaryLight : AppColors.primary,
+                    size: 28,
+                  ),
+                ),
               ),
-            ),
-            if (showProfit) ...[
-              const SizedBox(height: 4),
+              const Spacer(),
+              // Product Name & Price
               Text(
-                'Total profit: $currencySymbol${_totalProfit.toStringAsFixed(2)}',
+                product.name,
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 4),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    FormatService.formatCurrency(product.salePrice ?? product.price, symbol: currencySymbol),
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? AppColors.success : AppColors.primaryDark,
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: isDark ? AppColors.primaryLight : AppColors.primary,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.add, size: 14, color: Colors.white),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // ==================== CART PANE ====================
+
+  Widget _buildCartPane(String currencySymbol, bool isDark) {
+    return Container(
+      color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
+      child: Column(
+        children: [
+          // Cart Header & Customer selector
+          _buildCartHeader(isDark),
+          const Divider(height: 1),
+
+          // Items List
+          Expanded(
+            child: _cart.isEmpty
+                ? const EmptyStateView(
+                    icon: Icons.shopping_cart_outlined,
+                    title: 'Cart is Empty',
+                    description: 'Select products from the catalog or scan a barcode to begin checkout.',
+                  )
+                : ListView.separated(
+                    padding: const EdgeInsets.all(12),
+                    itemCount: _cart.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 8),
+                    itemBuilder: (ctx, i) => _buildCartItemTile(_cart[i], i, currencySymbol, isDark),
+                  ),
+          ),
+
+          // Order Totals & Pay Section
+          if (_cart.isNotEmpty) _buildCartSummary(currencySymbol, isDark),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCartHeader(bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.shopping_cart, size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Order Cart (${_cart.length})',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              Row(
+                children: [
+                  if (_heldOrders.isNotEmpty)
+                    Badge(
+                      label: Text('${_heldOrders.length}'),
+                      child: IconButton(
+                        icon: const Icon(Icons.history_toggle_off),
+                        tooltip: 'Held Orders',
+                        onPressed: _showHeldOrdersModal,
+                      ),
+                    ),
+                  IconButton(
+                    icon: const Icon(Icons.pause_circle_outline),
+                    tooltip: 'Hold / Park Sale',
+                    onPressed: _parkActiveSale,
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete_sweep_outlined, color: AppColors.error),
+                    tooltip: 'Clear Cart',
+                    onPressed: _clearCart,
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // Customer Selector Bar
+          InkWell(
+            onTap: _selectCustomer,
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.darkCard : AppColors.lightBackground,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.person_outline, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _selectedCustomer != null
+                          ? '${_selectedCustomer!.name} (${_selectedCustomer!.phone.isNotEmpty ? _selectedCustomer!.phone : 'Customer'})'
+                          : 'Guest Customer (Tap to attach customer)',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: _selectedCustomer != null ? FontWeight.bold : FontWeight.normal,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (_selectedCustomer != null)
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 16),
+                      onPressed: () => setState(() => _selectedCustomer = null),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    )
+                  else
+                    const Icon(Icons.arrow_drop_down),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCartItemTile(CartItem item, int index, String currencySymbol, bool isDark) {
+    return PosCard(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.name,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  FormatService.formatCurrency(item.unitPrice, symbol: currencySymbol),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Quantity Stepper
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.remove, size: 16),
+                onPressed: () => _decrementQty(index),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: isDark ? AppColors.darkBackground : AppColors.lightBackground,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  '${item.quantity}',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.add, size: 16),
+                onPressed: () => _incrementQty(index),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+              ),
+            ],
+          ),
+          const SizedBox(width: 8),
+          // Item Total
+          Text(
+            FormatService.formatCurrency(item.total, symbol: currencySymbol),
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+          ),
+          const SizedBox(width: 4),
+          IconButton(
+            icon: const Icon(Icons.close, size: 16, color: AppColors.error),
+            tooltip: 'Remove',
+            onPressed: () => _removeFromCart(index),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCartSummary(String currencySymbol, bool isDark) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkCard : AppColors.lightCard,
+        border: Border(top: BorderSide(color: isDark ? AppColors.darkBorder : AppColors.lightBorder)),
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Subtotal', style: TextStyle(color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary)),
+              Text(FormatService.formatCurrency(_cartSubtotal, symbol: currencySymbol)),
+            ],
+          ),
+          if (_totalDiscount > 0) ...[
+            const SizedBox(height: 4),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Discounts', style: TextStyle(color: AppColors.error)),
+                Text('-${FormatService.formatCurrency(_totalDiscount, symbol: currencySymbol)}', style: const TextStyle(color: AppColors.error)),
+              ],
+            ),
+          ],
+          const Divider(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Grand Total', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              Text(
+                FormatService.formatCurrency(_grandTotal, symbol: currencySymbol),
                 style: TextStyle(
-                  color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? AppColors.primaryLight : AppColors.primary,
                 ),
               ),
             ],
-            const SizedBox(height: 8),
-            Divider(color: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade300),
-            const SizedBox(height: 8),
-            Text(
-              'Proceed with checkout?',
-              style: TextStyle(
-                fontWeight: FontWeight.w500,
-                color: isDarkMode ? Colors.white : Colors.black,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(
-              'Cancel',
-              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
-            ),
           ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: isDarkMode ? Colors.green.shade400 : Colors.green.shade700,
-              foregroundColor: Colors.white,
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton.icon(
+              onPressed: _openCheckoutModal,
+              icon: const Icon(Icons.payment, size: 20),
+              label: const Text('Charge & Checkout', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             ),
-            child: const Text('Confirm'),
           ),
         ],
       ),
-    ) ?? false;
+    );
   }
 
-  void _showSnackBar(String message) {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+  Widget _buildMobileCartBottomBar(String currencySymbol, bool isDark) {
+    if (_cart.isEmpty) return const SizedBox.shrink();
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          message,
-          style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 10,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        child: Row(
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '${_cart.length} items in cart',
+                  style: TextStyle(fontSize: 12, color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+                ),
+                Text(
+                  FormatService.formatCurrency(_grandTotal, symbol: currencySymbol),
+                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            const Spacer(),
+            ElevatedButton.icon(
+              onPressed: () {
+                showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  backgroundColor: isDark ? AppColors.darkSurface : AppColors.lightSurface,
+                  shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+                  builder: (_) => SizedBox(
+                    height: MediaQuery.of(context).size.height * 0.8,
+                    child: _buildCartPane(currencySymbol, isDark),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.shopping_cart_checkout),
+              label: const Text('View Cart'),
+            ),
+          ],
         ),
-        duration: const Duration(seconds: 2),
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );
   }

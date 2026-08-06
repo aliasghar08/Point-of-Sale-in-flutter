@@ -346,11 +346,6 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final settingsProvider = Provider.of<SettingsProvider>(
-        context,
-        listen: false,
-      );
-
       final product = Product(
         id: widget.isEditing ? widget.product!.id : '',
         name: _nameController.text.trim(),
@@ -412,14 +407,16 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
         _showSnackBar('✅ Product updated successfully!');
       } else {
         await firebaseService.addProduct(product.toMap());
-        _showSnackBar('✅ Product added successfully!');
+        if (mounted) _showSnackBar('✅ Product added successfully!');
       }
 
-      Navigator.pop(context, true);
+      if (mounted) {
+        Navigator.pop(context, true);
+      }
     } catch (e) {
-      _showSnackBar('❌ Error: $e', isError: true);
+      if (mounted) _showSnackBar('❌ Error: $e', isError: true);
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -612,8 +609,8 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
         boxShadow: [
           BoxShadow(
             color: isDarkMode
-                ? Colors.black.withOpacity(0.3)
-                : Colors.grey.withOpacity(0.1),
+                ? Colors.black.withValues(alpha: 0.3)
+                : Colors.grey.withValues(alpha: 0.1),
             spreadRadius: 1,
             blurRadius: 5,
           ),
@@ -691,7 +688,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                             child: Container(
                               padding: const EdgeInsets.all(4),
                               decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.6),
+                                color: Colors.black.withValues(alpha: 0.6),
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: Row(
@@ -804,8 +801,8 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
         boxShadow: [
           BoxShadow(
             color: isDarkMode
-                ? Colors.black.withOpacity(0.3)
-                : Colors.grey.withOpacity(0.1),
+                ? Colors.black.withValues(alpha: 0.3)
+                : Colors.grey.withValues(alpha: 0.1),
             spreadRadius: 1,
             blurRadius: 5,
           ),
@@ -924,8 +921,8 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
         boxShadow: [
           BoxShadow(
             color: isDarkMode
-                ? Colors.black.withOpacity(0.3)
-                : Colors.grey.withOpacity(0.1),
+                ? Colors.black.withValues(alpha: 0.3)
+                : Colors.grey.withValues(alpha: 0.1),
             spreadRadius: 1,
             blurRadius: 5,
           ),
@@ -1208,7 +1205,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: DropdownButtonFormField<String>(
-                    value: _selectedUnit,
+                    initialValue: _selectedUnit,
                     decoration: const InputDecoration(
                       labelText: 'Unit *',
                       border: InputBorder.none,
@@ -1261,8 +1258,8 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
         boxShadow: [
           BoxShadow(
             color: isDarkMode
-                ? Colors.black.withOpacity(0.3)
-                : Colors.grey.withOpacity(0.1),
+                ? Colors.black.withValues(alpha: 0.3)
+                : Colors.grey.withValues(alpha: 0.1),
             spreadRadius: 1,
             blurRadius: 5,
           ),
@@ -1307,7 +1304,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                 borderRadius: BorderRadius.circular(8),
               ),
               child: DropdownButtonFormField<String>(
-                value: _selectedWeightUnit,
+                initialValue: _selectedWeightUnit,
                 decoration: const InputDecoration(
                   labelText: 'Weight Unit',
                   border: InputBorder.none,
@@ -1350,8 +1347,8 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
         boxShadow: [
           BoxShadow(
             color: isDarkMode
-                ? Colors.black.withOpacity(0.3)
-                : Colors.grey.withOpacity(0.1),
+                ? Colors.black.withValues(alpha: 0.3)
+                : Colors.grey.withValues(alpha: 0.1),
             spreadRadius: 1,
             blurRadius: 5,
           ),
@@ -1416,7 +1413,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
             Expanded(
               child: Text(
                 date != null
-                    ? '${DateFormat('dd/MM/yyyy').format(date)}'
+                    ? DateFormat('dd/MM/yyyy').format(date)
                     : label,
                 style: TextStyle(
                   color: date != null
@@ -1450,8 +1447,8 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
         boxShadow: [
           BoxShadow(
             color: isDarkMode
-                ? Colors.black.withOpacity(0.3)
-                : Colors.grey.withOpacity(0.1),
+                ? Colors.black.withValues(alpha: 0.3)
+                : Colors.grey.withValues(alpha: 0.1),
             spreadRadius: 1,
             blurRadius: 5,
           ),
@@ -1546,7 +1543,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: DropdownButtonFormField<String>(
-                    value: _selectedCategory,
+                    initialValue: _selectedCategory,
                     decoration: const InputDecoration(
                       labelText: 'Category *',
                       border: InputBorder.none,
@@ -1596,7 +1593,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: DropdownButtonFormField<String>(
-                    value: _selectedSubCategory,
+                    initialValue: _selectedSubCategory,
                     decoration: const InputDecoration(
                       labelText: 'Sub Category',
                       border: InputBorder.none,
@@ -1644,7 +1641,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: DropdownButtonFormField<String>(
-                    value: _selectedTaxClass,
+                    initialValue: _selectedTaxClass,
                     decoration: const InputDecoration(
                       labelText: 'Tax Class',
                       border: InputBorder.none,
@@ -1735,8 +1732,8 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
         boxShadow: [
           BoxShadow(
             color: isDarkMode
-                ? Colors.black.withOpacity(0.3)
-                : Colors.grey.withOpacity(0.1),
+                ? Colors.black.withValues(alpha: 0.3)
+                : Colors.grey.withValues(alpha: 0.1),
             spreadRadius: 1,
             blurRadius: 5,
           ),
@@ -1809,8 +1806,8 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
         boxShadow: [
           BoxShadow(
             color: isDarkMode
-                ? Colors.black.withOpacity(0.3)
-                : Colors.grey.withOpacity(0.1),
+                ? Colors.black.withValues(alpha: 0.3)
+                : Colors.grey.withValues(alpha: 0.1),
             spreadRadius: 1,
             blurRadius: 5,
           ),
@@ -1841,7 +1838,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                 _isActive = value;
               });
             },
-            activeColor: isDarkMode ? Colors.green.shade400 : Colors.green,
+            activeThumbColor: isDarkMode ? Colors.green.shade400 : Colors.green,
             inactiveThumbColor: isDarkMode ? Colors.grey.shade400 : Colors.grey,
             contentPadding: EdgeInsets.zero,
           ),
@@ -1869,7 +1866,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                 _isFeatured = value;
               });
             },
-            activeColor: isDarkMode ? Colors.orange.shade400 : Colors.orange,
+            activeThumbColor: isDarkMode ? Colors.orange.shade400 : Colors.orange,
             inactiveThumbColor: isDarkMode ? Colors.grey.shade400 : Colors.grey,
             contentPadding: EdgeInsets.zero,
           ),
@@ -1897,7 +1894,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                 _isDigital = value;
               });
             },
-            activeColor: isDarkMode ? Colors.purple.shade400 : Colors.purple,
+            activeThumbColor: isDarkMode ? Colors.purple.shade400 : Colors.purple,
             inactiveThumbColor: isDarkMode ? Colors.grey.shade400 : Colors.grey,
             contentPadding: EdgeInsets.zero,
           ),
@@ -1925,7 +1922,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                 _hasVariants = value;
               });
             },
-            activeColor: isDarkMode ? Colors.blue.shade400 : Colors.blue,
+            activeThumbColor: isDarkMode ? Colors.blue.shade400 : Colors.blue,
             inactiveThumbColor: isDarkMode ? Colors.grey.shade400 : Colors.grey,
             contentPadding: EdgeInsets.zero,
           ),

@@ -325,7 +325,7 @@ class AppSettings {
       }
       return null;
     } catch (e) {
-      print('IP detection error: $e');
+      debugPrint('IP detection error: $e');
       return null;
     }
   }
@@ -361,16 +361,16 @@ class AppSettings {
       if (countryCode != null && countryCode.isNotEmpty) {
         final currency = getCurrencyForCountry(countryCode);
         if (currency != null) {
-          print('✅ Currency detected: ${currency['symbol']} (${currency['code']}) for $countryCode');
+          debugPrint('✅ Currency detected: ${currency['symbol']} (${currency['code']}) for $countryCode');
           return currency;
         }
       }
 
       // Default to Pakistan (PKR) if detection fails
-      print('⚠️ Using default currency: ₨ (PKR)');
+      debugPrint('⚠️ Using default currency: ₨ (PKR)');
       return {'symbol': '₨', 'code': 'PKR'};
     } catch (e) {
-      print('❌ Currency detection error: $e');
+      debugPrint('❌ Currency detection error: $e');
       return {'symbol': '₨', 'code': 'PKR'};
     }
   }

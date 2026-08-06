@@ -1,10 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
-import 'package:intl/intl.dart';
-import 'package:pos/providers/settings_provider.dart';
+import 'package:pos/models/sale.dart';
 import 'package:pos/services/firebase_service.dart';
+import 'package:pos/services/format_service.dart';
+import 'package:pos/services/feedback_service.dart';
+import 'package:pos/providers/settings_provider.dart';
+import 'package:pos/theme/app_colors.dart';
+import 'package:pos/widgets/pos_card.dart';
+import 'package:pos/widgets/empty_state_view.dart';
 
+/// Modern Executive BI, Analytics & Reports Screen.
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key});
 
@@ -14,1203 +20,436 @@ class ReportsScreen extends StatefulWidget {
 
 class _ReportsScreenState extends State<ReportsScreen> {
   final FirebaseService _firebaseService = FirebaseService();
-  
-  // ✅ CHANGED: Default to 'Today' instead of 'All' to save massive read costs
-  String _selectedPeriod = 'Today'; 
-  DateTime _startDate = DateTime.now();
-  DateTime _endDate = DateTime.now();
-  bool _isLoading = true;
-  
-  // Statistics
-  double _totalSales = 0;
-  double _totalProfit = 0;
-  int _totalItems = 0;
-  int _totalTransactions = 0;
-  double _averageSale = 0;
-  
-  // Customer Statistics
-  int _totalCustomers = 0;
-  int _guestCustomers = 0;
-  int _registeredCustomers = 0;
-  double _averageCustomerSpend = 0;
-  
-  // Top products
-  List<Map<String, dynamic>> _topProducts = [];
-  
-  // Top customers
-  List<Map<String, dynamic>> _topCustomers = [];
-  
-  // Payment method breakdown
-  Map<String, double> _paymentBreakdown = {};
-  
-  // Daily sales data for chart
-  List<Map<String, dynamic>> _dailySales = [];
 
-  final List<String> _periodOptions = [
-    'Today',
-    'Week',
-    'Month',
-    'Year',
-    'Custom',
-    'All', // Moved to end as a fallback option
-  ];
+  String _selectedPeriod = 'Today'; // 'Today', 'Week', 'Month', 'Year', 'All'
+  bool _isLoading = true;
+
+  // Aggregated BI Metrics
+  double _grossSales = 0.0;
+  double _netProfit = 0.0;
+  int _totalOrders = 0;
+  int _totalUnits = 0;
+  double _avgOrderValue = 0.0;
+
+  final Map<String, double> _paymentMethodSplit = {};
+  final List<Map<String, dynamic>> _topProducts = [];
+  final List<Map<String, dynamic>> _topCustomers = [];
+
+  final List<String> _periodOptions = ['Today', 'Week', 'Month', 'Year', 'All'];
 
   @override
   void initState() {
     super.initState();
-    _loadReports();
+    _loadAnalytics();
   }
 
-  Future<void> _loadReports() async {
+  Future<void> _loadAnalytics() async {
     setState(() => _isLoading = true);
     try {
       QuerySnapshot snapshot;
-      
-      // Fetch sales based on selected period
-      if (_selectedPeriod == 'All') {
-        snapshot = await _firebaseService.getAllSales();
-      } else {
-        final startDate = _getStartDate();
-        final endDate = _getEndDate();
+      final now = DateTime.now();
 
-        snapshot = await _firebaseService.getSalesByDateRange(
-          startDate: startDate,
-          endDate: endDate,
-          limit: 1000,
-        );
+      switch (_selectedPeriod) {
+        case 'Today':
+          snapshot = await _firebaseService.getTodaySales();
+          break;
+        case 'Week':
+          snapshot = await _firebaseService.getWeekSales();
+          break;
+        case 'Month':
+          snapshot = await _firebaseService.getMonthSales();
+          break;
+        case 'Year':
+          final startOfYear = DateTime(now.year, 1, 1);
+          snapshot = await _firebaseService.getSalesByDateRange(startDate: startOfYear, endDate: now, limit: 2000);
+          break;
+        case 'All':
+        default:
+          snapshot = await _firebaseService.getAllSales();
+          break;
       }
 
-      // Process the data
-      _processSalesData(snapshot.docs);
-      
+      _calculateMetrics(snapshot.docs);
       setState(() => _isLoading = false);
     } catch (e) {
       setState(() => _isLoading = false);
-      _showSnackBar('Error loading reports: ${e.toString().replaceFirst('Exception: ', '')}', isError: true);
-      debugPrint('❌ Reports error: $e');
+      FeedbackService.error();
     }
   }
 
-  void _processSalesData(List<QueryDocumentSnapshot> docs) {
-    // Reset stats
-    _totalSales = 0;
-    _totalProfit = 0;
-    _totalItems = 0;
-    _totalTransactions = docs.length;
-    
-    // Reset customer stats
-    _totalCustomers = 0;
-    _guestCustomers = 0;
-    _registeredCustomers = 0;
-    _averageCustomerSpend = 0;
-    
-    // Maps for processing
-    Map<String, Map<String, dynamic>> productMap = {};
-    Map<String, double> paymentMap = {};
-    Map<String, double> dailyMap = {};
-    
-    // Customer tracking
-    Map<String, Map<String, dynamic>> customerMap = {};
+  void _calculateMetrics(List<QueryDocumentSnapshot> docs) {
+    _grossSales = 0.0;
+    _netProfit = 0.0;
+    _totalUnits = 0;
+    _totalOrders = docs.length;
+    _paymentMethodSplit.clear();
+    _topProducts.clear();
+    _topCustomers.clear();
 
-    for (var doc in docs) {
-      var data = doc.data() as Map<String, dynamic>;
-      
-      // ✅ CHANGED: Safe number parsing for Firestore dynamic types
-      double total = ((data['total'] ?? 0) as num).toDouble();
-      double profit = ((data['profit'] ?? 0) as num).toDouble();
-      int quantity = ((data['quantity'] ?? 0) as num).toInt();
-      
-      _totalSales += total;
-      _totalProfit += profit;
-      _totalItems += quantity;
+    final Map<String, Map<String, dynamic>> productMap = {};
+    final Map<String, Map<String, dynamic>> customerMap = {};
 
-      // Payment breakdown
-      String method = data['paymentMethod'] ?? 'Cash';
-      paymentMap[method] = (paymentMap[method] ?? 0) + total;
+    for (final doc in docs) {
+      final data = doc.data() as Map<String, dynamic>;
+      final sale = Sale.fromMap(data, doc.id);
 
-      // Top products
-      String productId = data['productId'] ?? '';
-      String productName = data['productName'] ?? 'Unknown';
-      
-      if (productMap.containsKey(productId)) {
-        productMap[productId]!['quantity'] += quantity;
-        productMap[productId]!['total'] += total;
-      } else {
-        productMap[productId] = {
-          'name': productName,
-          'quantity': quantity,
-          'total': total,
-        };
+      _grossSales += sale.total;
+      _netProfit += sale.profit;
+      _totalUnits += sale.quantity;
+
+      // Payment Split
+      final method = sale.paymentMethod.isNotEmpty ? sale.paymentMethod : 'Cash';
+      _paymentMethodSplit[method] = (_paymentMethodSplit[method] ?? 0.0) + sale.total;
+
+      // Product Aggregates
+      final pName = sale.productName.isNotEmpty ? sale.productName : 'General Item';
+      if (!productMap.containsKey(pName)) {
+        productMap[pName] = {'name': pName, 'revenue': 0.0, 'qty': 0};
       }
+      productMap[pName]!['revenue'] = (productMap[pName]!['revenue'] as double) + sale.total;
+      productMap[pName]!['qty'] = (productMap[pName]!['qty'] as int) + sale.quantity;
 
-      // Daily sales
-      // ✅ CHANGED: Safe timestamp parsing
-      DateTime date = (data['saleDate'] as Timestamp?)?.toDate() ?? DateTime.now();
-      String dateKey = DateFormat('yyyy-MM-dd').format(date);
-      dailyMap[dateKey] = (dailyMap[dateKey] ?? 0) + total;
-
-      // Customer tracking
-      String customerId = data['customerId'] ?? 'guest';
-      String customerName = data['customerName'] ?? 'Guest Customer';
-      bool isGuest = data['isGuestCustomer'] ?? true;
-      
-      if (isGuest) {
-        _guestCustomers++;
-      } else {
-        _registeredCustomers++;
-      }
-      
-      if (customerMap.containsKey(customerId)) {
-        customerMap[customerId]!['totalSpent'] += total;
-        customerMap[customerId]!['orders'] += 1;
-      } else {
-        _totalCustomers++;
-        customerMap[customerId] = {
-          'name': customerName,
-          'id': customerId,
-          'totalSpent': total,
-          'orders': 1,
-          'isGuest': isGuest,
-        };
+      // Customer Aggregates
+      final cName = sale.customerDisplayName;
+      if (cName != 'Guest' && cName.isNotEmpty) {
+        if (!customerMap.containsKey(cName)) {
+          customerMap[cName] = {'name': cName, 'spent': 0.0, 'orders': 0};
+        }
+        customerMap[cName]!['spent'] = (customerMap[cName]!['spent'] as double) + sale.total;
+        customerMap[cName]!['orders'] = (customerMap[cName]!['orders'] as int) + 1;
       }
     }
 
-    // Calculate average
-    _averageSale = _totalTransactions > 0 ? _totalSales / _totalTransactions : 0;
-    _averageCustomerSpend = _totalCustomers > 0 ? _totalSales / _totalCustomers : 0;
+    _avgOrderValue = _totalOrders > 0 ? _grossSales / _totalOrders : 0.0;
 
-    // Process top products
-    _topProducts = productMap.values.toList();
-    _topProducts.sort((a, b) => b['quantity'].compareTo(a['quantity']));
-    _topProducts = _topProducts.take(10).toList();
+    // Sort Top Products
+    _topProducts.addAll(productMap.values.toList()
+      ..sort((a, b) => (b['revenue'] as double).compareTo(a['revenue'] as double)));
 
-    // Process top customers
-    _topCustomers = customerMap.values.toList();
-    _topCustomers.sort((a, b) => b['totalSpent'].compareTo(a['totalSpent']));
-    _topCustomers = _topCustomers.take(10).toList();
-
-    // Process payment breakdown
-    _paymentBreakdown = paymentMap;
-
-    // Process daily sales
-    _dailySales = dailyMap.entries.map((entry) {
-      return {
-        'date': entry.key,
-        'sales': entry.value,
-      };
-    }).toList();
-    _dailySales.sort((a, b) => a['date'].compareTo(b['date']));
-  }
-
-  DateTime _getStartDate() {
-    DateTime now = DateTime.now();
-    switch (_selectedPeriod) {
-      case 'Today':
-        return DateTime(now.year, now.month, now.day);
-      case 'Week':
-        return now.subtract(Duration(days: now.weekday - 1));
-      case 'Month':
-        return DateTime(now.year, now.month, 1);
-      case 'Year':
-        return DateTime(now.year, 1, 1);
-      case 'Custom':
-        return _startDate;
-      default:
-        return DateTime(now.year, now.month, now.day);
-    }
-  }
-
-  DateTime _getEndDate() {
-    DateTime now = DateTime.now();
-    switch (_selectedPeriod) {
-      case 'Today':
-        return DateTime(now.year, now.month, now.day, 23, 59, 59);
-      case 'Week':
-        return now;
-      case 'Month':
-        return now;
-      case 'Year':
-        return now;
-      case 'Custom':
-        return _endDate;
-      default:
-        return DateTime(now.year, now.month, now.day, 23, 59, 59);
-    }
-  }
-
-  void _showSnackBar(String message, {bool isError = false}) {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          message,
-          style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
-        ),
-        backgroundColor: isError
-            ? (isDarkMode ? Colors.red.shade400 : Colors.red.shade700)
-            : (isDarkMode ? Colors.green.shade400 : Colors.green.shade700),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      ),
-    );
+    // Sort Top Customers
+    _topCustomers.addAll(customerMap.values.toList()
+      ..sort((a, b) => (b['spent'] as double).compareTo(a['spent'] as double)));
   }
 
   @override
   Widget build(BuildContext context) {
     final settingsProvider = Provider.of<SettingsProvider>(context);
     final currencySymbol = settingsProvider.currencySymbol;
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final profitMargin = _grossSales > 0 ? (_netProfit / _grossSales) * 100 : 0.0;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Reports'),
-        backgroundColor: isDarkMode ? Colors.blue.shade800 : Colors.blue.shade700,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadReports,
-            tooltip: 'Refresh',
-          ),
-          IconButton(
-            icon: const Icon(Icons.download),
-            onPressed: () {
-              _showSnackBar('Export feature coming soon!');
-            },
-            tooltip: 'Export',
+      body: Column(
+        children: [
+          // Period Switcher Bar
+          _buildPeriodSelector(isDark),
+
+          // Scrollable Reports Body
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _totalOrders == 0
+                    ? const EmptyStateView(
+                        icon: Icons.analytics_outlined,
+                        title: 'No sales data for this period',
+                        description: 'Select a different time period or process new sales on the POS register.',
+                      )
+                    : RefreshIndicator(
+                        onRefresh: _loadAnalytics,
+                        child: ListView(
+                          padding: const EdgeInsets.all(16),
+                          children: [
+                            // Executive Profit & Loss Cards
+                            _buildFinancialOverview(currencySymbol, profitMargin, isDark),
+                            const SizedBox(height: 16),
+
+                            // Payment Methods Split
+                            _buildPaymentMethodChart(currencySymbol, isDark),
+                            const SizedBox(height: 16),
+
+                            // Top Products Leaderboard
+                            _buildTopProductsCard(currencySymbol, isDark),
+                            const SizedBox(height: 16),
+
+                            // Top Spenders CRM Card
+                            if (_topCustomers.isNotEmpty) ...[
+                              _buildTopCustomersCard(currencySymbol, isDark),
+                              const SizedBox(height: 16),
+                            ],
+                          ],
+                        ),
+                      ),
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1200),
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
-                      _buildPeriodSelector(isDarkMode),
-                      const SizedBox(height: 16),
-                      _buildSummaryCards(currencySymbol, isDarkMode),
-                      const SizedBox(height: 16),
-                      _buildCustomerSummary(currencySymbol, isDarkMode),
-                      const SizedBox(height: 16),
-                      if (_dailySales.isNotEmpty && _selectedPeriod != 'All')
-                        _buildSalesChart(currencySymbol, isDarkMode),
-                      const SizedBox(height: 16),
-                      if (_paymentBreakdown.isNotEmpty)
-                        _buildPaymentBreakdown(currencySymbol, isDarkMode),
-                      const SizedBox(height: 16),
-                      if (_topProducts.isNotEmpty)
-                        _buildTopProducts(currencySymbol, isDarkMode),
-                      const SizedBox(height: 16),
-                      if (_topCustomers.isNotEmpty)
-                        _buildTopCustomers(currencySymbol, isDarkMode),
-                      const SizedBox(height: 16),
-                      if (_totalTransactions > 0)
-                        _buildDetailedStats(currencySymbol, isDarkMode),
-                    ],
-                  ),
-                ),
-              ),
-            ),
     );
   }
 
-  Widget _buildPeriodSelector(bool isDarkMode) {
+  Widget _buildPeriodSelector(bool isDark) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: isDarkMode ? Colors.grey.shade800 : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: isDarkMode
-                ? Colors.black.withOpacity(0.3)
-                : Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 5,
-          ),
-        ],
+        color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
+        border: Border(bottom: BorderSide(color: isDark ? AppColors.darkBorder : AppColors.lightBorder)),
       ),
-      child: Column(
-        children: [
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: _periodOptions.map((period) {
-              bool isSelected = _selectedPeriod == period;
-              return FilterChip(
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: _periodOptions.map((period) {
+            final isSelected = _selectedPeriod == period;
+            final primaryColor = isDark ? AppColors.primaryLight : AppColors.primary;
+
+            return Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: FilterChip(
                 label: Text(period),
                 selected: isSelected,
+                selectedColor: primaryColor.withValues(alpha: 0.2),
+                checkmarkColor: primaryColor,
+                labelStyle: TextStyle(
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  color: isSelected ? primaryColor : null,
+                ),
                 onSelected: (_) {
                   setState(() {
                     _selectedPeriod = period;
-                    if (period == 'Custom') {
-                      _selectCustomDateRange();
-                    } else {
-                      if (period == 'All') {
-                        _showSnackBar('Loading entire history...');
-                      }
-                      _loadReports();
-                    }
+                    _loadAnalytics();
                   });
+                  FeedbackService.lightTap();
                 },
-                backgroundColor: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade100,
-                selectedColor: isDarkMode ? Colors.blue.shade800 : Colors.blue.shade100,
-                labelStyle: TextStyle(
-                  color: isSelected
-                      ? (isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700)
-                      : (isDarkMode ? Colors.white : Colors.black),
-                ),
-                checkmarkColor: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
-              );
-            }).toList(),
-          ),
-          if (_selectedPeriod == 'Custom')
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    '${DateFormat('dd/MM/yyyy').format(_startDate)} - ${DateFormat('dd/MM/yyyy').format(_endDate)}',
-                    style: TextStyle(
-                      color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+              ),
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFinancialOverview(String currencySymbol, double profitMargin, bool isDark) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: PosCard(
+                gradient: isDark ? AppColors.darkCardGradient : AppColors.primaryGradient,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Gross Sales Revenue',
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 12),
                     ),
-                  ),
-                  TextButton.icon(
-                    onPressed: _selectCustomDateRange,
-                    icon: const Icon(Icons.edit, size: 16),
-                    label: const Text('Change'),
-                  ),
-                ],
+                    const SizedBox(height: 6),
+                    Text(
+                      FormatService.formatCurrency(_grossSales, symbol: currencySymbol),
+                      style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '$_totalOrders Transactions • $_totalUnits Units',
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 11),
+                    ),
+                  ],
+                ),
               ),
             ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _selectCustomDateRange() async {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    
-    DateTimeRange? picked = await showDateRangePicker(
-      context: context,
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
-      initialDateRange: DateTimeRange(
-        start: _startDate,
-        end: _endDate,
-      ),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.fromSeed(
-              seedColor: Colors.blue,
-              brightness: isDarkMode ? Brightness.dark : Brightness.light,
+            const SizedBox(width: 12),
+            Expanded(
+              child: PosCard(
+                gradient: isDark ? AppColors.darkCardGradient : AppColors.successGradient,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Estimated Net Profit',
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 12),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      FormatService.formatCurrency(_netProfit, symbol: currencySymbol),
+                      style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '${profitMargin.toStringAsFixed(1)}% Profit Margin',
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ),
-          child: child!,
-        );
-      },
-    );
-
-    if (picked != null) {
-      setState(() {
-        _startDate = picked.start;
-        _endDate = DateTime(
-          picked.end.year,
-          picked.end.month,
-          picked.end.day,
-          23, 59, 59,
-        );
-      });
-      _loadReports();
-    }
-  }
-
-  Widget _buildSummaryCards(String currencySymbol, bool isDarkMode) {
-    return Row(
-      children: [
-        Expanded(
-          child: _buildSummaryCard(
-            title: 'Total Sales',
-            value: '$currencySymbol${_totalSales.toStringAsFixed(2)}',
-            icon: Icons.attach_money,
-            color: isDarkMode ? Colors.green.shade400 : Colors.green.shade700,
-            isDarkMode: isDarkMode,
-          ),
+          ],
         ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: _buildSummaryCard(
-            title: 'Total Profit',
-            value: '$currencySymbol${_totalProfit.toStringAsFixed(2)}',
-            icon: Icons.trending_up,
-            color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
-            isDarkMode: isDarkMode,
+        const SizedBox(height: 10),
+        PosCard(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Average Order Value (AOV)', style: TextStyle(color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary)),
+              Text(
+                FormatService.formatCurrency(_avgOrderValue, symbol: currencySymbol),
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+            ],
           ),
         ),
       ],
     );
   }
 
-  Widget _buildSummaryCard({
-    required String title,
-    required String value,
-    required IconData icon,
-    required Color color,
-    required bool isDarkMode,
-  }) {
-    return Container(
+  Widget _buildPaymentMethodChart(String currencySymbol, bool isDark) {
+    return PosCard(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDarkMode ? Colors.grey.shade800 : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: isDarkMode
-                ? Colors.black.withOpacity(0.3)
-                : Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 5,
-          ),
-        ],
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(icon, size: 20, color: color),
-              const SizedBox(width: 8),
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: isDarkMode ? Colors.white : Colors.black,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCustomerSummary(String currencySymbol, bool isDarkMode) {
-    if (_totalCustomers == 0 && _guestCustomers == 0) {
-      return const SizedBox.shrink();
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDarkMode ? Colors.grey.shade800 : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: isDarkMode
-                ? Colors.black.withOpacity(0.3)
-                : Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 5,
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.people,
-                color: isDarkMode ? Colors.teal.shade400 : Colors.teal.shade700,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'Customer Insights',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: isDarkMode ? Colors.white : Colors.black,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: _buildCustomerStat(
-                  label: 'Total Customers',
-                  value: _totalCustomers.toString(),
-                  icon: Icons.people_outline,
-                  color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
-                  isDarkMode: isDarkMode,
-                ),
-              ),
-              Expanded(
-                child: _buildCustomerStat(
-                  label: 'Registered',
-                  value: _registeredCustomers.toString(),
-                  icon: Icons.person,
-                  color: isDarkMode ? Colors.green.shade400 : Colors.green.shade700,
-                  isDarkMode: isDarkMode,
-                ),
-              ),
-              Expanded(
-                child: _buildCustomerStat(
-                  label: 'Guest',
-                  value: _guestCustomers.toString(),
-                  icon: Icons.person_outline,
-                  color: isDarkMode ? Colors.orange.shade400 : Colors.orange.shade700,
-                  isDarkMode: isDarkMode,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: _buildCustomerStat(
-                  label: 'Avg. Spend',
-                  value: '$currencySymbol${_averageCustomerSpend.toStringAsFixed(2)}',
-                  icon: Icons.trending_up,
-                  color: isDarkMode ? Colors.purple.shade400 : Colors.purple.shade700,
-                  isDarkMode: isDarkMode,
-                ),
-              ),
-              Expanded(
-                child: _buildCustomerStat(
-                  label: 'Avg. Orders',
-                  value: _totalTransactions > 0 && _totalCustomers > 0
-                      ? (_totalTransactions / _totalCustomers).toStringAsFixed(1)
-                      : '0',
-                  icon: Icons.shopping_cart_outlined,
-                  color: isDarkMode ? Colors.cyan.shade400 : Colors.cyan.shade700,
-                  isDarkMode: isDarkMode,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCustomerStat({
-    required String label,
-    required String value,
-    required IconData icon,
-    required Color color,
-    required bool isDarkMode,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(8),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 16, color: color),
-              const SizedBox(width: 4),
-              Text(
-                value,
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                  color: isDarkMode ? Colors.white : Colors.black,
-                ),
-              ),
-            ],
-          ),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 10,
-              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSalesChart(String currencySymbol, bool isDarkMode) {
-    if (_dailySales.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    double maxSales = _dailySales.fold(0.0, (max, item) {
-      return item['sales'] > max ? item['sales'] : max;
-    });
-
-    if (maxSales == 0) maxSales = 1;
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDarkMode ? Colors.grey.shade800 : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: isDarkMode
-                ? Colors.black.withOpacity(0.3)
-                : Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 5,
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.show_chart,
-                color: isDarkMode ? Colors.purple.shade400 : Colors.purple.shade700,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'Sales Trend',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: isDarkMode ? Colors.white : Colors.black,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            height: 120,
-            child: Row(
-              children: [
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      '$currencySymbol${maxSales.toStringAsFixed(0)}',
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                      ),
-                    ),
-                    Text(
-                      '${currencySymbol}0',
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: _dailySales.map((item) {
-                      double height = (item['sales'] / maxSales) * 100;
-                      return Expanded(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            Container(
-                              margin: const EdgeInsets.symmetric(horizontal: 2),
-                              height: height,
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.bottomCenter,
-                                  end: Alignment.topCenter,
-                                  colors: [
-                                    isDarkMode
-                                        ? Colors.blue.shade900
-                                        : Colors.blue.shade200,
-                                    isDarkMode
-                                        ? Colors.blue.shade400
-                                        : Colors.blue.shade700,
-                                  ],
-                                ),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              DateFormat('dd').format(DateTime.parse(item['date'])),
-                              style: TextStyle(
-                                fontSize: 8,
-                                color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPaymentBreakdown(String currencySymbol, bool isDarkMode) {
-    if (_paymentBreakdown.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    double total = _paymentBreakdown.values.fold(0.0, (sum, value) => sum + value);
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDarkMode ? Colors.grey.shade800 : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: isDarkMode
-                ? Colors.black.withOpacity(0.3)
-                : Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 5,
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.payment,
-                color: isDarkMode ? Colors.orange.shade400 : Colors.orange.shade700,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'Payment Methods',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: isDarkMode ? Colors.white : Colors.black,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          ..._paymentBreakdown.entries.map((entry) {
-            double percentage = (entry.value / total) * 100;
+          const Text('Payment Methods Breakdown', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+          const SizedBox(height: 14),
+          ..._paymentMethodSplit.entries.map((entry) {
+            final percent = _grossSales > 0 ? (entry.value / _grossSales) : 0.0;
             return Padding(
-              padding: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.symmetric(vertical: 6),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
+                      Text(entry.key, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                       Text(
-                        entry.key,
+                        '${FormatService.formatCurrency(entry.value, symbol: currencySymbol)} (${(percent * 100).toStringAsFixed(1)}%)',
                         style: TextStyle(
-                          color: isDarkMode ? Colors.white : Colors.black,
-                        ),
-                      ),
-                      Text(
-                        '$currencySymbol${entry.value.toStringAsFixed(2)} (${percentage.toStringAsFixed(1)}%)',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: isDarkMode ? Colors.white : Colors.black,
+                          fontSize: 12,
+                          color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 6),
                   ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
+                    borderRadius: BorderRadius.circular(6),
                     child: LinearProgressIndicator(
-                      value: percentage / 100,
+                      value: percent,
                       minHeight: 8,
-                      backgroundColor: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade200,
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        _getPaymentColor(entry.key, isDarkMode),
-                      ),
+                      backgroundColor: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.06),
+                      valueColor: AlwaysStoppedAnimation(isDark ? AppColors.primaryLight : AppColors.primary),
                     ),
                   ),
                 ],
               ),
             );
-          }).toList(),
+          }),
         ],
       ),
     );
   }
 
-  Color _getPaymentColor(String method, bool isDarkMode) {
-    switch (method) {
-      case 'Cash':
-        return isDarkMode ? Colors.green.shade400 : Colors.green;
-      case 'Card':
-        return isDarkMode ? Colors.blue.shade400 : Colors.blue;
-      case 'Mobile Payment':
-        return isDarkMode ? Colors.orange.shade400 : Colors.orange;
-      case 'Credit':
-        return isDarkMode ? Colors.purple.shade400 : Colors.purple;
-      default:
-        return isDarkMode ? Colors.grey.shade400 : Colors.grey;
-    }
-  }
+  Widget _buildTopProductsCard(String currencySymbol, bool isDark) {
+    final top5 = _topProducts.take(5).toList();
 
-  Widget _buildTopProducts(String currencySymbol, bool isDarkMode) {
-    if (_topProducts.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    return Container(
+    return PosCard(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDarkMode ? Colors.grey.shade800 : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: isDarkMode
-                ? Colors.black.withOpacity(0.3)
-                : Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 5,
-          ),
-        ],
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(
-                Icons.star,
-                color: isDarkMode ? Colors.yellow.shade400 : Colors.yellow.shade700,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'Top Selling Products',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: isDarkMode ? Colors.white : Colors.black,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          ListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: _topProducts.length,
-            itemBuilder: (context, index) {
-              var product = _topProducts[index];
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 28,
-                      height: 28,
-                      decoration: BoxDecoration(
-                        color: isDarkMode ? Colors.blue.shade900 : Colors.blue.shade100,
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Center(
-                        child: Text(
-                          '${index + 1}',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
-                            fontSize: 12,
-                          ),
-                        ),
+          const Text('Top Selling Products', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+          const SizedBox(height: 12),
+          ...top5.asMap().entries.map((entry) {
+            final index = entry.key + 1;
+            final item = entry.value;
+            final revenue = (item['revenue'] as double);
+            final qty = (item['qty'] as int);
+
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Row(
+                children: [
+                  Container(
+                    width: 26,
+                    height: 26,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: index == 1
+                          ? AppColors.warning
+                          : (isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.06)),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Text(
+                      '$index',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                        color: index == 1 ? Colors.white : (isDark ? Colors.white : Colors.black),
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            product['name'],
-                            style: TextStyle(
-                              fontWeight: FontWeight.w500,
-                              color: isDarkMode ? Colors.white : Colors.black,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          Row(
-                            children: [
-                              Text(
-                                '${product['quantity']} units',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Text(
-                                '$currencySymbol${product['total'].toStringAsFixed(2)}',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: isDarkMode ? Colors.green.shade400 : Colors.green.shade700,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(item['name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        Text('$qty units sold', style: TextStyle(fontSize: 11, color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary)),
+                      ],
                     ),
-                  ],
-                ),
-              );
-            },
-          ),
+                  ),
+                  Text(
+                    FormatService.formatCurrency(revenue, symbol: currencySymbol),
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  ),
+                ],
+              ),
+            );
+          }),
         ],
       ),
     );
   }
 
-  Widget _buildTopCustomers(String currencySymbol, bool isDarkMode) {
-    if (_topCustomers.isEmpty) {
-      return const SizedBox.shrink();
-    }
+  Widget _buildTopCustomersCard(String currencySymbol, bool isDark) {
+    final top5 = _topCustomers.take(5).toList();
 
-    return Container(
+    return PosCard(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDarkMode ? Colors.grey.shade800 : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: isDarkMode
-                ? Colors.black.withOpacity(0.3)
-                : Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 5,
-          ),
-        ],
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(
-                Icons.people,
-                color: isDarkMode ? Colors.teal.shade400 : Colors.teal.shade700,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'Top Customers',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: isDarkMode ? Colors.white : Colors.black,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          ListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: _topCustomers.length,
-            itemBuilder: (context, index) {
-              var customer = _topCustomers[index];
-              final isGuest = customer['isGuest'] ?? true;
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 28,
-                      height: 28,
-                      decoration: BoxDecoration(
-                        color: isGuest
-                            ? (isDarkMode ? Colors.grey.shade700 : Colors.grey.shade300)
-                            : (isDarkMode ? Colors.blue.shade900 : Colors.blue.shade100),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Center(
-                        child: Text(
-                          '${index + 1}',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: isGuest
-                                ? (isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600)
-                                : (isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700),
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
+          const Text('Top VIP Clients (This Period)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+          const SizedBox(height: 12),
+          ...top5.map((c) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 14,
+                    backgroundColor: (isDark ? AppColors.primaryLight : AppColors.primary).withValues(alpha: 0.2),
+                    child: Text(
+                      (c['name'] as String).isNotEmpty ? (c['name'] as String)[0] : 'C',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            customer['name'] ?? 'Guest Customer',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w500,
-                              color: isDarkMode ? Colors.white : Colors.black,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          Row(
-                            children: [
-                              Text(
-                                '${customer['orders']} orders',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Text(
-                                '$currencySymbol${customer['totalSpent'].toStringAsFixed(2)}',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: isDarkMode ? Colors.green.shade400 : Colors.green.shade700,
-                                ),
-                              ),
-                              if (isGuest) ...[
-                                const SizedBox(width: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade300,
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: Text(
-                                    'Guest',
-                                    style: TextStyle(
-                                      fontSize: 8,
-                                      color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ],
-                      ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(c['name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        Text('${c['orders']} orders', style: TextStyle(fontSize: 11, color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary)),
+                      ],
                     ),
-                  ],
-                ),
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDetailedStats(String currencySymbol, bool isDarkMode) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDarkMode ? Colors.grey.shade800 : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: isDarkMode
-                ? Colors.black.withOpacity(0.3)
-                : Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 5,
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.analytics,
-                color: isDarkMode ? Colors.cyan.shade400 : Colors.cyan.shade700,
+                  ),
+                  Text(
+                    FormatService.formatCurrency(c['spent'] as double, symbol: currencySymbol),
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.success),
+                  ),
+                ],
               ),
-              const SizedBox(width: 8),
-              Text(
-                'Detailed Statistics',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: isDarkMode ? Colors.white : Colors.black,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          _buildDetailRow('Total Transactions', _totalTransactions.toString(), isDarkMode),
-          _buildDetailRow('Total Items Sold', _totalItems.toString(), isDarkMode),
-          _buildDetailRow('Average Sale Value', '$currencySymbol${_averageSale.toStringAsFixed(2)}', isDarkMode),
-          _buildDetailRow('Total Sales', '$currencySymbol${_totalSales.toStringAsFixed(2)}', isDarkMode),
-          _buildDetailRow('Total Profit', '$currencySymbol${_totalProfit.toStringAsFixed(2)}', isDarkMode),
-          _buildDetailRow(
-            'Profit Margin',
-            '${_totalSales > 0 ? ((_totalProfit / _totalSales) * 100).toStringAsFixed(1) : 0}%',
-            isDarkMode,
-          ),
-          _buildDetailRow(
-            'Period',
-            _selectedPeriod == 'Custom'
-                ? '${DateFormat('dd/MM/yyyy').format(_startDate)} - ${DateFormat('dd/MM/yyyy').format(_endDate)}'
-                : _selectedPeriod == 'All'
-                    ? 'All Time'
-                    : _selectedPeriod,
-            isDarkMode,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDetailRow(String label, String value, bool isDarkMode) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-            ),
-          ),
-          Text(
-            value,
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: isDarkMode ? Colors.white : Colors.black,
-            ),
-          ),
+            );
+          }),
         ],
       ),
     );

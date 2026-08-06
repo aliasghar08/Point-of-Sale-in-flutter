@@ -3,6 +3,7 @@ import 'package:crypto/crypto.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:pos/models/product.dart';
 
 class FirebaseService {
   static final FirebaseService _instance = FirebaseService._internal();
@@ -116,11 +117,11 @@ class FirebaseService {
       final snapshot = await _firestore.collection('businesses').get();
       
       final results = snapshot.docs.where((doc) {
-        final data = doc.data() as Map<String, dynamic>;
+        final data = doc.data();
         final name = (data['name'] ?? '').toString().toLowerCase();
         return name.contains(searchTerm);
       }).map((doc) {
-        final data = doc.data() as Map<String, dynamic>;
+        final data = doc.data();
         return {
           'id': doc.id,
           'name': data['name'] ?? 'Unknown Business',
@@ -144,7 +145,7 @@ class FirebaseService {
       final snapshot = await _firestore.collection('businesses').get();
       
       for (var doc in snapshot.docs) {
-        final data = doc.data() as Map<String, dynamic>;
+        final data = doc.data();
         final businessName = (data['name'] ?? '').toString().toLowerCase();
         if (businessName == searchTerm) {
           return {
@@ -175,7 +176,7 @@ class FirebaseService {
     try {
       final snapshot = await _firestore.collection('businesses').get();
       return snapshot.docs
-          .map((doc) => (doc.data() as Map<String, dynamic>)['name'] ?? '')
+          .map((doc) => (doc.data())['name'] ?? '')
           .where((name) => name.isNotEmpty)
           .cast<String>()
           .toList();
@@ -203,7 +204,7 @@ class FirebaseService {
           .get();
 
       return snapshot.docs.map((doc) {
-        final data = doc.data() as Map<String, dynamic>;
+        final data = doc.data();
         return {
           'id': doc.id,
           'name': data['name'] ?? '',
@@ -720,7 +721,7 @@ class FirebaseService {
 
       return await productsRef
           .where('name', isGreaterThanOrEqualTo: name)
-          .where('name', isLessThanOrEqualTo: name + '\uf8ff')
+          .where('name', isLessThanOrEqualTo: '$name\uf8ff')
           .limit(20)
           .get();
     } catch (e) {
@@ -748,6 +749,47 @@ class FirebaseService {
     } catch (e) {
       throw Exception('Failed to get products: $e');
     }
+  }
+
+  Future<List<Product>> getProducts() async {
+    final snap = await getAllProducts();
+    return snap.docs.map((d) => Product.fromMap(d.data() as Map<String, dynamic>, d.id)).toList();
+  }
+
+  Future<String> processSale({
+    required List<Product> cartItems,
+    required String paymentMethod,
+    required double totalAmount,
+    required double totalProfit,
+    required String receiptNumber,
+    required String customerId,
+    required String customerName,
+    String? customerPhone,
+    String? customerEmail,
+    String? customerAddress,
+    bool isGuestCustomer = false,
+  }) async {
+    final salesList = cartItems.map((item) => {
+      'productId': item.id,
+      'productName': item.name,
+      'quantity': item.stock,
+      'price': item.price,
+      'costPrice': item.costPrice,
+      'profit': (item.price - item.costPrice) * item.stock,
+      'total': item.price * item.stock,
+      'paymentMethod': paymentMethod,
+      'receiptNumber': receiptNumber,
+      'customerId': customerId,
+      'customerName': customerName,
+      'customerPhone': customerPhone ?? '',
+      'customerEmail': customerEmail ?? '',
+      'customerAddress': customerAddress ?? '',
+      'isGuestCustomer': isGuestCustomer,
+      'saleDate': FieldValue.serverTimestamp(),
+    }).toList();
+
+    await addMultipleSales(salesList);
+    return receiptNumber;
   }
 
   // ==================== SALES (NOW USES BATCH WRITES) ====================

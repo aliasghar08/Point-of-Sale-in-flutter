@@ -23,7 +23,7 @@ class CustomerService {
       final Map<String, Customer> customerMap = {};
 
       for (var doc in salesSnapshot.docs) {
-        final data = doc.data() as Map<String, dynamic>;
+        final data = doc.data();
         final customerId = data['customerId'] ?? 'guest';
         final isGuest = data['isGuestCustomer'] ?? true;
 
@@ -87,7 +87,7 @@ class CustomerService {
             final Map<String, Customer> customerMap = {};
 
             for (var doc in snapshot.docs) {
-              final data = doc.data() as Map<String, dynamic>;
+              final data = doc.data();
               final customerId = data['customerId'] ?? 'guest';
               final isGuest = data['isGuestCustomer'] ?? true;
 
@@ -163,12 +163,12 @@ class CustomerService {
 
       if (salesSnapshot.docs.isEmpty) return null;
 
-      final firstSale = salesSnapshot.docs.first.data() as Map<String, dynamic>;
+      final firstSale = salesSnapshot.docs.first.data();
       double totalSpent = 0;
       int totalOrders = salesSnapshot.docs.length;
 
       for (var doc in salesSnapshot.docs) {
-        final data = doc.data() as Map<String, dynamic>;
+        final data = doc.data();
         totalSpent += (data['total'] ?? 0.0).toDouble();
       }
 

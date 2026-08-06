@@ -217,7 +217,7 @@ class _CustomerSelectionDialogState extends State<CustomerSelectionDialog> {
                   decoration: BoxDecoration(
                     color: isDarkMode ? Colors.grey.shade800 : Colors.grey.shade100,
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: primaryColor.withOpacity(0.5)),
+                    border: Border.all(color: primaryColor.withValues(alpha: 0.5)),
                   ),
                   child: ListView.separated(
                     shrinkWrap: true,
@@ -236,7 +236,7 @@ class _CustomerSelectionDialogState extends State<CustomerSelectionDialog> {
                         dense: true,
                         leading: CircleAvatar(
                           radius: 16,
-                          backgroundColor: primaryColor.withOpacity(0.2),
+                          backgroundColor: primaryColor.withValues(alpha: 0.2),
                           child: Text(
                             name.isNotEmpty ? name[0].toUpperCase() : '?',
                             style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold),
@@ -273,7 +273,7 @@ class _CustomerSelectionDialogState extends State<CustomerSelectionDialog> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
-                    color: Colors.green.withOpacity(0.15),
+                    color: Colors.green.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: Colors.green.shade400),
                   ),

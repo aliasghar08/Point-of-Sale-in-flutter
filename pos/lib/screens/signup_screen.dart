@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:pos/providers/settings_provider.dart';
 import 'package:pos/screens/login_screen.dart';
 import 'package:provider/provider.dart';
-import 'package:email_validator/email_validator.dart';
+import 'package:pos/services/validation_service.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -75,16 +75,12 @@ class _SignupScreenState extends State<SignupScreen> {
     }
   }
 
-  static final RegExp _emailRegex = RegExp(
-    r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
-  );
-
   String? _validateEmail(String? value) {
     if (value == null || value.trim().isEmpty) {
       return 'Please enter your email address';
     }
     final trimmed = value.trim();
-    if (!EmailValidator.validate(trimmed) || !_emailRegex.hasMatch(trimmed)) {
+    if (!ValidationService.isValidEmail(trimmed)) {
       return 'Please enter a valid email address (e.g. name@example.com)';
     }
     return null;
@@ -430,7 +426,7 @@ class _SignupScreenState extends State<SignupScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               decoration: BoxDecoration(
                 color: isDarkMode
-                    ? Colors.blue.shade900.withOpacity(0.5)
+                    ? Colors.blue.shade900.withValues(alpha: 0.5)
                     : Colors.blue.shade50,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
@@ -471,7 +467,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 margin: const EdgeInsets.only(bottom: 16),
                 decoration: BoxDecoration(
                   color: isDarkMode
-                      ? Colors.blue.shade900.withOpacity(0.5)
+                      ? Colors.blue.shade900.withValues(alpha: 0.5)
                       : Colors.blue.shade50,
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -506,7 +502,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 margin: const EdgeInsets.only(bottom: 16),
                 decoration: BoxDecoration(
                   color: isDarkMode
-                      ? Colors.orange.shade900.withOpacity(0.5)
+                      ? Colors.orange.shade900.withValues(alpha: 0.5)
                       : Colors.orange.shade50,
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
@@ -569,7 +565,7 @@ class _SignupScreenState extends State<SignupScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: DropdownButtonFormField<String>(
-                      value: _selectedRole,
+                      initialValue: _selectedRole,
                       decoration: const InputDecoration(
                         labelText: 'Role *',
                         border: InputBorder.none,
@@ -633,7 +629,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     ),
                     decoration: BoxDecoration(
                       color: isDarkMode
-                          ? Colors.blue.shade900.withOpacity(0.3)
+                          ? Colors.blue.shade900.withValues(alpha: 0.3)
                           : Colors.blue.shade50,
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
@@ -765,8 +761,8 @@ class _SignupScreenState extends State<SignupScreen> {
                             boxShadow: [
                               BoxShadow(
                                 color: isDarkMode
-                                    ? Colors.black.withOpacity(0.3)
-                                    : Colors.grey.withOpacity(0.2),
+                                    ? Colors.black.withValues(alpha: 0.3)
+                                    : Colors.grey.withValues(alpha: 0.2),
                                 spreadRadius: 1,
                                 blurRadius: 8,
                               ),
@@ -821,7 +817,7 @@ class _SignupScreenState extends State<SignupScreen> {
                           ),
                           decoration: BoxDecoration(
                             color: isDarkMode
-                                ? Colors.red.shade900.withOpacity(0.3)
+                                ? Colors.red.shade900.withValues(alpha: 0.3)
                                 : Colors.red.shade50,
                             borderRadius: BorderRadius.circular(8),
                           ),
@@ -862,7 +858,7 @@ class _SignupScreenState extends State<SignupScreen> {
                           ),
                           decoration: BoxDecoration(
                             color: isDarkMode
-                                ? Colors.green.shade900.withOpacity(0.3)
+                                ? Colors.green.shade900.withValues(alpha: 0.3)
                                 : Colors.green.shade50,
                             borderRadius: BorderRadius.circular(8),
                           ),
@@ -1253,7 +1249,7 @@ class _SignupScreenState extends State<SignupScreen> {
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         color: isDarkMode
-                            ? Colors.red.shade900.withOpacity(0.5)
+                            ? Colors.red.shade900.withValues(alpha: 0.5)
                             : Colors.red.shade50,
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(

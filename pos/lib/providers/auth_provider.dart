@@ -32,13 +32,13 @@ class AuthProvider extends ChangeNotifier {
     try {
       _currentUser = await _authService.getCurrentUserData();
       if (_currentUser != null) {
-        print('✅ User loaded: ${_currentUser!.name}');
-        print('✅ Business ID: ${_currentUser!.businessId}');
-        print('✅ Role: ${_currentUser!.role}');
+        debugPrint('✅ User loaded: ${_currentUser!.name}');
+        debugPrint('✅ Business ID: ${_currentUser!.businessId}');
+        debugPrint('✅ Role: ${_currentUser!.role}');
       }
     } catch (e) {
       _error = e.toString();
-      print('❌ Init error: $e');
+      debugPrint('❌ Init error: $e');
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -81,10 +81,10 @@ class AuthProvider extends ChangeNotifier {
       _currentUser = await _authService.getCurrentUserData();
       
       if (_currentUser != null) {
-        print('✅ Signup successful!');
-        print('✅ User: ${_currentUser!.name}');
-        print('✅ Business ID: ${_currentUser!.businessId}');
-        print('✅ Role: ${_currentUser!.role}');
+        debugPrint('✅ Signup successful!');
+        debugPrint('✅ User: ${_currentUser!.name}');
+        debugPrint('✅ Business ID: ${_currentUser!.businessId}');
+        debugPrint('✅ Role: ${_currentUser!.role}');
         
         // Sign out immediately after signup (user will sign in manually)
         await _authService.signOut();
@@ -94,7 +94,7 @@ class AuthProvider extends ChangeNotifier {
       return true;
     } catch (e) {
       _error = e.toString();
-      print('❌ Signup error: $e');
+      debugPrint('❌ Signup error: $e');
       return false;
     } finally {
       _isLoading = false;
@@ -158,11 +158,11 @@ class AuthProvider extends ChangeNotifier {
       await _authService.signOut();
       _currentUser = null;
       
-      print('✅ Signup completed successfully!');
+      debugPrint('✅ Signup completed successfully!');
       return true;
     } catch (e) {
       _error = e.toString();
-      print('❌ Complete signup error: $e');
+      debugPrint('❌ Complete signup error: $e');
       return false;
     } finally {
       _isLoading = false;
@@ -186,16 +186,16 @@ class AuthProvider extends ChangeNotifier {
       );
       
       if (_currentUser != null) {
-        print('✅ Signin successful!');
-        print('✅ User: ${_currentUser!.name}');
-        print('✅ Business ID: ${_currentUser!.businessId}');
-        print('✅ Role: ${_currentUser!.role}');
+        debugPrint('✅ Signin successful!');
+        debugPrint('✅ User: ${_currentUser!.name}');
+        debugPrint('✅ Business ID: ${_currentUser!.businessId}');
+        debugPrint('✅ Role: ${_currentUser!.role}');
       }
       
       return _currentUser != null;
     } catch (e) {
       _error = e.toString();
-      print('❌ Signin error: $e');
+      debugPrint('❌ Signin error: $e');
       return false;
     } finally {
       _isLoading = false;
@@ -211,10 +211,10 @@ class AuthProvider extends ChangeNotifier {
     try {
       await _authService.signOut();
       _currentUser = null;
-      print('✅ Signout successful');
+      debugPrint('✅ Signout successful');
     } catch (e) {
       _error = e.toString();
-      print('❌ Signout error: $e');
+      debugPrint('❌ Signout error: $e');
     } finally {
       _isLoading = false;
       notifyListeners();
