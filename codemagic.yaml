@@ -9,17 +9,19 @@ workflows:
     scripts:
       - name: Install dependencies
         script: flutter pub get
-      - name: Build iOS App
+      - name: Build iOS App & Package IPA
         script: |
-          # For testing the build process without signing, use:
           flutter build ios --release --no-codesign
+          mkdir -p build/ios/ipa/Payload
+          cp -r build/ios/iphoneos/Runner.app build/ios/ipa/Payload/
+          cd build/ios/ipa
+          zip -r pos.ipa Payload
     artifacts:
-      - build/ios/iphoneos/*.app
       - build/ios/ipa/*.ipa
     publishing:
       email:
         recipients:
-          - aliasgharinnocent@yahoo.com 
+          - aliasgharinnocent@yahoo.com
         notify:
           success: true
           failure: true
