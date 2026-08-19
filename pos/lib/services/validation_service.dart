@@ -11,9 +11,7 @@ class ValidationService {
   );
 
   // Phone number with optional international code
-  static final RegExp _phoneRegex = RegExp(
-    r'^\+?[0-9\s\-()]{7,20}$',
-  );
+  static final RegExp _phoneRegex = RegExp(r'^\+?[0-9\s\-()]{7,20}$');
 
   // SKU regex (alphanumeric with hyphens/underscores)
   static final RegExp _skuRegex = RegExp(r'^[A-Za-z0-9\-_]{2,30}$');
@@ -30,7 +28,9 @@ class ValidationService {
   static bool isValidPhone(String? phone) {
     if (phone == null || phone.trim().isEmpty) return false;
     final digitsOnly = phone.replaceAll(RegExp(r'[^0-9]'), '');
-    return digitsOnly.length >= 7 && digitsOnly.length <= 15 && _phoneRegex.hasMatch(phone.trim());
+    return digitsOnly.length >= 7 &&
+        digitsOnly.length <= 15 &&
+        _phoneRegex.hasMatch(phone.trim());
   }
 
   /// Validates SKU format
@@ -131,9 +131,4 @@ class ValidationService {
   }
 }
 
-enum PasswordStrength {
-  empty,
-  weak,
-  medium,
-  strong,
-}
+enum PasswordStrength { empty, weak, medium, strong }

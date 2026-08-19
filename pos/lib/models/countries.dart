@@ -21,12 +21,7 @@ class Country {
   }
 
   Map<String, String> toMap() {
-    return {
-      'code': code,
-      'flag': flag,
-      'name': name,
-      'iso': iso,
-    };
+    return {'code': code, 'flag': flag, 'name': name, 'iso': iso};
   }
 }
 
@@ -62,7 +57,12 @@ final List<Country> countries = [
   Country(code: '+237', flag: '🇨🇲', name: 'Cameroon', iso: 'CM'),
   Country(code: '+1', flag: '🇨🇦', name: 'Canada', iso: 'CA'),
   Country(code: '+238', flag: '🇨🇻', name: 'Cape Verde', iso: 'CV'),
-  Country(code: '+236', flag: '🇨🇫', name: 'Central African Republic', iso: 'CF'),
+  Country(
+    code: '+236',
+    flag: '🇨🇫',
+    name: 'Central African Republic',
+    iso: 'CF',
+  ),
   Country(code: '+235', flag: '🇹🇩', name: 'Chad', iso: 'TD'),
   Country(code: '+56', flag: '🇨🇱', name: 'Chile', iso: 'CL'),
   Country(code: '+86', flag: '🇨🇳', name: 'China', iso: 'CN'),

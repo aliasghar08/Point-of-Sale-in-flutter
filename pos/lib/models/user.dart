@@ -38,7 +38,11 @@ class AppUser {
   }
 
   // ✅ Updated: fromMap with optional businessId override
-  factory AppUser.fromMap(Map<String, dynamic> map, String id, {String? businessId}) {
+  factory AppUser.fromMap(
+    Map<String, dynamic> map,
+    String id, {
+    String? businessId,
+  }) {
     return AppUser(
       id: id,
       email: map['email'] ?? '',
@@ -54,7 +58,11 @@ class AppUser {
   }
 
   // ✅ Helper to create from business user document
-  factory AppUser.fromBusinessUser(Map<String, dynamic> map, String id, String businessId) {
+  factory AppUser.fromBusinessUser(
+    Map<String, dynamic> map,
+    String id,
+    String businessId,
+  ) {
     return AppUser(
       id: id,
       email: map['email'] ?? '',
@@ -89,7 +97,7 @@ class AppUser {
         return 'User';
     }
   }
-  
+
   // ✅ Helper to check if user belongs to a business
   bool get hasBusiness => businessId != null && businessId!.isNotEmpty;
 }

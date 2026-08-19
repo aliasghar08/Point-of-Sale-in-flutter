@@ -39,19 +39,19 @@ class _VoiceInputState extends State<VoiceInput> {
           debugPrint('Speech error: $error');
           if (mounted) {
             setState(() => _isListening = false);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Speech error: $error')),
-            );
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text('Speech error: $error')));
           }
         },
       );
-      
+
       if (mounted) {
         setState(() {
           _isInitialized = available;
         });
       }
-      
+
       if (available) {
         // Auto-start listening
         _startListening();
@@ -59,9 +59,9 @@ class _VoiceInputState extends State<VoiceInput> {
     } catch (e) {
       debugPrint('Error initializing speech: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }
@@ -119,18 +119,12 @@ class _VoiceInputState extends State<VoiceInput> {
         children: [
           const Text(
             'Voice Input',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           Text(
             'Speak the product name or code',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey.shade600,
-            ),
+            style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
           ),
           const SizedBox(height: 32),
           GestureDetector(
@@ -147,8 +141,9 @@ class _VoiceInputState extends State<VoiceInput> {
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: (_isListening ? Colors.red : Colors.blue)
-                        .withValues(alpha: 0.5),
+                    color: (_isListening ? Colors.red : Colors.blue).withValues(
+                      alpha: 0.5,
+                    ),
                     blurRadius: 20,
                     spreadRadius: 5,
                   ),
@@ -164,10 +159,7 @@ class _VoiceInputState extends State<VoiceInput> {
           const SizedBox(height: 16),
           Text(
             _isListening ? 'Listening...' : 'Tap to speak',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey.shade600,
-            ),
+            style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
           ),
           if (_text.isNotEmpty) ...[
             const SizedBox(height: 16),

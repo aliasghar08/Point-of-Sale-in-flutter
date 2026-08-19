@@ -51,3 +51,14 @@ A modern Point of Sale (POS) system built with Flutter and Firebase. This applic
 * Firebase Account
 * Android Studio / VS Code
 * *Note: A physical device is recommended to test the camera-based barcode and QR scanning features.*
+
+## CI/CD Pipeline
+This project is configured with **Codemagic** for continuous integration and delivery.
+The codemagic.yaml file in the root directory defines the ios-release workflow, which installs dependencies, CocoaPods, and builds an iOS IPA artifact.
+*Note: Ensure code signing is configured in your Codemagic dashboard before building for TestFlight.*
+
+## Security
+Please see [SECURITY.md](SECURITY.md) for reporting vulnerabilities and security protocols.
+
+## License
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.

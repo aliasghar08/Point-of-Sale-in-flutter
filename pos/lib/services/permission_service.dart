@@ -6,15 +6,15 @@ import 'package:permission_handler/permission_handler.dart' as ph;
 
 class PermissionService {
   // ==================== OPEN APP SETTINGS ====================
-  
+
   /// Open the app settings page so user can manually enable permissions
   static Future<void> openAppSettings() async {
-    await Permission.camera.request(); 
+    await Permission.camera.request();
     // ✅ FIX: Call the package's function using the 'ph' prefix
     // This stops the infinite recursion crash!
     await ph.openAppSettings();
   }
-  
+
   /// Check if a specific permission is granted
   static Future<bool> isPermissionGranted(Permission permission) async {
     final status = await permission.status;
@@ -22,11 +22,11 @@ class PermissionService {
   }
 
   // ==================== CAMERA PERMISSION ====================
-  
+
   // Request camera permission
   static Future<bool> requestCameraPermission() async {
     PermissionStatus status = await Permission.camera.request();
-    
+
     if (status.isGranted) {
       return true;
     } else if (status.isDenied) {
@@ -46,11 +46,11 @@ class PermissionService {
   }
 
   // ==================== MICROPHONE PERMISSION ====================
-  
+
   // Request microphone permission
   static Future<bool> requestMicrophonePermission() async {
     PermissionStatus status = await Permission.microphone.request();
-    
+
     if (status.isGranted) {
       return true;
     } else if (status.isDenied) {
@@ -68,11 +68,11 @@ class PermissionService {
   }
 
   // ==================== LOCATION PERMISSIONS ====================
-  
+
   // Request location permission (fine location)
   static Future<bool> requestLocationPermission() async {
     PermissionStatus status = await Permission.location.request();
-    
+
     if (status.isGranted) {
       return true;
     } else if (status.isDenied) {
@@ -82,11 +82,11 @@ class PermissionService {
     }
     return false;
   }
-  
+
   // Request location permission (always/background)
   static Future<bool> requestLocationAlwaysPermission() async {
     PermissionStatus status = await Permission.locationAlways.request();
-    
+
     if (status.isGranted) {
       return true;
     } else if (status.isDenied) {
@@ -96,11 +96,11 @@ class PermissionService {
     }
     return false;
   }
-  
+
   // Request location permission (when in use)
   static Future<bool> requestLocationWhenInUsePermission() async {
     PermissionStatus status = await Permission.locationWhenInUse.request();
-    
+
     if (status.isGranted) {
       return true;
     } else if (status.isDenied) {
@@ -115,7 +115,7 @@ class PermissionService {
   static Future<PermissionStatus> checkLocationPermission() async {
     return await Permission.location.status;
   }
-  
+
   // Check if location permission is granted
   static Future<bool> isLocationPermissionGranted() async {
     PermissionStatus status = await Permission.location.status;
@@ -123,11 +123,11 @@ class PermissionService {
   }
 
   // ==================== STORAGE PERMISSIONS (Optional) ====================
-  
+
   // Request storage permission (for Android)
   static Future<bool> requestStoragePermission() async {
     PermissionStatus status = await Permission.storage.request();
-    
+
     if (status.isGranted) {
       return true;
     } else if (status.isDenied) {
@@ -145,11 +145,11 @@ class PermissionService {
   }
 
   // ==================== NOTIFICATION PERMISSION (Android 13+) ====================
-  
+
   // Request notification permission
   static Future<bool> requestNotificationPermission() async {
     PermissionStatus status = await Permission.notification.request();
-    
+
     if (status.isGranted) {
       return true;
     } else if (status.isDenied) {
@@ -167,19 +167,19 @@ class PermissionService {
   }
 
   // ==================== COMBINED PERMISSIONS ====================
-  
+
   // Request all permissions (camera, microphone, location)
   static Future<Map<Permission, bool>> requestAllPermissions() async {
     Map<Permission, PermissionStatus> statuses = await [
       Permission.camera,
       Permission.microphone,
-      Permission.location,  // Add location permission
+      Permission.location, // Add location permission
     ].request();
-    
+
     bool cameraGranted = statuses[Permission.camera]?.isGranted ?? false;
     bool micGranted = statuses[Permission.microphone]?.isGranted ?? false;
     bool locationGranted = statuses[Permission.location]?.isGranted ?? false;
-    
+
     return {
       Permission.camera: cameraGranted,
       Permission.microphone: micGranted,
@@ -194,29 +194,29 @@ class PermissionService {
       Permission.microphone,
       Permission.location,
     ];
-    
+
     // Add storage for Android
     if (await _isAndroid()) {
       permissions.add(Permission.storage);
     }
-    
+
     // Add notification for Android 13+
     if (await _isAndroid13Plus()) {
       permissions.add(Permission.notification);
     }
-    
+
     Map<Permission, PermissionStatus> statuses = await permissions.request();
-    
+
     Map<Permission, bool> result = {};
     for (var permission in permissions) {
       result[permission] = statuses[permission]?.isGranted ?? false;
     }
-    
+
     return result;
   }
 
   // ==================== PERMISSION DIALOGS ====================
-  
+
   // Show permission denied dialog
   static Future<void> showPermissionDialog(
     BuildContext context,
@@ -244,20 +244,18 @@ class PermissionService {
       ),
     );
   }
-  
+
   // Show location permission denied dialog
-  static Future<void> showLocationPermissionDialog(
-    BuildContext context,
-  ) async {
+  static Future<void> showLocationPermissionDialog(BuildContext context) async {
     return showPermissionDialog(
       context,
       'Location Permission Required',
       'This app needs location access to detect your country automatically.\n\n'
-      'Please grant location permission to automatically set your country code.\n'
-      'You can also manually select your country from the dropdown.',
+          'Please grant location permission to automatically set your country code.\n'
+          'You can also manually select your country from the dropdown.',
     );
   }
-  
+
   // Show location permission permanently denied dialog
   static Future<void> showLocationPermanentlyDeniedDialog(
     BuildContext context,
@@ -289,14 +287,12 @@ class PermissionService {
   }
 
   // Show camera permission denied dialog
-  static Future<void> showCameraPermissionDialog(
-    BuildContext context,
-  ) async {
+  static Future<void> showCameraPermissionDialog(BuildContext context) async {
     return showPermissionDialog(
       context,
       'Camera Permission Required',
       'This app needs camera access to scan QR codes and barcodes.\n\n'
-      'Please grant camera permission to use the scanner features.',
+          'Please grant camera permission to use the scanner features.',
     );
   }
 
@@ -308,16 +304,16 @@ class PermissionService {
       context,
       'Microphone Permission Required',
       'This app needs microphone access for voice input.\n\n'
-      'Please grant microphone permission to use voice search.',
+          'Please grant microphone permission to use voice search.',
     );
   }
 
   // ==================== UTILITY METHODS ====================
-  
+
   // Request location permission with fallback
   static Future<bool> requestLocationWithFallback() async {
     PermissionStatus status = await Permission.location.request();
-    
+
     if (status.isGranted) {
       return true;
     } else if (status.isDenied) {
@@ -332,22 +328,23 @@ class PermissionService {
     }
     return false;
   }
-  
+
   // Request multiple location permissions (fine + coarse)
   static Future<bool> requestLocationFineAndCoarse() async {
     // Request fine location (which includes coarse location)
     PermissionStatus status = await Permission.location.request();
-    
+
     if (status.isGranted) {
       return true;
     }
-    
+
     // Try coarse location if fine is not granted
     if (!status.isGranted) {
-      PermissionStatus coarseStatus = await Permission.locationWhenInUse.request();
+      PermissionStatus coarseStatus = await Permission.locationWhenInUse
+          .request();
       return coarseStatus.isGranted;
     }
-    
+
     return false;
   }
 
@@ -368,7 +365,7 @@ class PermissionService {
   }
 
   // ==================== BATCH PERMISSION CHECKS ====================
-  
+
   /// Check multiple permissions at once
   static Future<Map<Permission, bool>> checkPermissions(
     List<Permission> permissions,
@@ -397,7 +394,7 @@ class PermissionService {
     List<Permission> permissions,
   ) async {
     Map<Permission, PermissionStatus> statuses = await permissions.request();
-    
+
     Map<Permission, bool> results = {};
     for (var permission in permissions) {
       results[permission] = statuses[permission]?.isGranted ?? false;

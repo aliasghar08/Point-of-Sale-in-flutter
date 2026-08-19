@@ -62,7 +62,9 @@ class _CrmScreenState extends State<CrmScreen> {
     List<Customer> list = List.from(_customers);
 
     if (_selectedTier != 'All') {
-      list = list.where((c) => c.customerValueCategory.contains(_selectedTier)).toList();
+      list = list
+          .where((c) => c.customerValueCategory.contains(_selectedTier))
+          .toList();
     }
 
     if (_searchQuery.trim().isNotEmpty) {
@@ -94,12 +96,18 @@ class _CrmScreenState extends State<CrmScreen> {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Close'),
+          ),
           ElevatedButton.icon(
             onPressed: () {
               Navigator.pop(ctx);
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Customer directory ready!'), behavior: SnackBarBehavior.floating),
+                const SnackBar(
+                  content: Text('Customer directory ready!'),
+                  behavior: SnackBarBehavior.floating,
+                ),
               );
             },
             icon: const Icon(Icons.check),
@@ -129,37 +137,59 @@ class _CrmScreenState extends State<CrmScreen> {
               children: [
                 TextFormField(
                   controller: nameCtrl,
-                  decoration: const InputDecoration(labelText: 'Customer Full Name *', prefixIcon: Icon(Icons.person)),
-                  validator: (v) => ValidationService.validateRequired(v, fieldName: 'Full Name'),
+                  decoration: const InputDecoration(
+                    labelText: 'Customer Full Name *',
+                    prefixIcon: Icon(Icons.person),
+                  ),
+                  validator: (v) => ValidationService.validateRequired(
+                    v,
+                    fieldName: 'Full Name',
+                  ),
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: phoneCtrl,
                   keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(labelText: 'Phone Number *', prefixIcon: Icon(Icons.phone)),
-                  validator: (v) => ValidationService.isValidPhone(v) ? null : 'Enter valid phone number',
+                  decoration: const InputDecoration(
+                    labelText: 'Phone Number *',
+                    prefixIcon: Icon(Icons.phone),
+                  ),
+                  validator: (v) => ValidationService.isValidPhone(v)
+                      ? null
+                      : 'Enter valid phone number',
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: emailCtrl,
                   keyboardType: TextInputType.emailAddress,
-                  decoration: const InputDecoration(labelText: 'Email Address (Optional)', prefixIcon: Icon(Icons.email)),
+                  decoration: const InputDecoration(
+                    labelText: 'Email Address (Optional)',
+                    prefixIcon: Icon(Icons.email),
+                  ),
                   validator: (v) {
                     if (v == null || v.trim().isEmpty) return null;
-                    return ValidationService.isValidEmail(v) ? null : 'Enter valid email';
+                    return ValidationService.isValidEmail(v)
+                        ? null
+                        : 'Enter valid email';
                   },
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: addrCtrl,
-                  decoration: const InputDecoration(labelText: 'Address (Optional)', prefixIcon: Icon(Icons.home)),
+                  decoration: const InputDecoration(
+                    labelText: 'Address (Optional)',
+                    prefixIcon: Icon(Icons.home),
+                  ),
                 ),
               ],
             ),
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
           ElevatedButton(
             onPressed: () async {
               if (formKey.currentState!.validate()) {
@@ -198,7 +228,10 @@ class _CrmScreenState extends State<CrmScreen> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _showAddCustomerModal,
         icon: const Icon(Icons.person_add, color: Colors.white),
-        label: const Text('Add Customer', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        label: const Text(
+          'Add Customer',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
         backgroundColor: isDark ? AppColors.primaryLight : AppColors.primary,
       ),
       body: Column(
@@ -223,21 +256,25 @@ class _CrmScreenState extends State<CrmScreen> {
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : _filteredCustomers.isEmpty
-                    ? EmptyStateView(
-                        icon: Icons.people_outline,
-                        title: 'No customers found',
-                        description: _customers.isEmpty
-                            ? 'Your customer directory is empty. Register your first customer!'
-                            : 'No customer matches your search criteria.',
-                        actionLabel: 'Add New Customer',
-                        onAction: _showAddCustomerModal,
-                      )
-                    : ListView.separated(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: _filteredCustomers.length,
-                        separatorBuilder: (_, _) => const SizedBox(height: 10),
-                        itemBuilder: (ctx, i) => _buildCustomerCard(_filteredCustomers[i], currencySymbol, isDark),
-                      ),
+                ? EmptyStateView(
+                    icon: Icons.people_outline,
+                    title: 'No customers found',
+                    description: _customers.isEmpty
+                        ? 'Your customer directory is empty. Register your first customer!'
+                        : 'No customer matches your search criteria.',
+                    actionLabel: 'Add New Customer',
+                    onAction: _showAddCustomerModal,
+                  )
+                : ListView.separated(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _filteredCustomers.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 10),
+                    itemBuilder: (ctx, i) => _buildCustomerCard(
+                      _filteredCustomers[i],
+                      currencySymbol,
+                      isDark,
+                    ),
+                  ),
           ),
         ],
       ),
@@ -249,7 +286,11 @@ class _CrmScreenState extends State<CrmScreen> {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-        border: Border(bottom: BorderSide(color: isDark ? AppColors.darkBorder : AppColors.lightBorder)),
+        border: Border(
+          bottom: BorderSide(
+            color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+          ),
+        ),
       ),
       child: Row(
         children: [
@@ -263,7 +304,10 @@ class _CrmScreenState extends State<CrmScreen> {
               decoration: const InputDecoration(
                 hintText: 'Search customers by name, phone, or email...',
                 prefixIcon: Icon(Icons.search),
-                contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
               ),
             ),
           ),
@@ -301,25 +345,22 @@ class _CrmScreenState extends State<CrmScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Directory', style: TextStyle(fontSize: 11, color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary)),
-                  const SizedBox(height: 2),
-                  Text('$totalCustomers Clients', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: PosCard(
-              padding: const EdgeInsets.all(10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('LTV Revenue', style: TextStyle(fontSize: 11, color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary)),
+                  Text(
+                    'Directory',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: isDark
+                          ? AppColors.darkTextSecondary
+                          : AppColors.lightTextSecondary,
+                    ),
+                  ),
                   const SizedBox(height: 2),
                   Text(
-                    FormatService.formatCurrency(totalSpent, symbol: currencySymbol),
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.success),
+                    '$totalCustomers Clients',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
                   ),
                 ],
               ),
@@ -332,14 +373,59 @@ class _CrmScreenState extends State<CrmScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Avg Value', style: TextStyle(fontSize: 11, color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary)),
+                  Text(
+                    'LTV Revenue',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: isDark
+                          ? AppColors.darkTextSecondary
+                          : AppColors.lightTextSecondary,
+                    ),
+                  ),
                   const SizedBox(height: 2),
                   Text(
-                    FormatService.formatCurrency(avgSpend, symbol: currencySymbol),
+                    FormatService.formatCurrency(
+                      totalSpent,
+                      symbol: currencySymbol,
+                    ),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: AppColors.success,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: PosCard(
+              padding: const EdgeInsets.all(10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Avg Value',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: isDark
+                          ? AppColors.darkTextSecondary
+                          : AppColors.lightTextSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    FormatService.formatCurrency(
+                      avgSpend,
+                      symbol: currencySymbol,
+                    ),
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
-                      color: isDark ? AppColors.primaryLight : AppColors.primary,
+                      color: isDark
+                          ? AppColors.primaryLight
+                          : AppColors.primary,
                     ),
                   ),
                 ],
@@ -363,7 +449,9 @@ class _CrmScreenState extends State<CrmScreen> {
         itemBuilder: (ctx, i) {
           final t = tiers[i];
           final isSelected = _selectedTier == t;
-          final primaryColor = isDark ? AppColors.primaryLight : AppColors.primary;
+          final primaryColor = isDark
+              ? AppColors.primaryLight
+              : AppColors.primary;
 
           return Padding(
             padding: const EdgeInsets.only(right: 8),
@@ -417,7 +505,9 @@ class _CrmScreenState extends State<CrmScreen> {
         children: [
           CircleAvatar(
             radius: 22,
-            backgroundColor: (isDark ? AppColors.primaryLight : AppColors.primary).withValues(alpha: 0.15),
+            backgroundColor:
+                (isDark ? AppColors.primaryLight : AppColors.primary)
+                    .withValues(alpha: 0.15),
             child: Text(
               c.name.isNotEmpty ? c.name[0].toUpperCase() : 'C',
               style: TextStyle(
@@ -437,7 +527,10 @@ class _CrmScreenState extends State<CrmScreen> {
                     Expanded(
                       child: Text(
                         c.name,
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -450,7 +543,9 @@ class _CrmScreenState extends State<CrmScreen> {
                   '${c.phone} • ${c.totalOrders} Orders • Lifetime: ${FormatService.formatCurrency(c.totalSpent, symbol: currencySymbol)}',
                   style: TextStyle(
                     fontSize: 12,
-                    color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                    color: isDark
+                        ? AppColors.darkTextSecondary
+                        : AppColors.lightTextSecondary,
                   ),
                 ),
               ],

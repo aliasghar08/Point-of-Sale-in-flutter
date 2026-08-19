@@ -6,7 +6,7 @@ import '../models/settings_model.dart';
 class SettingsProvider extends ChangeNotifier {
   AppSettings _settings = AppSettings();
   // ✅ CHANGED: Default to true so we don't need to synchronously notify listeners on boot
-  bool _isLoading = true; 
+  bool _isLoading = true;
 
   AppSettings get settings => _settings;
   bool get isLoading => _isLoading;
@@ -24,11 +24,14 @@ class SettingsProvider extends ChangeNotifier {
   bool get autoSyncData => _settings.autoSyncData;
   String get dateFormat => _settings.dateFormat;
   String get timeFormat => _settings.timeFormat;
-  
+
   // Customer related getters
   bool get enableCustomerLoyalty => _settings.enableCustomerLoyalty;
   bool get requireCustomerInfo => _settings.requireCustomerInfo;
   int get pointsPerCurrency => _settings.pointsPerCurrency;
+
+  // Security related getters
+  bool get enableBiometrics => _settings.enableBiometrics;
 
   SettingsProvider() {
     loadSettings();
@@ -40,7 +43,7 @@ class SettingsProvider extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       final String? settingsJson = prefs.getString('app_settings');
-      
+
       if (settingsJson != null) {
         final Map<String, dynamic> data = json.decode(settingsJson);
         _settings = AppSettings.fromMap(data);
@@ -72,10 +75,7 @@ class SettingsProvider extends ChangeNotifier {
 
   // Currency Methods
   Future<void> updateCurrency(String symbol, String code) async {
-    _settings = _settings.copyWith(
-      currencySymbol: symbol,
-      currencyCode: code,
-    );
+    _settings = _settings.copyWith(currencySymbol: symbol, currencyCode: code);
     await _saveSettings();
     notifyListeners();
   }
@@ -95,14 +95,18 @@ class SettingsProvider extends ChangeNotifier {
   }
 
   Future<void> toggleAutoPrint() async {
-    _settings = _settings.copyWith(autoPrintReceipt: !_settings.autoPrintReceipt);
+    _settings = _settings.copyWith(
+      autoPrintReceipt: !_settings.autoPrintReceipt,
+    );
     await _saveSettings();
     notifyListeners();
   }
 
   // Notification Toggles
   Future<void> toggleNotifications() async {
-    _settings = _settings.copyWith(enableNotifications: !_settings.enableNotifications);
+    _settings = _settings.copyWith(
+      enableNotifications: !_settings.enableNotifications,
+    );
     await _saveSettings();
     notifyListeners();
   }
@@ -121,7 +125,9 @@ class SettingsProvider extends ChangeNotifier {
 
   // Data & Sync Toggles
   Future<void> toggleOfflineMode() async {
-    _settings = _settings.copyWith(enableOfflineMode: !_settings.enableOfflineMode);
+    _settings = _settings.copyWith(
+      enableOfflineMode: !_settings.enableOfflineMode,
+    );
     await _saveSettings();
     notifyListeners();
   }
@@ -134,13 +140,26 @@ class SettingsProvider extends ChangeNotifier {
 
   // Customer Settings Methods
   Future<void> toggleCustomerLoyalty() async {
-    _settings = _settings.copyWith(enableCustomerLoyalty: !_settings.enableCustomerLoyalty);
+    _settings = _settings.copyWith(
+      enableCustomerLoyalty: !_settings.enableCustomerLoyalty,
+    );
     await _saveSettings();
     notifyListeners();
   }
 
   Future<void> toggleRequireCustomerInfo() async {
-    _settings = _settings.copyWith(requireCustomerInfo: !_settings.requireCustomerInfo);
+    _settings = _settings.copyWith(
+      requireCustomerInfo: !_settings.requireCustomerInfo,
+    );
+    await _saveSettings();
+    notifyListeners();
+  }
+
+  // Security Methods
+  Future<void> toggleBiometrics() async {
+    _settings = _settings.copyWith(
+      enableBiometrics: !_settings.enableBiometrics,
+    );
     await _saveSettings();
     notifyListeners();
   }
@@ -159,7 +178,7 @@ class SettingsProvider extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       final String? settingsJson = prefs.getString('app_settings');
-      
+
       if (settingsJson != null) {
         // Settings exist, load them
         final Map<String, dynamic> data = json.decode(settingsJson);

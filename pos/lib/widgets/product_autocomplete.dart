@@ -178,7 +178,9 @@ class _ProductAutocompleteState extends State<ProductAutocomplete> {
                             Icon(
                               Icons.info_outline,
                               size: 18,
-                              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                              color: isDarkMode
+                                  ? Colors.grey.shade400
+                                  : Colors.grey.shade600,
                             ),
                             const SizedBox(width: 8),
                             Expanded(
@@ -186,7 +188,9 @@ class _ProductAutocompleteState extends State<ProductAutocomplete> {
                                 'No products found.',
                                 style: TextStyle(
                                   fontSize: 13,
-                                  color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                                  color: isDarkMode
+                                      ? Colors.grey.shade400
+                                      : Colors.grey.shade600,
                                 ),
                               ),
                             ),
@@ -206,13 +210,22 @@ class _ProductAutocompleteState extends State<ProductAutocomplete> {
                             onTapDown: (_) => _selectProduct(product),
                             onTap: () => _selectProduct(product),
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 12,
+                              ),
                               decoration: BoxDecoration(
                                 color: isDarkMode
-                                    ? (index % 2 == 0 ? Colors.grey.shade800 : Colors.grey.shade900)
-                                    : (index % 2 == 0 ? Colors.white : Colors.grey.shade50),
+                                    ? (index % 2 == 0
+                                          ? Colors.grey.shade800
+                                          : Colors.grey.shade900)
+                                    : (index % 2 == 0
+                                          ? Colors.white
+                                          : Colors.grey.shade50),
                                 borderRadius: isLast
-                                    ? const BorderRadius.vertical(bottom: Radius.circular(12))
+                                    ? const BorderRadius.vertical(
+                                        bottom: Radius.circular(12),
+                                      )
                                     : BorderRadius.zero,
                               ),
                               child: Row(
@@ -236,14 +249,17 @@ class _ProductAutocompleteState extends State<ProductAutocomplete> {
                                   const SizedBox(width: 12),
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         Text(
                                           product,
                                           style: TextStyle(
                                             fontSize: 14,
-                                            color: isDarkMode ? Colors.white : Colors.black,
+                                            color: isDarkMode
+                                                ? Colors.white
+                                                : Colors.black,
                                             fontWeight: FontWeight.w500,
                                           ),
                                         ),
@@ -294,16 +310,23 @@ class _ProductAutocompleteState extends State<ProductAutocomplete> {
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
-                  color: isDarkMode ? Colors.blue.shade900 : Colors.blue.shade50,
+                  color: isDarkMode
+                      ? Colors.blue.shade900
+                      : Colors.blue.shade50,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
                   'Category: ${widget.category}',
                   style: TextStyle(
                     fontSize: 12,
-                    color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+                    color: isDarkMode
+                        ? Colors.blue.shade400
+                        : Colors.blue.shade700,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -329,7 +352,9 @@ class _ProductAutocompleteState extends State<ProductAutocomplete> {
                   ? IconButton(
                       icon: Icon(
                         Icons.clear,
-                        color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                        color: isDarkMode
+                            ? Colors.grey.shade400
+                            : Colors.grey.shade600,
                       ),
                       onPressed: () {
                         _controller.clear();
@@ -346,12 +371,15 @@ class _ProductAutocompleteState extends State<ProductAutocomplete> {
                 borderSide: BorderSide.none,
               ),
               filled: true,
-              fillColor: isDarkMode ? Colors.grey.shade800 : Colors.grey.shade50,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              fillColor: isDarkMode
+                  ? Colors.grey.shade800
+                  : Colors.grey.shade50,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
             ),
-            style: TextStyle(
-              color: isDarkMode ? Colors.white : Colors.black,
-            ),
+            style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
             onSubmitted: (value) {
               if (value.isNotEmpty) {
                 if (_suggestions.length == 1) {

@@ -66,7 +66,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   // ===== DROPDOWN OPTIONS (from ProductReference) =====
   late List<String> _categories;
   List<String> _subCategories = [];
-  
+
   // ===== TAX CLASSES =====
   final List<String> _taxClasses = [
     'Standard (18%)',
@@ -105,7 +105,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     super.initState();
     // Get categories from ProductReference
     _categories = ProductReference.getCategories();
-    
+
     if (widget.isEditing && widget.product != null) {
       _populateFields();
     }
@@ -144,7 +144,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     _isDigital = p.isDigital;
     _hasVariants = p.hasVariants;
     _imageUrl = p.imageUrl;
-    
+
     // Load subcategories for the selected category
     if (_selectedCategory != null) {
       _subCategories = ProductReference.getSubCategories(_selectedCategory!);
@@ -212,7 +212,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
       _nameController.text = productName;
       _productSuggestions = [];
       _showSuggestions = false;
-      
+
       // Try to auto-fill category from product reference
       final category = ProductReference.findCategoryForProduct(productName);
       if (category != null && category != _selectedCategory) {
@@ -244,7 +244,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
 
   void _showImagePickerOptions() {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    
+
     showModalBottomSheet(
       context: context,
       backgroundColor: isDarkMode ? Colors.grey.shade900 : Colors.white,
@@ -273,7 +273,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
             Text(
               'Add a product image to make it stand out',
               style: TextStyle(
-                fontSize: 14, 
+                fontSize: 14,
                 color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
               ),
             ),
@@ -285,17 +285,24 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                 leading: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: isDarkMode ? Colors.blue.shade900 : Colors.blue.shade50,
+                    color: isDarkMode
+                        ? Colors.blue.shade900
+                        : Colors.blue.shade50,
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Icon(Icons.photo_library, color: isDarkMode ? Colors.blue.shade400 : Colors.blue),
+                  child: Icon(
+                    Icons.photo_library,
+                    color: isDarkMode ? Colors.blue.shade400 : Colors.blue,
+                  ),
                 ),
                 title: const Text('Choose from Gallery'),
                 subtitle: Text(
                   'Select from your device',
                   style: TextStyle(
-                    fontSize: 12, 
-                    color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                    fontSize: 12,
+                    color: isDarkMode
+                        ? Colors.grey.shade400
+                        : Colors.grey.shade600,
                   ),
                 ),
                 onTap: () {
@@ -311,17 +318,24 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                 leading: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: isDarkMode ? Colors.green.shade900 : Colors.green.shade50,
+                    color: isDarkMode
+                        ? Colors.green.shade900
+                        : Colors.green.shade50,
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Icon(Icons.camera_alt, color: isDarkMode ? Colors.green.shade400 : Colors.green),
+                  child: Icon(
+                    Icons.camera_alt,
+                    color: isDarkMode ? Colors.green.shade400 : Colors.green,
+                  ),
                 ),
                 title: const Text('Take Photo'),
                 subtitle: Text(
                   'Capture with camera',
                   style: TextStyle(
-                    fontSize: 12, 
-                    color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                    fontSize: 12,
+                    color: isDarkMode
+                        ? Colors.grey.shade400
+                        : Colors.grey.shade600,
                   ),
                 ),
                 onTap: () {
@@ -338,10 +352,15 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                   leading: Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: isDarkMode ? Colors.red.shade900 : Colors.red.shade50,
+                      color: isDarkMode
+                          ? Colors.red.shade900
+                          : Colors.red.shade50,
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Icon(Icons.delete, color: isDarkMode ? Colors.red.shade400 : Colors.red),
+                    child: Icon(
+                      Icons.delete,
+                      color: isDarkMode ? Colors.red.shade400 : Colors.red,
+                    ),
                   ),
                   title: const Text(
                     'Remove Image',
@@ -386,7 +405,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                 _barcodeController.text = code;
               }
             });
-            _showSnackBar('✅ ${target == 'qr' ? 'QR Code' : 'Barcode'} scanned: $code');
+            _showSnackBar(
+              '✅ ${target == 'qr' ? 'QR Code' : 'Barcode'} scanned: $code',
+            );
           },
         ),
       ),
@@ -411,7 +432,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
 
   Future<void> _selectDate(BuildContext context, String type) async {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    
+
     DateTime firstDate = DateTime(2000, 1, 1);
     DateTime lastDate = DateTime(2100, 12, 31);
     DateTime? currentSelected;
@@ -502,22 +523,37 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     if (_manufactureDate != null && _bestBeforeDate != null) {
-      if (_normalizeDate(_manufactureDate!).isAfter(_normalizeDate(_bestBeforeDate!))) {
-        _showSnackBar('❌ Manufacture date cannot be after Best Before date', isError: true);
+      if (_normalizeDate(
+        _manufactureDate!,
+      ).isAfter(_normalizeDate(_bestBeforeDate!))) {
+        _showSnackBar(
+          '❌ Manufacture date cannot be after Best Before date',
+          isError: true,
+        );
         return;
       }
     }
 
     if (_bestBeforeDate != null && _expiryDate != null) {
-      if (_normalizeDate(_bestBeforeDate!).isAfter(_normalizeDate(_expiryDate!))) {
-        _showSnackBar('❌ Best Before date cannot be after Expiry date', isError: true);
+      if (_normalizeDate(
+        _bestBeforeDate!,
+      ).isAfter(_normalizeDate(_expiryDate!))) {
+        _showSnackBar(
+          '❌ Best Before date cannot be after Expiry date',
+          isError: true,
+        );
         return;
       }
     }
 
     if (_manufactureDate != null && _expiryDate != null) {
-      if (_normalizeDate(_manufactureDate!).isAfter(_normalizeDate(_expiryDate!))) {
-        _showSnackBar('❌ Manufacture date cannot be after Expiry date', isError: true);
+      if (_normalizeDate(
+        _manufactureDate!,
+      ).isAfter(_normalizeDate(_expiryDate!))) {
+        _showSnackBar(
+          '❌ Manufacture date cannot be after Expiry date',
+          isError: true,
+        );
         return;
       }
     }
@@ -600,7 +636,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
 
   void _showSnackBar(String message, {bool isError = false}) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
@@ -676,7 +712,10 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                     _buildSectionCard(
                       title: 'Pricing & Stock',
                       icon: Icons.attach_money,
-                      child: _buildPricingStockFields(currencySymbol, isDarkMode),
+                      child: _buildPricingStockFields(
+                        currencySymbol,
+                        isDarkMode,
+                      ),
                       isDarkMode: isDarkMode,
                     ),
                     const SizedBox(height: 20),
@@ -801,7 +840,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
               children: [
                 Icon(
                   Icons.image,
-                  color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+                  color: isDarkMode
+                      ? Colors.blue.shade400
+                      : Colors.blue.shade700,
                   size: 20,
                 ),
                 const SizedBox(width: 8),
@@ -815,16 +856,23 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                 ),
                 const SizedBox(width: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
-                    color: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade200,
+                    color: isDarkMode
+                        ? Colors.grey.shade700
+                        : Colors.grey.shade200,
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
                     'Optional',
                     style: TextStyle(
                       fontSize: 10,
-                      color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                      color: isDarkMode
+                          ? Colors.grey.shade400
+                          : Colors.grey.shade600,
                     ),
                   ),
                 ),
@@ -839,10 +887,14 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                 height: 180,
                 width: double.infinity,
                 decoration: BoxDecoration(
-                  color: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
+                  color: isDarkMode
+                      ? Colors.grey.shade700
+                      : Colors.grey.shade50,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: isDarkMode ? Colors.grey.shade600 : Colors.grey.shade300,
+                    color: isDarkMode
+                        ? Colors.grey.shade600
+                        : Colors.grey.shade300,
                     width: 2,
                     style: BorderStyle.solid,
                   ),
@@ -866,11 +918,18 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                               ),
                               child: const Row(
                                 children: [
-                                  Icon(Icons.edit, color: Colors.white, size: 16),
+                                  Icon(
+                                    Icons.edit,
+                                    color: Colors.white,
+                                    size: 16,
+                                  ),
                                   SizedBox(width: 4),
                                   Text(
                                     'Edit',
-                                    style: TextStyle(color: Colors.white, fontSize: 12),
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -884,13 +943,17 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                           Icon(
                             Icons.cloud_upload,
                             size: 48,
-                            color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                            color: isDarkMode
+                                ? Colors.grey.shade400
+                                : Colors.grey.shade600,
                           ),
                           const SizedBox(height: 8),
                           Text(
                             'Tap to upload product image',
                             style: TextStyle(
-                              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                              color: isDarkMode
+                                  ? Colors.grey.shade400
+                                  : Colors.grey.shade600,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
@@ -899,7 +962,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                             'PNG, JPG, WEBP (Max 5MB)',
                             style: TextStyle(
                               fontSize: 12,
-                              color: isDarkMode ? Colors.grey.shade500 : Colors.grey.shade400,
+                              color: isDarkMode
+                                  ? Colors.grey.shade500
+                                  : Colors.grey.shade400,
                             ),
                           ),
                         ],
@@ -942,13 +1007,17 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: isDarkMode ? Colors.blue.shade900 : Colors.blue.shade50,
+                    color: isDarkMode
+                        ? Colors.blue.shade900
+                        : Colors.blue.shade50,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(
                     icon,
                     size: 18,
-                    color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+                    color: isDarkMode
+                        ? Colors.blue.shade400
+                        : Colors.blue.shade700,
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -967,7 +1036,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
-                        isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+                        isDarkMode
+                            ? Colors.blue.shade400
+                            : Colors.blue.shade700,
                         isDarkMode ? Colors.blue.shade900 : Colors.blue.shade50,
                       ],
                     ),
@@ -983,10 +1054,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
               height: 1,
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: child,
-          ),
+          Padding(padding: const EdgeInsets.all(16), child: child),
         ],
       ),
     );
@@ -1016,12 +1084,17 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                       hintText: 'Enter the product name',
                       prefixIcon: Icon(
                         Icons.production_quantity_limits,
-                        color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                        color: isDarkMode
+                            ? Colors.grey.shade400
+                            : Colors.grey.shade600,
                       ),
                       suffixIcon: _nameController.text.isNotEmpty
                           ? IconButton(
-                              icon: Icon(Icons.clear, 
-                                color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                              icon: Icon(
+                                Icons.clear,
+                                color: isDarkMode
+                                    ? Colors.grey.shade400
+                                    : Colors.grey.shade600,
                               ),
                               onPressed: () {
                                 setState(() {
@@ -1037,9 +1110,13 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                         borderSide: BorderSide.none,
                       ),
                       filled: true,
-                      fillColor: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
+                      fillColor: isDarkMode
+                          ? Colors.grey.shade700
+                          : Colors.grey.shade50,
                     ),
-                    style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                    style: TextStyle(
+                      color: isDarkMode ? Colors.white : Colors.black,
+                    ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
                         return 'Please enter product name';
@@ -1082,7 +1159,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                       child: ListTile(
                         leading: Icon(
                           Icons.search,
-                          color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                          color: isDarkMode
+                              ? Colors.grey.shade400
+                              : Colors.grey.shade600,
                           size: 16,
                         ),
                         title: Text(
@@ -1113,16 +1192,22 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                   hintText: 'Enter product description',
                   prefixIcon: Icon(
                     Icons.description,
-                    color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                    color: isDarkMode
+                        ? Colors.grey.shade400
+                        : Colors.grey.shade600,
                   ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,
                   ),
                   filled: true,
-                  fillColor: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
+                  fillColor: isDarkMode
+                      ? Colors.grey.shade700
+                      : Colors.grey.shade50,
                 ),
-                style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                style: TextStyle(
+                  color: isDarkMode ? Colors.white : Colors.black,
+                ),
               ),
             ),
             const InfoIconWidget(info: FieldInfo.descriptionField),
@@ -1140,16 +1225,22 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                   hintText: 'Enter brand name',
                   prefixIcon: Icon(
                     Icons.branding_watermark,
-                    color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                    color: isDarkMode
+                        ? Colors.grey.shade400
+                        : Colors.grey.shade600,
                   ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,
                   ),
                   filled: true,
-                  fillColor: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
+                  fillColor: isDarkMode
+                      ? Colors.grey.shade700
+                      : Colors.grey.shade50,
                 ),
-                style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                style: TextStyle(
+                  color: isDarkMode ? Colors.white : Colors.black,
+                ),
               ),
             ),
             const InfoIconWidget(info: FieldInfo.brand),
@@ -1167,16 +1258,22 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                   hintText: 'Enter SKU code',
                   prefixIcon: Icon(
                     Icons.code,
-                    color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                    color: isDarkMode
+                        ? Colors.grey.shade400
+                        : Colors.grey.shade600,
                   ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,
                   ),
                   filled: true,
-                  fillColor: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
+                  fillColor: isDarkMode
+                      ? Colors.grey.shade700
+                      : Colors.grey.shade50,
                 ),
-                style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                style: TextStyle(
+                  color: isDarkMode ? Colors.white : Colors.black,
+                ),
               ),
             ),
             const InfoIconWidget(info: FieldInfo.sku),
@@ -1200,7 +1297,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                   hintText: '0.00',
                   prefixIcon: Icon(
                     Icons.attach_money,
-                    color: isDarkMode ? Colors.green.shade400 : Colors.green.shade700,
+                    color: isDarkMode
+                        ? Colors.green.shade400
+                        : Colors.green.shade700,
                   ),
                   prefixText: '$currencySymbol ',
                   border: OutlineInputBorder(
@@ -1208,10 +1307,14 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                     borderSide: BorderSide.none,
                   ),
                   filled: true,
-                  fillColor: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
+                  fillColor: isDarkMode
+                      ? Colors.grey.shade700
+                      : Colors.grey.shade50,
                 ),
                 keyboardType: TextInputType.number,
-                style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                style: TextStyle(
+                  color: isDarkMode ? Colors.white : Colors.black,
+                ),
                 inputFormatters: [
                   FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
                 ],
@@ -1238,7 +1341,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                   hintText: '0.00',
                   prefixIcon: Icon(
                     Icons.currency_exchange,
-                    color: isDarkMode ? Colors.orange.shade400 : Colors.orange.shade700,
+                    color: isDarkMode
+                        ? Colors.orange.shade400
+                        : Colors.orange.shade700,
                   ),
                   prefixText: '$currencySymbol ',
                   border: OutlineInputBorder(
@@ -1246,10 +1351,14 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                     borderSide: BorderSide.none,
                   ),
                   filled: true,
-                  fillColor: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
+                  fillColor: isDarkMode
+                      ? Colors.grey.shade700
+                      : Colors.grey.shade50,
                 ),
                 keyboardType: TextInputType.number,
-                style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                style: TextStyle(
+                  color: isDarkMode ? Colors.white : Colors.black,
+                ),
                 inputFormatters: [
                   FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
                 ],
@@ -1276,7 +1385,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                   hintText: '0.00 (Optional)',
                   prefixIcon: Icon(
                     Icons.local_offer,
-                    color: isDarkMode ? Colors.purple.shade400 : Colors.purple.shade700,
+                    color: isDarkMode
+                        ? Colors.purple.shade400
+                        : Colors.purple.shade700,
                   ),
                   prefixText: '$currencySymbol ',
                   border: OutlineInputBorder(
@@ -1284,10 +1395,14 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                     borderSide: BorderSide.none,
                   ),
                   filled: true,
-                  fillColor: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
+                  fillColor: isDarkMode
+                      ? Colors.grey.shade700
+                      : Colors.grey.shade50,
                 ),
                 keyboardType: TextInputType.number,
-                style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                style: TextStyle(
+                  color: isDarkMode ? Colors.white : Colors.black,
+                ),
                 inputFormatters: [
                   FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
                 ],
@@ -1308,7 +1423,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                   hintText: '0.00 (Optional)',
                   prefixIcon: Icon(
                     Icons.shopping_bag,
-                    color: isDarkMode ? Colors.teal.shade400 : Colors.teal.shade700,
+                    color: isDarkMode
+                        ? Colors.teal.shade400
+                        : Colors.teal.shade700,
                   ),
                   prefixText: '$currencySymbol ',
                   border: OutlineInputBorder(
@@ -1316,10 +1433,14 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                     borderSide: BorderSide.none,
                   ),
                   filled: true,
-                  fillColor: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
+                  fillColor: isDarkMode
+                      ? Colors.grey.shade700
+                      : Colors.grey.shade50,
                 ),
                 keyboardType: TextInputType.number,
-                style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                style: TextStyle(
+                  color: isDarkMode ? Colors.white : Colors.black,
+                ),
                 inputFormatters: [
                   FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
                 ],
@@ -1340,17 +1461,23 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                   hintText: '0',
                   prefixIcon: Icon(
                     Icons.inventory,
-                    color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+                    color: isDarkMode
+                        ? Colors.blue.shade400
+                        : Colors.blue.shade700,
                   ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,
                   ),
                   filled: true,
-                  fillColor: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
+                  fillColor: isDarkMode
+                      ? Colors.grey.shade700
+                      : Colors.grey.shade50,
                 ),
                 keyboardType: TextInputType.number,
-                style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                style: TextStyle(
+                  color: isDarkMode ? Colors.white : Colors.black,
+                ),
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 validator: (value) {
                   if (value == null || value.isEmpty) return 'Required';
@@ -1375,17 +1502,23 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                   hintText: '10',
                   prefixIcon: Icon(
                     Icons.warning,
-                    color: isDarkMode ? Colors.red.shade400 : Colors.red.shade700,
+                    color: isDarkMode
+                        ? Colors.red.shade400
+                        : Colors.red.shade700,
                   ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,
                   ),
                   filled: true,
-                  fillColor: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
+                  fillColor: isDarkMode
+                      ? Colors.grey.shade700
+                      : Colors.grey.shade50,
                 ),
                 keyboardType: TextInputType.number,
-                style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                style: TextStyle(
+                  color: isDarkMode ? Colors.white : Colors.black,
+                ),
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 validator: (value) {
                   if (value == null || value.isEmpty) return 'Required';
@@ -1410,17 +1543,23 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                   hintText: '0 (Optional)',
                   prefixIcon: Icon(
                     Icons.inventory_2,
-                    color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                    color: isDarkMode
+                        ? Colors.grey.shade400
+                        : Colors.grey.shade600,
                   ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,
                   ),
                   filled: true,
-                  fillColor: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
+                  fillColor: isDarkMode
+                      ? Colors.grey.shade700
+                      : Colors.grey.shade50,
                 ),
                 keyboardType: TextInputType.number,
-                style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                style: TextStyle(
+                  color: isDarkMode ? Colors.white : Colors.black,
+                ),
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               ),
             ),
@@ -1435,7 +1574,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
               child: Container(
                 decoration: BoxDecoration(
                   border: Border.all(
-                    color: isDarkMode ? Colors.grey.shade600 : Colors.grey.shade300,
+                    color: isDarkMode
+                        ? Colors.grey.shade600
+                        : Colors.grey.shade300,
                   ),
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -1446,7 +1587,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                     border: InputBorder.none,
                     contentPadding: EdgeInsets.symmetric(horizontal: 12),
                   ),
-                  dropdownColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
+                  dropdownColor: isDarkMode
+                      ? Colors.grey.shade800
+                      : Colors.white,
                   style: TextStyle(
                     color: isDarkMode ? Colors.white : Colors.black,
                   ),
@@ -1467,7 +1610,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                   hint: Text(
                     'Select unit',
                     style: TextStyle(
-                      color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                      color: isDarkMode
+                          ? Colors.grey.shade400
+                          : Colors.grey.shade600,
                     ),
                   ),
                 ),
@@ -1488,17 +1633,23 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                   hintText: '0.00 (Optional)',
                   prefixIcon: Icon(
                     Icons.fitness_center,
-                    color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                    color: isDarkMode
+                        ? Colors.grey.shade400
+                        : Colors.grey.shade600,
                   ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,
                   ),
                   filled: true,
-                  fillColor: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
+                  fillColor: isDarkMode
+                      ? Colors.grey.shade700
+                      : Colors.grey.shade50,
                 ),
                 keyboardType: TextInputType.number,
-                style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                style: TextStyle(
+                  color: isDarkMode ? Colors.white : Colors.black,
+                ),
                 inputFormatters: [
                   FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
                 ],
@@ -1515,7 +1666,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
               child: Container(
                 decoration: BoxDecoration(
                   border: Border.all(
-                    color: isDarkMode ? Colors.grey.shade600 : Colors.grey.shade300,
+                    color: isDarkMode
+                        ? Colors.grey.shade600
+                        : Colors.grey.shade300,
                   ),
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -1526,7 +1679,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                     border: InputBorder.none,
                     contentPadding: EdgeInsets.symmetric(horizontal: 12),
                   ),
-                  dropdownColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
+                  dropdownColor: isDarkMode
+                      ? Colors.grey.shade800
+                      : Colors.white,
                   style: TextStyle(
                     color: isDarkMode ? Colors.white : Colors.black,
                   ),
@@ -1541,7 +1696,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                   hint: Text(
                     'Select unit',
                     style: TextStyle(
-                      color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                      color: isDarkMode
+                          ? Colors.grey.shade400
+                          : Colors.grey.shade600,
                     ),
                   ),
                 ),
@@ -1557,25 +1714,32 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   Widget _buildDateFields(bool isDarkMode) {
     String? manufactureHelper;
     if (_bestBeforeDate != null) {
-      manufactureHelper = 'Must be on or before Best Before (${DateFormat('dd/MM/yyyy').format(_bestBeforeDate!)})';
+      manufactureHelper =
+          'Must be on or before Best Before (${DateFormat('dd/MM/yyyy').format(_bestBeforeDate!)})';
     } else if (_expiryDate != null) {
-      manufactureHelper = 'Must be on or before Expiry (${DateFormat('dd/MM/yyyy').format(_expiryDate!)})';
+      manufactureHelper =
+          'Must be on or before Expiry (${DateFormat('dd/MM/yyyy').format(_expiryDate!)})';
     }
 
     String? bestBeforeHelper;
     if (_manufactureDate != null && _expiryDate != null) {
-      bestBeforeHelper = 'Must be between ${DateFormat('dd/MM/yyyy').format(_manufactureDate!)} & ${DateFormat('dd/MM/yyyy').format(_expiryDate!)}';
+      bestBeforeHelper =
+          'Must be between ${DateFormat('dd/MM/yyyy').format(_manufactureDate!)} & ${DateFormat('dd/MM/yyyy').format(_expiryDate!)}';
     } else if (_manufactureDate != null) {
-      bestBeforeHelper = 'Must be on or after Manufacture (${DateFormat('dd/MM/yyyy').format(_manufactureDate!)})';
+      bestBeforeHelper =
+          'Must be on or after Manufacture (${DateFormat('dd/MM/yyyy').format(_manufactureDate!)})';
     } else if (_expiryDate != null) {
-      bestBeforeHelper = 'Must be on or before Expiry (${DateFormat('dd/MM/yyyy').format(_expiryDate!)})';
+      bestBeforeHelper =
+          'Must be on or before Expiry (${DateFormat('dd/MM/yyyy').format(_expiryDate!)})';
     }
 
     String? expiryHelper;
     if (_bestBeforeDate != null) {
-      expiryHelper = 'Must be on or after Best Before (${DateFormat('dd/MM/yyyy').format(_bestBeforeDate!)})';
+      expiryHelper =
+          'Must be on or after Best Before (${DateFormat('dd/MM/yyyy').format(_bestBeforeDate!)})';
     } else if (_manufactureDate != null) {
-      expiryHelper = 'Must be on or after Manufacture (${DateFormat('dd/MM/yyyy').format(_manufactureDate!)})';
+      expiryHelper =
+          'Must be on or after Manufacture (${DateFormat('dd/MM/yyyy').format(_manufactureDate!)})';
     }
 
     return Column(
@@ -1666,20 +1830,24 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
               children: [
                 Icon(
                   icon,
-                  color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+                  color: isDarkMode
+                      ? Colors.blue.shade400
+                      : Colors.blue.shade700,
                   size: 20,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    hasValue
-                        ? DateFormat('dd/MM/yyyy').format(date)
-                        : label,
+                    hasValue ? DateFormat('dd/MM/yyyy').format(date) : label,
                     style: TextStyle(
                       color: hasValue
                           ? (isDarkMode ? Colors.white : Colors.black)
-                          : (isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600),
-                      fontWeight: hasValue ? FontWeight.w500 : FontWeight.normal,
+                          : (isDarkMode
+                                ? Colors.grey.shade400
+                                : Colors.grey.shade600),
+                      fontWeight: hasValue
+                          ? FontWeight.w500
+                          : FontWeight.normal,
                     ),
                   ),
                 ),
@@ -1692,7 +1860,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                       child: Icon(
                         Icons.cancel,
                         size: 18,
-                        color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                        color: isDarkMode
+                            ? Colors.grey.shade400
+                            : Colors.grey.shade600,
                       ),
                     ),
                   )
@@ -1700,7 +1870,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                   Icon(
                     Icons.calendar_today,
                     size: 18,
-                    color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                    color: isDarkMode
+                        ? Colors.grey.shade400
+                        : Colors.grey.shade600,
                   ),
               ],
             ),
@@ -1738,12 +1910,16 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                   hintText: 'Enter or scan barcode',
                   prefixIcon: Icon(
                     Icons.barcode_reader,
-                    color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                    color: isDarkMode
+                        ? Colors.grey.shade400
+                        : Colors.grey.shade600,
                   ),
                   suffixIcon: IconButton(
                     icon: Icon(
                       Icons.qr_code_scanner,
-                      color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+                      color: isDarkMode
+                          ? Colors.blue.shade400
+                          : Colors.blue.shade700,
                     ),
                     onPressed: () => _openScanner('barcode'),
                     tooltip: 'Scan Barcode',
@@ -1753,9 +1929,13 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                     borderSide: BorderSide.none,
                   ),
                   filled: true,
-                  fillColor: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
+                  fillColor: isDarkMode
+                      ? Colors.grey.shade700
+                      : Colors.grey.shade50,
                 ),
-                style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                style: TextStyle(
+                  color: isDarkMode ? Colors.white : Colors.black,
+                ),
               ),
             ),
             const InfoIconWidget(info: FieldInfo.barcode),
@@ -1773,12 +1953,16 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                   hintText: 'Enter or scan QR code',
                   prefixIcon: Icon(
                     Icons.qr_code,
-                    color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                    color: isDarkMode
+                        ? Colors.grey.shade400
+                        : Colors.grey.shade600,
                   ),
                   suffixIcon: IconButton(
                     icon: Icon(
                       Icons.qr_code_scanner,
-                      color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+                      color: isDarkMode
+                          ? Colors.blue.shade400
+                          : Colors.blue.shade700,
                     ),
                     onPressed: () => _openScanner('qr'),
                     tooltip: 'Scan QR Code',
@@ -1788,9 +1972,13 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                     borderSide: BorderSide.none,
                   ),
                   filled: true,
-                  fillColor: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
+                  fillColor: isDarkMode
+                      ? Colors.grey.shade700
+                      : Colors.grey.shade50,
                 ),
-                style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                style: TextStyle(
+                  color: isDarkMode ? Colors.white : Colors.black,
+                ),
               ),
             ),
             const InfoIconWidget(info: FieldInfo.qrCode),
@@ -1804,7 +1992,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
               child: Container(
                 decoration: BoxDecoration(
                   border: Border.all(
-                    color: isDarkMode ? Colors.grey.shade600 : Colors.grey.shade300,
+                    color: isDarkMode
+                        ? Colors.grey.shade600
+                        : Colors.grey.shade300,
                   ),
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -1815,7 +2005,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                     border: InputBorder.none,
                     contentPadding: EdgeInsets.symmetric(horizontal: 12),
                   ),
-                  dropdownColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
+                  dropdownColor: isDarkMode
+                      ? Colors.grey.shade800
+                      : Colors.white,
                   style: TextStyle(
                     color: isDarkMode ? Colors.white : Colors.black,
                   ),
@@ -1857,7 +2049,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
               child: Container(
                 decoration: BoxDecoration(
                   border: Border.all(
-                    color: isDarkMode ? Colors.grey.shade600 : Colors.grey.shade300,
+                    color: isDarkMode
+                        ? Colors.grey.shade600
+                        : Colors.grey.shade300,
                   ),
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -1868,7 +2062,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                     border: InputBorder.none,
                     contentPadding: EdgeInsets.symmetric(horizontal: 12),
                   ),
-                  dropdownColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
+                  dropdownColor: isDarkMode
+                      ? Colors.grey.shade800
+                      : Colors.white,
                   style: TextStyle(
                     color: isDarkMode ? Colors.white : Colors.black,
                   ),
@@ -1903,7 +2099,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
               child: Container(
                 decoration: BoxDecoration(
                   border: Border.all(
-                    color: isDarkMode ? Colors.grey.shade600 : Colors.grey.shade300,
+                    color: isDarkMode
+                        ? Colors.grey.shade600
+                        : Colors.grey.shade300,
                   ),
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -1914,7 +2112,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                     border: InputBorder.none,
                     contentPadding: EdgeInsets.symmetric(horizontal: 12),
                   ),
-                  dropdownColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
+                  dropdownColor: isDarkMode
+                      ? Colors.grey.shade800
+                      : Colors.white,
                   style: TextStyle(
                     color: isDarkMode ? Colors.white : Colors.black,
                   ),
@@ -1950,17 +2150,23 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                   hintText: '0 (Optional)',
                   prefixIcon: Icon(
                     Icons.notifications_active,
-                    color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                    color: isDarkMode
+                        ? Colors.grey.shade400
+                        : Colors.grey.shade600,
                   ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,
                   ),
                   filled: true,
-                  fillColor: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
+                  fillColor: isDarkMode
+                      ? Colors.grey.shade700
+                      : Colors.grey.shade50,
                 ),
                 keyboardType: TextInputType.number,
-                style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                style: TextStyle(
+                  color: isDarkMode ? Colors.white : Colors.black,
+                ),
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               ),
             ),
@@ -1979,17 +2185,23 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                   hintText: '0 (Optional)',
                   prefixIcon: Icon(
                     Icons.shopping_cart,
-                    color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                    color: isDarkMode
+                        ? Colors.grey.shade400
+                        : Colors.grey.shade600,
                   ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,
                   ),
                   filled: true,
-                  fillColor: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
+                  fillColor: isDarkMode
+                      ? Colors.grey.shade700
+                      : Colors.grey.shade50,
                 ),
                 keyboardType: TextInputType.number,
-                style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                style: TextStyle(
+                  color: isDarkMode ? Colors.white : Colors.black,
+                ),
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               ),
             ),
@@ -2014,16 +2226,22 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                   hintText: 'Enter supplier name',
                   prefixIcon: Icon(
                     Icons.business,
-                    color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                    color: isDarkMode
+                        ? Colors.grey.shade400
+                        : Colors.grey.shade600,
                   ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,
                   ),
                   filled: true,
-                  fillColor: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
+                  fillColor: isDarkMode
+                      ? Colors.grey.shade700
+                      : Colors.grey.shade50,
                 ),
-                style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                style: TextStyle(
+                  color: isDarkMode ? Colors.white : Colors.black,
+                ),
               ),
             ),
             const InfoIconWidget(info: FieldInfo.supplierName),
@@ -2041,16 +2259,22 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                   hintText: 'Enter supplier SKU',
                   prefixIcon: Icon(
                     Icons.code,
-                    color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                    color: isDarkMode
+                        ? Colors.grey.shade400
+                        : Colors.grey.shade600,
                   ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,
                   ),
                   filled: true,
-                  fillColor: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
+                  fillColor: isDarkMode
+                      ? Colors.grey.shade700
+                      : Colors.grey.shade50,
                 ),
-                style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                style: TextStyle(
+                  color: isDarkMode ? Colors.white : Colors.black,
+                ),
               ),
             ),
             const InfoIconWidget(info: FieldInfo.supplierSku),
@@ -2119,7 +2343,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                 _isFeatured = value;
               });
             },
-            activeThumbColor: isDarkMode ? Colors.orange.shade400 : Colors.orange,
+            activeThumbColor: isDarkMode
+                ? Colors.orange.shade400
+                : Colors.orange,
             inactiveThumbColor: isDarkMode ? Colors.grey.shade400 : Colors.grey,
             contentPadding: EdgeInsets.zero,
           ),
@@ -2150,7 +2376,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                 _isDigital = value;
               });
             },
-            activeThumbColor: isDarkMode ? Colors.purple.shade400 : Colors.purple,
+            activeThumbColor: isDarkMode
+                ? Colors.purple.shade400
+                : Colors.purple,
             inactiveThumbColor: isDarkMode ? Colors.grey.shade400 : Colors.grey,
             contentPadding: EdgeInsets.zero,
           ),
@@ -2197,7 +2425,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
       child: ElevatedButton(
         onPressed: _saveProduct,
         style: ElevatedButton.styleFrom(
-          backgroundColor: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+          backgroundColor: isDarkMode
+              ? Colors.blue.shade400
+              : Colors.blue.shade700,
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
@@ -2221,7 +2451,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
 
   void _showHelpDialog() {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -2234,14 +2464,54 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildHelpItem('📝', 'Basic Info', 'Name, description, brand, and SKU', isDarkMode),
-            _buildHelpItem('💰', 'Pricing', 'Selling price, cost, sale, and wholesale', isDarkMode),
-            _buildHelpItem('📦', 'Stock', 'Quantity, min stock, max stock, and unit', isDarkMode),
-            _buildHelpItem('📅', 'Dates', 'Manufacture, expiry, and best before dates', isDarkMode),
-            _buildHelpItem('🔢', 'Codes', 'Barcode and QR code for scanning', isDarkMode),
-            _buildHelpItem('📂', 'Categories', 'Category, sub-category, and tax class', isDarkMode),
-            _buildHelpItem('🏢', 'Supplier', 'Supplier name and SKU', isDarkMode),
-            _buildHelpItem('✅', 'Status', 'Active, featured, digital, and variants', isDarkMode),
+            _buildHelpItem(
+              '📝',
+              'Basic Info',
+              'Name, description, brand, and SKU',
+              isDarkMode,
+            ),
+            _buildHelpItem(
+              '💰',
+              'Pricing',
+              'Selling price, cost, sale, and wholesale',
+              isDarkMode,
+            ),
+            _buildHelpItem(
+              '📦',
+              'Stock',
+              'Quantity, min stock, max stock, and unit',
+              isDarkMode,
+            ),
+            _buildHelpItem(
+              '📅',
+              'Dates',
+              'Manufacture, expiry, and best before dates',
+              isDarkMode,
+            ),
+            _buildHelpItem(
+              '🔢',
+              'Codes',
+              'Barcode and QR code for scanning',
+              isDarkMode,
+            ),
+            _buildHelpItem(
+              '📂',
+              'Categories',
+              'Category, sub-category, and tax class',
+              isDarkMode,
+            ),
+            _buildHelpItem(
+              '🏢',
+              'Supplier',
+              'Supplier name and SKU',
+              isDarkMode,
+            ),
+            _buildHelpItem(
+              '✅',
+              'Status',
+              'Active, featured, digital, and variants',
+              isDarkMode,
+            ),
           ],
         ),
         actions: [
@@ -2257,7 +2527,12 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     );
   }
 
-  Widget _buildHelpItem(String icon, String title, String description, bool isDarkMode) {
+  Widget _buildHelpItem(
+    String icon,
+    String title,
+    String description,
+    bool isDarkMode,
+  ) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Row(
@@ -2280,7 +2555,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                   description,
                   style: TextStyle(
                     fontSize: 11,
-                    color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                    color: isDarkMode
+                        ? Colors.grey.shade400
+                        : Colors.grey.shade600,
                   ),
                 ),
               ],

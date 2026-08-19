@@ -61,7 +61,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
           break;
         case 'Year':
           final startOfYear = DateTime(now.year, 1, 1);
-          snapshot = await _firebaseService.getSalesByDateRange(startDate: startOfYear, endDate: now, limit: 2000);
+          snapshot = await _firebaseService.getSalesByDateRange(
+            startDate: startOfYear,
+            endDate: now,
+            limit: 2000,
+          );
           break;
         case 'All':
         default:
@@ -98,16 +102,23 @@ class _ReportsScreenState extends State<ReportsScreen> {
       _totalUnits += sale.quantity;
 
       // Payment Split
-      final method = sale.paymentMethod.isNotEmpty ? sale.paymentMethod : 'Cash';
-      _paymentMethodSplit[method] = (_paymentMethodSplit[method] ?? 0.0) + sale.total;
+      final method = sale.paymentMethod.isNotEmpty
+          ? sale.paymentMethod
+          : 'Cash';
+      _paymentMethodSplit[method] =
+          (_paymentMethodSplit[method] ?? 0.0) + sale.total;
 
       // Product Aggregates
-      final pName = sale.productName.isNotEmpty ? sale.productName : 'General Item';
+      final pName = sale.productName.isNotEmpty
+          ? sale.productName
+          : 'General Item';
       if (!productMap.containsKey(pName)) {
         productMap[pName] = {'name': pName, 'revenue': 0.0, 'qty': 0};
       }
-      productMap[pName]!['revenue'] = (productMap[pName]!['revenue'] as double) + sale.total;
-      productMap[pName]!['qty'] = (productMap[pName]!['qty'] as int) + sale.quantity;
+      productMap[pName]!['revenue'] =
+          (productMap[pName]!['revenue'] as double) + sale.total;
+      productMap[pName]!['qty'] =
+          (productMap[pName]!['qty'] as int) + sale.quantity;
 
       // Customer Aggregates
       final cName = sale.customerDisplayName;
@@ -115,20 +126,28 @@ class _ReportsScreenState extends State<ReportsScreen> {
         if (!customerMap.containsKey(cName)) {
           customerMap[cName] = {'name': cName, 'spent': 0.0, 'orders': 0};
         }
-        customerMap[cName]!['spent'] = (customerMap[cName]!['spent'] as double) + sale.total;
-        customerMap[cName]!['orders'] = (customerMap[cName]!['orders'] as int) + 1;
+        customerMap[cName]!['spent'] =
+            (customerMap[cName]!['spent'] as double) + sale.total;
+        customerMap[cName]!['orders'] =
+            (customerMap[cName]!['orders'] as int) + 1;
       }
     }
 
     _avgOrderValue = _totalOrders > 0 ? _grossSales / _totalOrders : 0.0;
 
     // Sort Top Products
-    _topProducts.addAll(productMap.values.toList()
-      ..sort((a, b) => (b['revenue'] as double).compareTo(a['revenue'] as double)));
+    _topProducts.addAll(
+      productMap.values.toList()..sort(
+        (a, b) => (b['revenue'] as double).compareTo(a['revenue'] as double),
+      ),
+    );
 
     // Sort Top Customers
-    _topCustomers.addAll(customerMap.values.toList()
-      ..sort((a, b) => (b['spent'] as double).compareTo(a['spent'] as double)));
+    _topCustomers.addAll(
+      customerMap.values.toList()..sort(
+        (a, b) => (b['spent'] as double).compareTo(a['spent'] as double),
+      ),
+    );
   }
 
   @override
@@ -136,7 +155,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
     final settingsProvider = Provider.of<SettingsProvider>(context);
     final currencySymbol = settingsProvider.currencySymbol;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final profitMargin = _grossSales > 0 ? (_netProfit / _grossSales) * 100 : 0.0;
+    final profitMargin = _grossSales > 0
+        ? (_netProfit / _grossSales) * 100
+        : 0.0;
 
     return Scaffold(
       body: Column(
@@ -149,36 +170,41 @@ class _ReportsScreenState extends State<ReportsScreen> {
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : _totalOrders == 0
-                    ? const EmptyStateView(
-                        icon: Icons.analytics_outlined,
-                        title: 'No sales data for this period',
-                        description: 'Select a different time period or process new sales on the POS register.',
-                      )
-                    : RefreshIndicator(
-                        onRefresh: _loadAnalytics,
-                        child: ListView(
-                          padding: const EdgeInsets.all(16),
-                          children: [
-                            // Executive Profit & Loss Cards
-                            _buildFinancialOverview(currencySymbol, profitMargin, isDark),
-                            const SizedBox(height: 16),
-
-                            // Payment Methods Split
-                            _buildPaymentMethodChart(currencySymbol, isDark),
-                            const SizedBox(height: 16),
-
-                            // Top Products Leaderboard
-                            _buildTopProductsCard(currencySymbol, isDark),
-                            const SizedBox(height: 16),
-
-                            // Top Spenders CRM Card
-                            if (_topCustomers.isNotEmpty) ...[
-                              _buildTopCustomersCard(currencySymbol, isDark),
-                              const SizedBox(height: 16),
-                            ],
-                          ],
+                ? const EmptyStateView(
+                    icon: Icons.analytics_outlined,
+                    title: 'No sales data for this period',
+                    description:
+                        'Select a different time period or process new sales on the POS register.',
+                  )
+                : RefreshIndicator(
+                    onRefresh: _loadAnalytics,
+                    child: ListView(
+                      padding: const EdgeInsets.all(16),
+                      children: [
+                        // Executive Profit & Loss Cards
+                        _buildFinancialOverview(
+                          currencySymbol,
+                          profitMargin,
+                          isDark,
                         ),
-                      ),
+                        const SizedBox(height: 16),
+
+                        // Payment Methods Split
+                        _buildPaymentMethodChart(currencySymbol, isDark),
+                        const SizedBox(height: 16),
+
+                        // Top Products Leaderboard
+                        _buildTopProductsCard(currencySymbol, isDark),
+                        const SizedBox(height: 16),
+
+                        // Top Spenders CRM Card
+                        if (_topCustomers.isNotEmpty) ...[
+                          _buildTopCustomersCard(currencySymbol, isDark),
+                          const SizedBox(height: 16),
+                        ],
+                      ],
+                    ),
+                  ),
           ),
         ],
       ),
@@ -190,14 +216,20 @@ class _ReportsScreenState extends State<ReportsScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-        border: Border(bottom: BorderSide(color: isDark ? AppColors.darkBorder : AppColors.lightBorder)),
+        border: Border(
+          bottom: BorderSide(
+            color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+          ),
+        ),
       ),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Row(
           children: _periodOptions.map((period) {
             final isSelected = _selectedPeriod == period;
-            final primaryColor = isDark ? AppColors.primaryLight : AppColors.primary;
+            final primaryColor = isDark
+                ? AppColors.primaryLight
+                : AppColors.primary;
 
             return Padding(
               padding: const EdgeInsets.only(right: 8),
@@ -225,7 +257,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
     );
   }
 
-  Widget _buildFinancialOverview(String currencySymbol, double profitMargin, bool isDark) {
+  Widget _buildFinancialOverview(
+    String currencySymbol,
+    double profitMargin,
+    bool isDark,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -233,23 +269,38 @@ class _ReportsScreenState extends State<ReportsScreen> {
           children: [
             Expanded(
               child: PosCard(
-                gradient: isDark ? AppColors.darkCardGradient : AppColors.primaryGradient,
+                gradient: isDark
+                    ? AppColors.darkCardGradient
+                    : AppColors.primaryGradient,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       'Gross Sales Revenue',
-                      style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 12),
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.8),
+                        fontSize: 12,
+                      ),
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      FormatService.formatCurrency(_grossSales, symbol: currencySymbol),
-                      style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+                      FormatService.formatCurrency(
+                        _grossSales,
+                        symbol: currencySymbol,
+                      ),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       '$_totalOrders Transactions • $_totalUnits Units',
-                      style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 11),
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.85),
+                        fontSize: 11,
+                      ),
                     ),
                   ],
                 ),
@@ -258,23 +309,39 @@ class _ReportsScreenState extends State<ReportsScreen> {
             const SizedBox(width: 12),
             Expanded(
               child: PosCard(
-                gradient: isDark ? AppColors.darkCardGradient : AppColors.successGradient,
+                gradient: isDark
+                    ? AppColors.darkCardGradient
+                    : AppColors.successGradient,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       'Estimated Net Profit',
-                      style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 12),
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.8),
+                        fontSize: 12,
+                      ),
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      FormatService.formatCurrency(_netProfit, symbol: currencySymbol),
-                      style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+                      FormatService.formatCurrency(
+                        _netProfit,
+                        symbol: currencySymbol,
+                      ),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       '${profitMargin.toStringAsFixed(1)}% Profit Margin',
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 11,
+                      ),
                     ),
                   ],
                 ),
@@ -288,10 +355,23 @@ class _ReportsScreenState extends State<ReportsScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Average Order Value (AOV)', style: TextStyle(color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary)),
               Text(
-                FormatService.formatCurrency(_avgOrderValue, symbol: currencySymbol),
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                'Average Order Value (AOV)',
+                style: TextStyle(
+                  color: isDark
+                      ? AppColors.darkTextSecondary
+                      : AppColors.lightTextSecondary,
+                ),
+              ),
+              Text(
+                FormatService.formatCurrency(
+                  _avgOrderValue,
+                  symbol: currencySymbol,
+                ),
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
               ),
             ],
           ),
@@ -306,7 +386,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Payment Methods Breakdown', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+          const Text(
+            'Payment Methods Breakdown',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+          ),
           const SizedBox(height: 14),
           ..._paymentMethodSplit.entries.map((entry) {
             final percent = _grossSales > 0 ? (entry.value / _grossSales) : 0.0;
@@ -318,12 +401,20 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(entry.key, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                      Text(
+                        entry.key,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
                       Text(
                         '${FormatService.formatCurrency(entry.value, symbol: currencySymbol)} (${(percent * 100).toStringAsFixed(1)}%)',
                         style: TextStyle(
                           fontSize: 12,
-                          color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                          color: isDark
+                              ? AppColors.darkTextSecondary
+                              : AppColors.lightTextSecondary,
                         ),
                       ),
                     ],
@@ -334,8 +425,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     child: LinearProgressIndicator(
                       value: percent,
                       minHeight: 8,
-                      backgroundColor: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.06),
-                      valueColor: AlwaysStoppedAnimation(isDark ? AppColors.primaryLight : AppColors.primary),
+                      backgroundColor: isDark
+                          ? Colors.white.withValues(alpha: 0.06)
+                          : Colors.black.withValues(alpha: 0.06),
+                      valueColor: AlwaysStoppedAnimation(
+                        isDark ? AppColors.primaryLight : AppColors.primary,
+                      ),
                     ),
                   ),
                 ],
@@ -355,7 +450,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Top Selling Products', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+          const Text(
+            'Top Selling Products',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+          ),
           const SizedBox(height: 12),
           ...top5.asMap().entries.map((entry) {
             final index = entry.key + 1;
@@ -374,7 +472,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     decoration: BoxDecoration(
                       color: index == 1
                           ? AppColors.warning
-                          : (isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.06)),
+                          : (isDark
+                                ? Colors.white.withValues(alpha: 0.1)
+                                : Colors.black.withValues(alpha: 0.06)),
                       shape: BoxShape.circle,
                     ),
                     child: Text(
@@ -382,7 +482,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 12,
-                        color: index == 1 ? Colors.white : (isDark ? Colors.white : Colors.black),
+                        color: index == 1
+                            ? Colors.white
+                            : (isDark ? Colors.white : Colors.black),
                       ),
                     ),
                   ),
@@ -391,14 +493,34 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(item['name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                        Text('$qty units sold', style: TextStyle(fontSize: 11, color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary)),
+                        Text(
+                          item['name'],
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                        ),
+                        Text(
+                          '$qty units sold',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: isDark
+                                ? AppColors.darkTextSecondary
+                                : AppColors.lightTextSecondary,
+                          ),
+                        ),
                       ],
                     ),
                   ),
                   Text(
-                    FormatService.formatCurrency(revenue, symbol: currencySymbol),
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                    FormatService.formatCurrency(
+                      revenue,
+                      symbol: currencySymbol,
+                    ),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
                   ),
                 ],
               ),
@@ -417,7 +539,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Top VIP Clients (This Period)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+          const Text(
+            'Top VIP Clients (This Period)',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+          ),
           const SizedBox(height: 12),
           ...top5.map((c) {
             return Padding(
@@ -426,10 +551,17 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 children: [
                   CircleAvatar(
                     radius: 14,
-                    backgroundColor: (isDark ? AppColors.primaryLight : AppColors.primary).withValues(alpha: 0.2),
+                    backgroundColor:
+                        (isDark ? AppColors.primaryLight : AppColors.primary)
+                            .withValues(alpha: 0.2),
                     child: Text(
-                      (c['name'] as String).isNotEmpty ? (c['name'] as String)[0] : 'C',
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                      (c['name'] as String).isNotEmpty
+                          ? (c['name'] as String)[0]
+                          : 'C',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -437,14 +569,35 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(c['name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                        Text('${c['orders']} orders', style: TextStyle(fontSize: 11, color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary)),
+                        Text(
+                          c['name'],
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                        ),
+                        Text(
+                          '${c['orders']} orders',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: isDark
+                                ? AppColors.darkTextSecondary
+                                : AppColors.lightTextSecondary,
+                          ),
+                        ),
                       ],
                     ),
                   ),
                   Text(
-                    FormatService.formatCurrency(c['spent'] as double, symbol: currencySymbol),
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.success),
+                    FormatService.formatCurrency(
+                      c['spent'] as double,
+                      symbol: currencySymbol,
+                    ),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: AppColors.success,
+                    ),
                   ),
                 ],
               ),

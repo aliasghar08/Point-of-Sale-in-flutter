@@ -50,8 +50,10 @@ class CacheService {
       _productById[p.id] = p;
       if (p.barcode.isNotEmpty) _productByBarcode[p.barcode.trim()] = p;
       if (p.sku.isNotEmpty) _productBySku[p.sku.trim().toLowerCase()] = p;
-      
-      final cat = p.category.trim().isEmpty ? 'Uncategorized' : p.category.trim();
+
+      final cat = p.category.trim().isEmpty
+          ? 'Uncategorized'
+          : p.category.trim();
       _categories.add(cat);
       _productsByCategory.putIfAbsent(cat, () => []).add(p);
     }
@@ -62,8 +64,10 @@ class CacheService {
 
   void upsertProduct(Product product) {
     _productById[product.id] = product;
-    if (product.barcode.isNotEmpty) _productByBarcode[product.barcode.trim()] = product;
-    if (product.sku.isNotEmpty) _productBySku[product.sku.trim().toLowerCase()] = product;
+    if (product.barcode.isNotEmpty)
+      _productByBarcode[product.barcode.trim()] = product;
+    if (product.sku.isNotEmpty)
+      _productBySku[product.sku.trim().toLowerCase()] = product;
 
     final index = _allProducts.indexWhere((p) => p.id == product.id);
     if (index >= 0) {
@@ -72,7 +76,9 @@ class CacheService {
       _allProducts.add(product);
     }
 
-    final cat = product.category.trim().isEmpty ? 'Uncategorized' : product.category.trim();
+    final cat = product.category.trim().isEmpty
+        ? 'Uncategorized'
+        : product.category.trim();
     _categories.add(cat);
   }
 
@@ -86,8 +92,10 @@ class CacheService {
   }
 
   Product? getProductById(String id) => _productById[id];
-  Product? getProductByBarcode(String barcode) => _productByBarcode[barcode.trim()];
-  Product? getProductBySku(String sku) => _productBySku[sku.trim().toLowerCase()];
+  Product? getProductByBarcode(String barcode) =>
+      _productByBarcode[barcode.trim()];
+  Product? getProductBySku(String sku) =>
+      _productBySku[sku.trim().toLowerCase()];
 
   List<Product> searchProducts(String query, {String? category}) {
     List<Product> baseList = _allProducts;

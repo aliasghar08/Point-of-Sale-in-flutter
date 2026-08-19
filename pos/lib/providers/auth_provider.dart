@@ -7,20 +7,22 @@ import 'package:pos/services/firebase_service.dart';
 class AuthProvider extends ChangeNotifier {
   final AuthService _authService = AuthService();
   final FirebaseService _firebaseService = FirebaseService();
-  
+
   AppUser? _currentUser;
   bool _isLoading = false;
   String? _error;
+  bool _isUnlocked = false; // Biometric unlock state
 
   AppUser? get currentUser => _currentUser;
   bool get isLoading => _isLoading;
   String? get error => _error;
   bool get isAuthenticated => _currentUser != null;
+  bool get isUnlocked => _isUnlocked;
   bool get isOwner => _currentUser?.isOwner ?? false;
   bool get isManager => _currentUser?.isManager ?? false;
   bool get canManageInventory => _currentUser?.canManageInventory ?? false;
   bool get canManageUsers => _currentUser?.canManageUsers ?? false;
-  
+
   // ✅ Helper to get business ID
   String? get businessId => _currentUser?.businessId;
 
@@ -61,7 +63,7 @@ class AuthProvider extends ChangeNotifier {
     try {
       // Get the current Firebase user (created during email verification)
       final firebaseUser = FirebaseAuth.instance.currentUser;
-      
+
       if (firebaseUser == null) {
         // If no user exists, sign in to get the user
         await FirebaseAuth.instance.signInWithEmailAndPassword(
@@ -72,25 +74,25 @@ class AuthProvider extends ChangeNotifier {
 
       // Now create the business and user data in Firestore
       final businessId = await _firebaseService.createBusiness(storeName);
-      
+
       if (businessId.isEmpty) {
         throw Exception('Failed to create business');
       }
 
       // Get the updated user data
       _currentUser = await _authService.getCurrentUserData();
-      
+
       if (_currentUser != null) {
         debugPrint('✅ Signup successful!');
         debugPrint('✅ User: ${_currentUser!.name}');
         debugPrint('✅ Business ID: ${_currentUser!.businessId}');
         debugPrint('✅ Role: ${_currentUser!.role}');
-        
+
         // Sign out immediately after signup (user will sign in manually)
         await _authService.signOut();
         _currentUser = null;
       }
-      
+
       return true;
     } catch (e) {
       _error = e.toString();
@@ -123,7 +125,7 @@ class AuthProvider extends ChangeNotifier {
       );
 
       final firebaseUser = FirebaseAuth.instance.currentUser;
-      
+
       if (firebaseUser == null) {
         throw Exception('User not found');
       }
@@ -136,7 +138,7 @@ class AuthProvider extends ChangeNotifier {
 
       // Create business and user data
       final businessId = await _firebaseService.createBusiness(storeName);
-      
+
       if (businessId.isEmpty) {
         throw Exception('Failed to create business');
       }
@@ -153,11 +155,11 @@ class AuthProvider extends ChangeNotifier {
 
       // Get the updated user data
       _currentUser = await _authService.getCurrentUserData();
-      
+
       // Sign out after signup
       await _authService.signOut();
       _currentUser = null;
-      
+
       debugPrint('✅ Signup completed successfully!');
       return true;
     } catch (e) {
@@ -171,10 +173,7 @@ class AuthProvider extends ChangeNotifier {
   }
 
   // Sign in
-  Future<bool> signIn({
-    required String email,
-    required String password,
-  }) async {
+  Future<bool> signIn({required String email, required String password}) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
@@ -184,14 +183,14 @@ class AuthProvider extends ChangeNotifier {
         email: email,
         password: password,
       );
-      
+
       if (_currentUser != null) {
         debugPrint('✅ Signin successful!');
         debugPrint('✅ User: ${_currentUser!.name}');
         debugPrint('✅ Business ID: ${_currentUser!.businessId}');
         debugPrint('✅ Role: ${_currentUser!.role}');
       }
-      
+
       return _currentUser != null;
     } catch (e) {
       _error = e.toString();
@@ -232,10 +231,16 @@ class AuthProvider extends ChangeNotifier {
     _currentUser = user;
     notifyListeners();
   }
-  
+
+  // Unlock biometrics
+  void unlock() {
+    _isUnlocked = true;
+    notifyListeners();
+  }
+
   // ✅ Check if user has a business
   bool get hasBusiness => _currentUser?.businessId != null;
-  
+
   // ✅ Get user's role display name
   String get roleDisplay => _currentUser?.roleDisplay ?? 'User';
 }

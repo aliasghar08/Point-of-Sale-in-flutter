@@ -33,11 +33,7 @@ class RoleGuard extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.block,
-              size: 80,
-              color: Colors.red.shade300,
-            ),
+            Icon(Icons.block, size: 80, color: Colors.red.shade300),
             const SizedBox(height: 16),
             Text(
               'Access Denied',
@@ -50,10 +46,7 @@ class RoleGuard extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               'You do not have permission to access this page.',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey.shade600,
-              ),
+              style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
@@ -66,7 +59,10 @@ class RoleGuard extends StatelessWidget {
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blue.shade700,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 32,
+                  vertical: 12,
+                ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),

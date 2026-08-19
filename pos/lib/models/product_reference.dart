@@ -14,7 +14,7 @@ class ProductReference {
       'Codeine Phosphate',
       'Tramadol',
       'Morphine Sulfate',
-      
+
       // Antibiotics
       'Amoxicillin',
       'Ciprofloxacin',
@@ -26,7 +26,7 @@ class ProductReference {
       'Levofloxacin',
       'Ceftriaxone',
       'Gentamicin',
-      
+
       // Blood Pressure
       'Amlodipine',
       'Lisinopril',
@@ -38,7 +38,7 @@ class ProductReference {
       'Hydrochlorothiazide',
       'Furosemide',
       'Spironolactone',
-      
+
       // Diabetes
       'Metformin',
       'Insulin Glargine',
@@ -50,7 +50,7 @@ class ProductReference {
       'Pioglitazone',
       'Acarbose',
       'Repaglinide',
-      
+
       // Heart/Cholesterol
       'Atorvastatin',
       'Rosuvastatin',
@@ -62,7 +62,7 @@ class ProductReference {
       'Dabigatran',
       'Rivaroxaban',
       'Aspirin',
-      
+
       // Respiratory
       'Salbutamol Inhaler',
       'Budesonide Inhaler',
@@ -74,7 +74,7 @@ class ProductReference {
       'Hydrocortisone',
       'Beclomethasone',
       'Ipratropium',
-      
+
       // Stomach/Ulcer
       'Omeprazole',
       'Pantoprazole',
@@ -86,7 +86,7 @@ class ProductReference {
       'Lansoprazole',
       'Esomeprazole',
       'Sucralfate',
-      
+
       // Vitamins & Supplements
       'Vitamin C',
       'Vitamin D3',
@@ -98,7 +98,7 @@ class ProductReference {
       'Folic Acid',
       'Omega-3 Fish Oil',
       'Multivitamin',
-      
+
       // Skin/Creams
       'Hydrocortisone Cream',
       'Clotrimazole Cream',
@@ -110,7 +110,7 @@ class ProductReference {
       'Tretinoin Cream',
       'Benzoyl Peroxide',
       'Salicylic Acid',
-      
+
       // Eye/Ear
       'Tobramycin Eye Drops',
       'Ciprofloxacin Eye Drops',
@@ -150,7 +150,7 @@ class ProductReference {
       'Sony Xperia 1 V',
       'Vivo X100 Pro',
       'Oppo Find X7 Ultra',
-      
+
       // Laptops
       'MacBook Air M3',
       'MacBook Pro 14" M3',
@@ -170,7 +170,7 @@ class ProductReference {
       'MSI Stealth 16',
       'Razer Blade 16',
       'Samsung Galaxy Book 3 Pro',
-      
+
       // Tablets
       'iPad Pro 12.9" M2',
       'iPad Pro 11" M2',
@@ -185,7 +185,7 @@ class ProductReference {
       'Microsoft Surface Pro 9',
       'Google Pixel Tablet',
       'OnePlus Pad',
-      
+
       // Audio
       'AirPods Pro 2',
       'AirPods Max',
@@ -202,7 +202,7 @@ class ProductReference {
       'Google Pixel Buds Pro',
       'OnePlus Buds Pro 2',
       'Sennheiser HD 660S',
-      
+
       // TVs
       'Samsung QLED QN90C 55"',
       'Samsung QLED QN90C 65"',
@@ -215,7 +215,7 @@ class ProductReference {
       'Hisense U8K Mini-LED 65"',
       'Samsung Frame 55"',
       'Samsung Frame 65"',
-      
+
       // Gaming
       'PlayStation 5',
       'PlayStation 5 Digital Edition',
@@ -253,7 +253,7 @@ class ProductReference {
       'Apricots',
       'Dates',
       'Pomegranates',
-      
+
       // Vegetables
       'Tomatoes',
       'Potatoes',
@@ -275,7 +275,7 @@ class ProductReference {
       'Peas',
       'Corn',
       'Mushrooms',
-      
+
       // Beverages
       'Pepsi',
       'Coca-Cola',
@@ -291,7 +291,7 @@ class ProductReference {
       'Mango Juice',
       'Mixed Fruit Juice',
       'Rooh Afza',
-      
+
       // Dairy
       'Fresh Milk',
       'Yogurt',
@@ -303,7 +303,7 @@ class ProductReference {
       'Lassi',
       'Paneer',
       'Ghee',
-      
+
       // Breads/Bakery
       'White Bread',
       'Brown Bread',
@@ -318,7 +318,7 @@ class ProductReference {
       'Bagel',
       'Muffin',
       'Cake',
-      
+
       // Snacks
       'Lays Chips',
       'Kurkure',
@@ -332,7 +332,7 @@ class ProductReference {
       'Chips Ahoy',
       'Digestive Biscuits',
       'Marie Biscuits',
-      
+
       // Rice/Pulses
       'Basmati Rice',
       'Brown Rice',
@@ -348,7 +348,7 @@ class ProductReference {
       'Quinoa',
       'Oats',
       'Wheat Flour',
-      
+
       // Oils/Spices
       'Cooking Oil',
       'Olive Oil',
@@ -377,7 +377,7 @@ class ProductReference {
       'V-Neck T-Shirt Blue',
       'Graphic T-Shirt',
       'Striped T-Shirt',
-      
+
       // Men's Shirts
       'Formal Shirt White',
       'Formal Shirt Blue',
@@ -386,7 +386,7 @@ class ProductReference {
       'Oxford Shirt Blue',
       'Denim Shirt Blue',
       'Flannel Shirt Red',
-      
+
       // Men's Jeans
       'Slim Fit Jeans Blue',
       'Slim Fit Jeans Black',
@@ -395,7 +395,7 @@ class ProductReference {
       'Distressed Jeans',
       'Skinny Jeans Black',
       'Bootcut Jeans',
-      
+
       // Women's Tops
       'Cotton Top White',
       'Cotton Top Black',
@@ -405,7 +405,7 @@ class ProductReference {
       'Peplum Top Pink',
       'Off-Shoulder Top',
       'Wrap Top Floral',
-      
+
       // Women's Dresses
       'Maxi Dress Floral',
       'Midi Dress Striped',
@@ -413,7 +413,7 @@ class ProductReference {
       'A-Line Dress Blue',
       'Bodycon Dress Red',
       'Wrap Dress Floral',
-      
+
       // Women's Jeans
       'Skinny Jeans Blue',
       'Skinny Jeans Black',
@@ -422,7 +422,7 @@ class ProductReference {
       'High-Waist Jeans',
       'Jeggings Black',
       'Mom Jeans',
-      
+
       // Kids Clothing
       'Kids T-Shirt Red',
       'Kids T-Shirt Blue',
@@ -433,7 +433,7 @@ class ProductReference {
       'Kids Jacket Red',
       'Kids Pajama Set',
       'School Uniform',
-      
+
       // Traditional
       'White Kurta',
       'Blue Kurta',
@@ -467,7 +467,7 @@ class ProductReference {
       'The Hunger Games',
       'The Fault in Our Stars',
       'The Picture of Dorian Gray',
-      
+
       // Non-Fiction
       'The Power of Habit',
       'Sapiens',
@@ -479,7 +479,7 @@ class ProductReference {
       'Rich Dad Poor Dad',
       'The 7 Habits of Highly Effective People',
       'How to Win Friends and Influence People',
-      
+
       // Science
       'Cosmos',
       'The Double Helix',
@@ -488,7 +488,7 @@ class ProductReference {
       'The God Delusion',
       'The Origin of Species',
       'Astrophysics for People in a Hurry',
-      
+
       // Business
       'The Lean Startup',
       'Zero to One',
@@ -496,7 +496,7 @@ class ProductReference {
       'The Innovator\'s Dilemma',
       'Thinking, Fast and Slow',
       'Start with Why',
-      
+
       // Urdu Books
       'Pir-e-Kamil',
       'Raja Gidh',
@@ -504,7 +504,7 @@ class ProductReference {
       'Udas Naslain',
       'Manto Ke Afsanay',
       'Mirat-ul-Uroos',
-      
+
       // Poetry
       'Shakespeare Sonnets',
       'Allama Iqbal Poetry',
@@ -512,7 +512,7 @@ class ProductReference {
       'Mirza Ghalib Poetry',
       'Rumi Poetry',
       'Maya Angelou Poetry',
-      
+
       // Children Books
       'The Very Hungry Caterpillar',
       'Goodnight Moon',
@@ -537,7 +537,7 @@ class ProductReference {
       'Face Mask',
       'Eye Cream',
       'Lip Balm',
-      
+
       // Hair Care
       'Shampoo',
       'Conditioner',
@@ -547,7 +547,7 @@ class ProductReference {
       'Anti-Dandruff Shampoo',
       'Hair Color',
       'Hair Spray',
-      
+
       // Makeup
       'Foundation',
       'Concealer',
@@ -558,7 +558,7 @@ class ProductReference {
       'Lipstick',
       'Lip Gloss',
       'Nail Polish',
-      
+
       // Personal Care
       'Soap',
       'Body Wash',
@@ -568,7 +568,7 @@ class ProductReference {
       'Body Lotion',
       'Shaving Cream',
       'Razor',
-      
+
       // Oral Care
       'Toothpaste',
       'Toothbrush',
@@ -587,20 +587,20 @@ class ProductReference {
       'Oil Filter',
       'Fuel Filter',
       'Spark Plugs',
-      
+
       // Brakes
       'Brake Pads',
       'Brake Discs',
       'Brake Fluid',
       'Brake Caliper',
-      
+
       // Tires
       'Car Tire 16"',
       'Car Tire 17"',
       'All-Season Tire',
       'Winter Tire',
       'Spare Tire',
-      
+
       // Accessories
       'Car Battery',
       'Car Key',
@@ -611,7 +611,7 @@ class ProductReference {
       'Car Stereo',
       'Speakers',
       'GPS Navigator',
-      
+
       // Interior
       'Steering Wheel Cover',
       'Seat Covers',
@@ -619,7 +619,7 @@ class ProductReference {
       'Air Freshener',
       'Car Polish',
       'Car Wax',
-      
+
       // Maintenance
       'Windshield Wash',
       'Antifreeze',
@@ -719,7 +719,7 @@ class ProductReference {
     final searchTerm = query.toLowerCase().trim();
     final List<String> results = [];
 
-    final categories = category != null 
+    final categories = category != null
         ? {category: productNamesByCategory[category] ?? []}
         : productNamesByCategory;
 
@@ -734,11 +734,13 @@ class ProductReference {
     results.sort((a, b) {
       final aLower = a.toLowerCase();
       final bLower = b.toLowerCase();
-      
+
       if (aLower == searchTerm && bLower != searchTerm) return -1;
       if (bLower == searchTerm && aLower != searchTerm) return 1;
-      if (aLower.startsWith(searchTerm) && !bLower.startsWith(searchTerm)) return -1;
-      if (bLower.startsWith(searchTerm) && !aLower.startsWith(searchTerm)) return 1;
+      if (aLower.startsWith(searchTerm) && !bLower.startsWith(searchTerm))
+        return -1;
+      if (bLower.startsWith(searchTerm) && !aLower.startsWith(searchTerm))
+        return 1;
       return a.compareTo(b);
     });
 
@@ -758,9 +760,9 @@ class ProductReference {
   /// Find which category a product belongs to
   static String? findCategoryForProduct(String productName) {
     if (productName.isEmpty) return null;
-    
+
     final searchTerm = productName.toLowerCase().trim();
-    
+
     for (var entry in productNamesByCategory.entries) {
       for (var product in entry.value) {
         if (product.toLowerCase() == searchTerm) {
@@ -792,12 +794,15 @@ class ProductReference {
   }
 
   /// Get products by partial match (more flexible than searchProducts)
-  static List<String> getProductsByPartialMatch(String query, {int limit = 10}) {
+  static List<String> getProductsByPartialMatch(
+    String query, {
+    int limit = 10,
+  }) {
     if (query.isEmpty) return [];
-    
+
     final searchTerm = query.toLowerCase().trim();
     final List<String> results = [];
-    
+
     for (var entry in productNamesByCategory.entries) {
       for (var product in entry.value) {
         if (product.toLowerCase().contains(searchTerm)) {
@@ -805,18 +810,20 @@ class ProductReference {
         }
       }
     }
-    
+
     results.sort((a, b) {
       final aLower = a.toLowerCase();
       final bLower = b.toLowerCase();
-      
+
       if (aLower == searchTerm) return -1;
       if (bLower == searchTerm) return 1;
-      if (aLower.startsWith(searchTerm) && !bLower.startsWith(searchTerm)) return -1;
-      if (bLower.startsWith(searchTerm) && !aLower.startsWith(searchTerm)) return 1;
+      if (aLower.startsWith(searchTerm) && !bLower.startsWith(searchTerm))
+        return -1;
+      if (bLower.startsWith(searchTerm) && !aLower.startsWith(searchTerm))
+        return 1;
       return a.compareTo(b);
     });
-    
+
     return results.take(limit).toList();
   }
 

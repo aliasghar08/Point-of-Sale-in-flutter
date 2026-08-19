@@ -61,8 +61,14 @@ class _InventoryScreenState extends State<InventoryScreen> {
           'This will add 12+ realistic sample products with categories, barcodes, SKUs, and stock to your catalog.',
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Load Demo Products')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Load Demo Products'),
+          ),
         ],
       ),
     );
@@ -86,7 +92,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
       FeedbackService.error();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading demo products: $e'), backgroundColor: AppColors.error, behavior: SnackBarBehavior.floating),
+          SnackBar(
+            content: Text('Error loading demo products: $e'),
+            backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     } finally {
@@ -111,12 +121,20 @@ class _InventoryScreenState extends State<InventoryScreen> {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Close'),
+          ),
           ElevatedButton.icon(
             onPressed: () {
               Navigator.pop(ctx);
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('CSV ready! You can copy text from the dialog.'), behavior: SnackBarBehavior.floating),
+                const SnackBar(
+                  content: Text(
+                    'CSV ready! You can copy text from the dialog.',
+                  ),
+                  behavior: SnackBarBehavior.floating,
+                ),
               );
             },
             icon: const Icon(Icons.copy),
@@ -137,7 +155,10 @@ class _InventoryScreenState extends State<InventoryScreen> {
       FeedbackService.error();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to update stock: $e'), backgroundColor: AppColors.error),
+          SnackBar(
+            content: Text('Failed to update stock: $e'),
+            backgroundColor: AppColors.error,
+          ),
         );
       }
     }
@@ -150,7 +171,10 @@ class _InventoryScreenState extends State<InventoryScreen> {
         title: const Text('Delete Product'),
         content: Text('Are you sure you want to delete "${product.name}"?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
@@ -187,19 +211,26 @@ class _InventoryScreenState extends State<InventoryScreen> {
         },
         backgroundColor: isDark ? AppColors.primaryLight : AppColors.primary,
         icon: const Icon(Icons.add, color: Colors.white),
-        label: const Text('Add Product', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        label: const Text(
+          'Add Product',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
       ),
       body: StreamBuilder<QuerySnapshot>(
         stream: _firebaseService.productsStream(),
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting && !_cache.hasValidProductCache) {
+          if (snapshot.connectionState == ConnectionState.waiting &&
+              !_cache.hasValidProductCache) {
             return const Center(child: CircularProgressIndicator());
           }
 
           List<Product> products = [];
           if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
             products = snapshot.data!.docs.map((doc) {
-              return Product.fromMap(doc.data() as Map<String, dynamic>, doc.id);
+              return Product.fromMap(
+                doc.data() as Map<String, dynamic>,
+                doc.id,
+              );
             }).toList();
             _cache.setProducts(products);
           } else if (_cache.hasValidProductCache) {
@@ -208,18 +239,25 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
           // Calculate Inventory Metrics
           final totalSkus = products.length;
-          final lowStockCount = products.where((p) => p.stock > 0 && p.stock <= p.minStock).length;
+          final lowStockCount = products
+              .where((p) => p.stock > 0 && p.stock <= p.minStock)
+              .length;
           final outOfStockCount = products.where((p) => p.stock <= 0).length;
-          final totalValuation = products.fold(0.0, (prev, p) => prev + (p.price * p.stock));
+          final totalValuation = products.fold(
+            0.0,
+            (prev, p) => prev + (p.price * p.stock),
+          );
 
           // Filter Products
           final filtered = products.where((p) {
             // Stock state
-            if (_stockFilter == 'low' && (p.stock <= 0 || p.stock > p.minStock)) return false;
+            if (_stockFilter == 'low' && (p.stock <= 0 || p.stock > p.minStock))
+              return false;
             if (_stockFilter == 'out' && p.stock > 0) return false;
 
             // Category
-            if (_selectedCategory != 'All' && p.category != _selectedCategory) return false;
+            if (_selectedCategory != 'All' && p.category != _selectedCategory)
+              return false;
 
             // Search query
             if (_searchQuery.trim().isNotEmpty) {
@@ -255,23 +293,27 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 child: _isSeeding
                     ? const Center(child: CircularProgressIndicator())
                     : filtered.isEmpty
-                        ? EmptyStateView(
-                            icon: Icons.inventory_2_outlined,
-                            title: 'No inventory items match',
-                            description: products.isEmpty
-                                ? 'Your inventory is currently empty. Add your first item or load demo products!'
-                                : 'No products match the selected search and filter criteria.',
-                            actionLabel: products.isEmpty ? 'Load Demo Catalog' : 'Add New Product',
-                            onAction: products.isEmpty
-                                ? _seedSampleCatalog
-                                : () => Navigator.push(
-                                      context,
-                                      MaterialPageRoute(builder: (_) => const ProductFormScreen()),
-                                    ),
-                          )
-                        : _isGridView
-                            ? _buildGridView(filtered, currencySymbol, isDark)
-                            : _buildListView(filtered, currencySymbol, isDark),
+                    ? EmptyStateView(
+                        icon: Icons.inventory_2_outlined,
+                        title: 'No inventory items match',
+                        description: products.isEmpty
+                            ? 'Your inventory is currently empty. Add your first item or load demo products!'
+                            : 'No products match the selected search and filter criteria.',
+                        actionLabel: products.isEmpty
+                            ? 'Load Demo Catalog'
+                            : 'Add New Product',
+                        onAction: products.isEmpty
+                            ? _seedSampleCatalog
+                            : () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const ProductFormScreen(),
+                                ),
+                              ),
+                      )
+                    : _isGridView
+                    ? _buildGridView(filtered, currencySymbol, isDark)
+                    : _buildListView(filtered, currencySymbol, isDark),
               ),
             ],
           );
@@ -287,7 +329,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-        border: Border(bottom: BorderSide(color: isDark ? AppColors.darkBorder : AppColors.lightBorder)),
+        border: Border(
+          bottom: BorderSide(
+            color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+          ),
+        ),
       ),
       child: Row(
         children: [
@@ -307,7 +353,10 @@ class _InventoryScreenState extends State<InventoryScreen> {
                         },
                       )
                     : null,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
               ),
             ),
           ),
@@ -362,7 +411,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
               color: AppColors.warning,
               isDark: isDark,
               isSelected: _stockFilter == 'low',
-              onTap: () => setState(() => _stockFilter = _stockFilter == 'low' ? 'all' : 'low'),
+              onTap: () => setState(
+                () => _stockFilter = _stockFilter == 'low' ? 'all' : 'low',
+              ),
             ),
           ),
           const SizedBox(width: 8),
@@ -373,14 +424,19 @@ class _InventoryScreenState extends State<InventoryScreen> {
               color: AppColors.error,
               isDark: isDark,
               isSelected: _stockFilter == 'out',
-              onTap: () => setState(() => _stockFilter = _stockFilter == 'out' ? 'all' : 'out'),
+              onTap: () => setState(
+                () => _stockFilter = _stockFilter == 'out' ? 'all' : 'out',
+              ),
             ),
           ),
           const SizedBox(width: 8),
           Expanded(
             child: _buildMetricTile(
               label: 'Stock Value',
-              value: FormatService.formatCurrency(valuation, symbol: currencySymbol),
+              value: FormatService.formatCurrency(
+                valuation,
+                symbol: currencySymbol,
+              ),
               color: AppColors.success,
               isDark: isDark,
             ),
@@ -412,7 +468,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w600,
-              color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+              color: isDark
+                  ? AppColors.darkTextSecondary
+                  : AppColors.lightTextSecondary,
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -458,7 +516,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
     );
   }
 
-  Widget _buildListView(List<Product> products, String currencySymbol, bool isDark) {
+  Widget _buildListView(
+    List<Product> products,
+    String currencySymbol,
+    bool isDark,
+  ) {
     return ListView.separated(
       padding: const EdgeInsets.all(16),
       itemCount: products.length,
@@ -498,7 +560,10 @@ class _InventoryScreenState extends State<InventoryScreen> {
                         Expanded(
                           child: Text(
                             p.name,
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -511,7 +576,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       '${p.category} • SKU: ${p.sku.isNotEmpty ? p.sku : '-'} • Price: ${FormatService.formatCurrency(p.price, symbol: currencySymbol)}',
                       style: TextStyle(
                         fontSize: 12,
-                        color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                        color: isDark
+                            ? AppColors.darkTextSecondary
+                            : AppColors.lightTextSecondary,
                       ),
                     ),
                   ],
@@ -529,14 +596,22 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     onPressed: () => _adjustStock(p, -1),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
-                      color: isDark ? AppColors.darkBackground : AppColors.lightBackground,
+                      color: isDark
+                          ? AppColors.darkBackground
+                          : AppColors.lightBackground,
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
                       '${p.stock}',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
                     ),
                   ),
                   IconButton(
@@ -550,7 +625,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       if (val == 'edit') {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (_) => ProductFormScreen(product: p)),
+                          MaterialPageRoute(
+                            builder: (_) => ProductFormScreen(product: p),
+                          ),
                         );
                       } else if (val == 'delete') {
                         _deleteProduct(p);
@@ -559,11 +636,20 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       }
                     },
                     itemBuilder: (_) => [
-                      const PopupMenuItem(value: 'add5', child: Text('Add +5 Units')),
-                      const PopupMenuItem(value: 'edit', child: Text('Edit Product')),
+                      const PopupMenuItem(
+                        value: 'add5',
+                        child: Text('Add +5 Units'),
+                      ),
+                      const PopupMenuItem(
+                        value: 'edit',
+                        child: Text('Edit Product'),
+                      ),
                       const PopupMenuItem(
                         value: 'delete',
-                        child: Text('Delete', style: TextStyle(color: AppColors.error)),
+                        child: Text(
+                          'Delete',
+                          style: TextStyle(color: AppColors.error),
+                        ),
                       ),
                     ],
                   ),
@@ -576,7 +662,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
     );
   }
 
-  Widget _buildGridView(List<Product> products, String currencySymbol, bool isDark) {
+  Widget _buildGridView(
+    List<Product> products,
+    String currencySymbol,
+    bool isDark,
+  ) {
     return GridView.builder(
       padding: const EdgeInsets.all(16),
       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
@@ -603,7 +693,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
-                        color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                        color: isDark
+                            ? AppColors.darkTextSecondary
+                            : AppColors.lightTextSecondary,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -615,7 +707,10 @@ class _InventoryScreenState extends State<InventoryScreen> {
               const Spacer(),
               Text(
                 p.name,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -638,14 +733,23 @@ class _InventoryScreenState extends State<InventoryScreen> {
                         icon: const Icon(Icons.remove, size: 16),
                         onPressed: () => _adjustStock(p, -1),
                         padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                        constraints: const BoxConstraints(
+                          minWidth: 28,
+                          minHeight: 28,
+                        ),
                       ),
-                      Text('${p.stock}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      Text(
+                        '${p.stock}',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
                       IconButton(
                         icon: const Icon(Icons.add, size: 16),
                         onPressed: () => _adjustStock(p, 1),
                         padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                        constraints: const BoxConstraints(
+                          minWidth: 28,
+                          minHeight: 28,
+                        ),
                       ),
                     ],
                   ),
@@ -654,7 +758,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     onPressed: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (_) => ProductFormScreen(product: p)),
+                        MaterialPageRoute(
+                          builder: (_) => ProductFormScreen(product: p),
+                        ),
                       );
                     },
                   ),

@@ -31,9 +31,9 @@ class CustomerService {
     final businessId = await _businessId;
     if (businessId == null) return [];
 
-    final snapshot = await _customersRef(businessId)
-        .orderBy('totalSpent', descending: true)
-        .get();
+    final snapshot = await _customersRef(
+      businessId,
+    ).orderBy('totalSpent', descending: true).get();
 
     final customers = snapshot.docs.map((doc) {
       return Customer.fromMap(doc.data() as Map<String, dynamic>, doc.id);
@@ -98,7 +98,10 @@ class CustomerService {
     final doc = await docRef.get();
 
     if (doc.exists) {
-      final customer = Customer.fromMap(doc.data() as Map<String, dynamic>, doc.id);
+      final customer = Customer.fromMap(
+        doc.data() as Map<String, dynamic>,
+        doc.id,
+      );
       final newSpent = customer.totalSpent + saleAmount;
       final newOrders = customer.totalOrders + 1;
       final updated = customer.copyWith(

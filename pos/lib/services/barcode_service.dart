@@ -98,10 +98,7 @@ class BarcodeWidget extends StatelessWidget {
           Expanded(
             child: CustomPaint(
               size: Size(width, height - (showText ? 16 : 0)),
-              painter: _BarcodePainter(
-                bitString: bitString,
-                barColor: color,
-              ),
+              painter: _BarcodePainter(bitString: bitString, barColor: color),
             ),
           ),
           if (showText) ...[
@@ -110,7 +107,8 @@ class BarcodeWidget extends StatelessWidget {
               data,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: textStyle ??
+              style:
+                  textStyle ??
                   TextStyle(
                     fontSize: 10,
                     fontFamily: 'monospace',
@@ -157,6 +155,7 @@ class _BarcodePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _BarcodePainter oldDelegate) {
-    return oldDelegate.bitString != bitString || oldDelegate.barColor != barColor;
+    return oldDelegate.bitString != bitString ||
+        oldDelegate.barColor != barColor;
   }
 }

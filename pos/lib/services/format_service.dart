@@ -35,7 +35,11 @@ class FormatService {
   }
 
   /// Percentage formatting (e.g., "15.0%", "+12.5%")
-  static String formatPercent(num value, {bool includeSign = false, int decimals = 1}) {
+  static String formatPercent(
+    num value, {
+    bool includeSign = false,
+    int decimals = 1,
+  }) {
     final prefix = (includeSign && value > 0) ? '+' : '';
     return '$prefix${value.toStringAsFixed(decimals)}%';
   }
@@ -46,7 +50,10 @@ class FormatService {
     return DateFormat(format).format(date);
   }
 
-  static String formatDateTime(DateTime? date, {String format = 'dd MMM yyyy, hh:mm a'}) {
+  static String formatDateTime(
+    DateTime? date, {
+    String format = 'dd MMM yyyy, hh:mm a',
+  }) {
     if (date == null) return '-';
     return DateFormat(format).format(date);
   }
@@ -78,7 +85,12 @@ class FormatService {
   }
 
   /// Formats receipt two-column row with dotted or space padding
-  static String receiptRow(String left, String right, {int totalWidth = 32, String filler = ' '}) {
+  static String receiptRow(
+    String left,
+    String right, {
+    int totalWidth = 32,
+    String filler = ' ',
+  }) {
     final remaining = totalWidth - left.length - right.length;
     if (remaining <= 0) {
       return '$left $right';

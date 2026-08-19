@@ -8,6 +8,7 @@ import 'package:pos/theme/app_theme.dart';
 import 'package:pos/theme/app_colors.dart';
 import 'package:pos/screens/login_screen.dart';
 import 'package:pos/screens/dashboard_screen.dart';
+import 'package:pos/screens/biometric_lock_screen.dart';
 import 'firebase_options.dart';
 
 void main() async {
@@ -48,13 +49,20 @@ class FirebaseErrorApp extends StatelessWidget {
                 const SizedBox(height: 16),
                 const Text(
                   'Cloud Connection Error',
-                  style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   error,
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 13),
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.8),
+                    fontSize: 13,
+                  ),
                 ),
                 const SizedBox(height: 24),
                 ElevatedButton(
@@ -100,12 +108,17 @@ class MyApp extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       CircularProgressIndicator(
-                        color: themeProvider.isDarkMode ? AppColors.primaryLight : AppColors.primary,
+                        color: themeProvider.isDarkMode
+                            ? AppColors.primaryLight
+                            : AppColors.primary,
                       ),
                       const SizedBox(height: 16),
                       const Text(
                         'Initializing POS System...',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ],
                   ),
@@ -121,7 +134,10 @@ class MyApp extends StatelessWidget {
             themeMode: themeProvider.themeMode,
             debugShowCheckedModeBanner: false,
             home: authProvider.isAuthenticated
-                ? const DashboardScreen()
+                ? (settingsProvider.settings.enableBiometrics &&
+                          !authProvider.isUnlocked
+                      ? const BiometricLockScreen()
+                      : const DashboardScreen())
                 : const LoginScreen(),
           );
         },

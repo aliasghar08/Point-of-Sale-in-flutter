@@ -36,14 +36,17 @@ class CustomerService {
         // If customer already exists, update their data
         if (customerMap.containsKey(customerId)) {
           final existing = customerMap[customerId]!;
-          final totalSpent = existing.totalSpent + (data['total'] ?? 0.0).toDouble();
+          final totalSpent =
+              existing.totalSpent + (data['total'] ?? 0.0).toDouble();
           final totalOrders = existing.totalOrders + 1;
-          
+
           customerMap[customerId] = existing.copyWith(
             totalSpent: totalSpent,
             totalOrders: totalOrders,
             averageOrderValue: totalSpent / totalOrders,
-            lastPurchaseDate: (data['saleDate'] as Timestamp?)?.toDate() ?? existing.lastPurchaseDate,
+            lastPurchaseDate:
+                (data['saleDate'] as Timestamp?)?.toDate() ??
+                existing.lastPurchaseDate,
             updatedAt: DateTime.now(),
           );
         } else {
@@ -58,7 +61,8 @@ class CustomerService {
             totalOrders: 1,
             averageOrderValue: (data['total'] ?? 0.0).toDouble(),
             lastPurchaseDate: (data['saleDate'] as Timestamp?)?.toDate(),
-            createdAt: (data['saleDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
+            createdAt:
+                (data['saleDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
             updatedAt: DateTime.now(),
             isActive: true,
           );
@@ -73,7 +77,9 @@ class CustomerService {
 
   // ✅ Get customers stream for real-time updates
   Stream<List<Customer>> getCustomersStream() {
-    return _firebaseService.getCurrentBusinessId().asStream().asyncExpand((businessId) {
+    return _firebaseService.getCurrentBusinessId().asStream().asyncExpand((
+      businessId,
+    ) {
       if (businessId == null) {
         return Stream.fromFuture(Future.value([]));
       }
@@ -91,18 +97,22 @@ class CustomerService {
               final customerId = data['customerId'] ?? 'guest';
               final isGuest = data['isGuestCustomer'] ?? true;
 
-              if (isGuest || customerId == 'guest' || customerId.isEmpty) continue;
+              if (isGuest || customerId == 'guest' || customerId.isEmpty)
+                continue;
 
               if (customerMap.containsKey(customerId)) {
                 final existing = customerMap[customerId]!;
-                final totalSpent = existing.totalSpent + (data['total'] ?? 0.0).toDouble();
+                final totalSpent =
+                    existing.totalSpent + (data['total'] ?? 0.0).toDouble();
                 final totalOrders = existing.totalOrders + 1;
-                
+
                 customerMap[customerId] = existing.copyWith(
                   totalSpent: totalSpent,
                   totalOrders: totalOrders,
                   averageOrderValue: totalSpent / totalOrders,
-                  lastPurchaseDate: (data['saleDate'] as Timestamp?)?.toDate() ?? existing.lastPurchaseDate,
+                  lastPurchaseDate:
+                      (data['saleDate'] as Timestamp?)?.toDate() ??
+                      existing.lastPurchaseDate,
                   updatedAt: DateTime.now(),
                 );
               } else {
@@ -116,7 +126,9 @@ class CustomerService {
                   totalOrders: 1,
                   averageOrderValue: (data['total'] ?? 0.0).toDouble(),
                   lastPurchaseDate: (data['saleDate'] as Timestamp?)?.toDate(),
-                  createdAt: (data['saleDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
+                  createdAt:
+                      (data['saleDate'] as Timestamp?)?.toDate() ??
+                      DateTime.now(),
                   updatedAt: DateTime.now(),
                   isActive: true,
                 );
@@ -131,11 +143,11 @@ class CustomerService {
   // ✅ Search customers from sales
   Future<List<Customer>> searchCustomers(String query) async {
     if (query.isEmpty) return [];
-    
+
     try {
       final allCustomers = await getAllCustomers();
       final searchTerm = query.toLowerCase().trim();
-      
+
       return allCustomers.where((customer) {
         return customer.name.toLowerCase().contains(searchTerm) ||
             customer.phone.contains(searchTerm) ||
@@ -182,7 +194,8 @@ class CustomerService {
         totalOrders: totalOrders,
         averageOrderValue: totalSpent / totalOrders,
         lastPurchaseDate: (firstSale['saleDate'] as Timestamp?)?.toDate(),
-        createdAt: (firstSale['saleDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
+        createdAt:
+            (firstSale['saleDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
         updatedAt: DateTime.now(),
         isActive: true,
       );
@@ -192,7 +205,9 @@ class CustomerService {
   }
 
   // ✅ Get customer's sales history
-  Future<List<QueryDocumentSnapshot>> getCustomerSales(String customerId) async {
+  Future<List<QueryDocumentSnapshot>> getCustomerSales(
+    String customerId,
+  ) async {
     try {
       final businessId = await _firebaseService.getCurrentBusinessId();
       if (businessId == null) throw Exception('Business not found');

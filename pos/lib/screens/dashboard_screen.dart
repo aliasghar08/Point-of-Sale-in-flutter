@@ -54,38 +54,48 @@ class _DashboardScreenState extends State<DashboardScreen> {
   List<NavigationDestination> _getDestinations(AppUser user) {
     final List<NavigationDestination> dests = [];
 
-    dests.add(const NavigationDestination(
-      icon: Icon(Icons.point_of_sale_outlined),
-      selectedIcon: Icon(Icons.point_of_sale),
-      label: 'POS Register',
-    ));
+    dests.add(
+      const NavigationDestination(
+        icon: Icon(Icons.point_of_sale_outlined),
+        selectedIcon: Icon(Icons.point_of_sale),
+        label: 'POS Register',
+      ),
+    );
 
     if (user.canManageInventory) {
-      dests.add(const NavigationDestination(
-        icon: Icon(Icons.inventory_2_outlined),
-        selectedIcon: Icon(Icons.inventory_2),
-        label: 'Inventory',
-      ));
+      dests.add(
+        const NavigationDestination(
+          icon: Icon(Icons.inventory_2_outlined),
+          selectedIcon: Icon(Icons.inventory_2),
+          label: 'Inventory',
+        ),
+      );
     }
 
-    dests.add(const NavigationDestination(
-      icon: Icon(Icons.analytics_outlined),
-      selectedIcon: Icon(Icons.analytics),
-      label: 'Analytics',
-    ));
+    dests.add(
+      const NavigationDestination(
+        icon: Icon(Icons.analytics_outlined),
+        selectedIcon: Icon(Icons.analytics),
+        label: 'Analytics',
+      ),
+    );
 
-    dests.add(const NavigationDestination(
-      icon: Icon(Icons.people_alt_outlined),
-      selectedIcon: Icon(Icons.people_alt),
-      label: 'CRM',
-    ));
+    dests.add(
+      const NavigationDestination(
+        icon: Icon(Icons.people_alt_outlined),
+        selectedIcon: Icon(Icons.people_alt),
+        label: 'CRM',
+      ),
+    );
 
     if (user.canManageUsers) {
-      dests.add(const NavigationDestination(
-        icon: Icon(Icons.manage_accounts_outlined),
-        selectedIcon: Icon(Icons.manage_accounts),
-        label: 'Staff',
-      ));
+      dests.add(
+        const NavigationDestination(
+          icon: Icon(Icons.manage_accounts_outlined),
+          selectedIcon: Icon(Icons.manage_accounts),
+          label: 'Staff',
+        ),
+      );
     }
 
     return dests;
@@ -96,11 +106,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
       case 0:
         return 'Point of Sale Register';
       case 1:
-        return user.canManageInventory ? 'Inventory Management' : 'Analytics & Insights';
+        return user.canManageInventory
+            ? 'Inventory Management'
+            : 'Analytics & Insights';
       case 2:
-        return user.canManageInventory ? 'Analytics & Insights' : 'Customers & Loyalty';
+        return user.canManageInventory
+            ? 'Analytics & Insights'
+            : 'Customers & Loyalty';
       case 3:
-        return user.canManageInventory ? 'Customers & Loyalty' : 'Staff & Roles';
+        return user.canManageInventory
+            ? 'Customers & Loyalty'
+            : 'Staff & Roles';
       case 4:
         return 'Staff & Roles';
       default:
@@ -151,7 +167,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.normal,
-                color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                color: isDark
+                    ? AppColors.darkTextSecondary
+                    : AppColors.lightTextSecondary,
               ),
             ),
           ],
@@ -168,7 +186,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
             },
           ),
           IconButton(
-            icon: Icon(themeProvider.isDarkMode ? Icons.light_mode : Icons.dark_mode),
+            icon: Icon(
+              themeProvider.isDarkMode ? Icons.light_mode : Icons.dark_mode,
+            ),
             tooltip: 'Toggle Theme',
             onPressed: () => themeProvider.toggleTheme(),
           ),
@@ -185,10 +205,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const SizedBox(width: 8),
         ],
       ),
-      body: IndexedStack(
-        index: _currentIndex,
-        children: tabs,
-      ),
+      body: IndexedStack(index: _currentIndex, children: tabs),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: (index) => setState(() => _currentIndex = index),

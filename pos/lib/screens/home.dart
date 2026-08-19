@@ -177,16 +177,22 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // ==================== TOTALS CALCULATIONS ====================
 
-  double get _cartSubtotal => _cart.fold(0.0, (sum, item) => sum + item.subtotal);
-  double get _itemsDiscountTotal => _cart.fold(0.0, (sum, item) => sum + item.calculatedDiscount);
+  double get _cartSubtotal =>
+      _cart.fold(0.0, (sum, item) => sum + item.subtotal);
+  double get _itemsDiscountTotal =>
+      _cart.fold(0.0, (sum, item) => sum + item.calculatedDiscount);
   double get _orderDiscountTotal {
     if (_orderDiscountAmount > 0) return _orderDiscountAmount;
-    if (_orderDiscountPercent > 0) return (_cartSubtotal - _itemsDiscountTotal) * (_orderDiscountPercent / 100);
+    if (_orderDiscountPercent > 0)
+      return (_cartSubtotal - _itemsDiscountTotal) *
+          (_orderDiscountPercent / 100);
     return 0.0;
   }
+
   double get _totalDiscount => _itemsDiscountTotal + _orderDiscountTotal;
   double get _totalTax => (_cartSubtotal - _totalDiscount) * (_taxRate / 100);
-  double get _grandTotal => (_cartSubtotal - _totalDiscount + _totalTax).clamp(0.0, double.infinity);
+  double get _grandTotal =>
+      (_cartSubtotal - _totalDiscount + _totalTax).clamp(0.0, double.infinity);
   double get _totalProfit => _cart.fold(0.0, (sum, item) => sum + item.profit);
 
   // ==================== PARK / HOLD SALE ====================
@@ -194,7 +200,10 @@ class _HomeScreenState extends State<HomeScreen> {
   void _parkActiveSale() {
     if (_cart.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Cart is empty. Nothing to hold.'), behavior: SnackBarBehavior.floating),
+        const SnackBar(
+          content: Text('Cart is empty. Nothing to hold.'),
+          behavior: SnackBarBehavior.floating,
+        ),
       );
       return;
     }
@@ -208,7 +217,9 @@ class _HomeScreenState extends State<HomeScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Hold ${_cart.length} items for customer "${_selectedCustomer?.name ?? 'Guest'}"?'),
+            Text(
+              'Hold ${_cart.length} items for customer "${_selectedCustomer?.name ?? 'Guest'}"?',
+            ),
             const SizedBox(height: 14),
             TextField(
               controller: noteController,
@@ -220,7 +231,10 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
           ElevatedButton(
             onPressed: () {
               final heldOrder = HeldOrder(
@@ -263,23 +277,33 @@ class _HomeScreenState extends State<HomeScreen> {
   void _showHeldOrdersModal() {
     if (_heldOrders.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No held orders found.'), behavior: SnackBarBehavior.floating),
+        const SnackBar(
+          content: Text('No held orders found.'),
+          behavior: SnackBarBehavior.floating,
+        ),
       );
       return;
     }
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final currencySymbol = Provider.of<SettingsProvider>(context, listen: false).currencySymbol;
+    final currencySymbol = Provider.of<SettingsProvider>(
+      context,
+      listen: false,
+    ).currencySymbol;
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSheetState) => Container(
           padding: const EdgeInsets.all(20),
-          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.75),
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.75,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -288,9 +312,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   Text(
                     'Held Orders (${_heldOrders.length})',
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                  IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
                 ],
               ),
               const Divider(height: 20),
@@ -310,11 +340,20 @@ class _HomeScreenState extends State<HomeScreen> {
                             children: [
                               Text(
                                 order.customerName,
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                ),
                               ),
                               Text(
-                                FormatService.formatCurrency(order.totalAmount, symbol: currencySymbol),
-                                style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.success),
+                                FormatService.formatCurrency(
+                                  order.totalAmount,
+                                  symbol: currencySymbol,
+                                ),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.success,
+                                ),
                               ),
                             ],
                           ),
@@ -323,7 +362,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             '${order.totalItems} items • Held ${FormatService.timeAgo(order.heldAt)}${order.note.isNotEmpty ? ' • "${order.note}"' : ''}',
                             style: TextStyle(
                               fontSize: 12,
-                              color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                              color: isDark
+                                  ? AppColors.darkTextSecondary
+                                  : AppColors.lightTextSecondary,
                             ),
                           ),
                           const SizedBox(height: 10),
@@ -336,21 +377,34 @@ class _HomeScreenState extends State<HomeScreen> {
                                   setSheetState(() {});
                                   FeedbackService.lightTap();
                                 },
-                                icon: const Icon(Icons.delete_outline, size: 16, color: AppColors.error),
-                                label: const Text('Discard', style: TextStyle(color: AppColors.error)),
+                                icon: const Icon(
+                                  Icons.delete_outline,
+                                  size: 16,
+                                  color: AppColors.error,
+                                ),
+                                label: const Text(
+                                  'Discard',
+                                  style: TextStyle(color: AppColors.error),
+                                ),
                               ),
                               const SizedBox(width: 8),
                               ElevatedButton.icon(
                                 onPressed: () {
                                   if (_cart.isNotEmpty) {
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('Please clear or hold active cart before restoring.'), behavior: SnackBarBehavior.floating),
+                                      const SnackBar(
+                                        content: Text(
+                                          'Please clear or hold active cart before restoring.',
+                                        ),
+                                        behavior: SnackBarBehavior.floating,
+                                      ),
                                     );
                                     return;
                                   }
                                   setState(() {
                                     _cart.addAll(order.items);
-                                    _orderDiscountPercent = order.discountPercent;
+                                    _orderDiscountPercent =
+                                        order.discountPercent;
                                     _orderDiscountAmount = order.discountAmount;
                                     _heldOrders.removeAt(i);
                                   });
@@ -394,17 +448,27 @@ class _HomeScreenState extends State<HomeScreen> {
               TextFormField(
                 controller: nameCtrl,
                 autofocus: true,
-                decoration: const InputDecoration(labelText: 'Item Name / Description', hintText: 'e.g. Custom Repair, Service'),
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter item name' : null,
+                decoration: const InputDecoration(
+                  labelText: 'Item Name / Description',
+                  hintText: 'e.g. Custom Repair, Service',
+                ),
+                validator: (v) =>
+                    (v == null || v.trim().isEmpty) ? 'Enter item name' : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: priceCtrl,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(labelText: 'Price', prefixText: '\$ '),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: const InputDecoration(
+                  labelText: 'Price',
+                  prefixText: '\$ ',
+                ),
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) return 'Enter price';
-                  if (double.tryParse(v.trim()) == null) return 'Enter valid number';
+                  if (double.tryParse(v.trim()) == null)
+                    return 'Enter valid number';
                   return null;
                 },
               ),
@@ -412,12 +476,18 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
           ElevatedButton(
             onPressed: () {
               if (formKey.currentState!.validate()) {
                 final price = double.parse(priceCtrl.text.trim());
-                final item = CartItem.custom(name: nameCtrl.text.trim(), price: price);
+                final item = CartItem.custom(
+                  name: nameCtrl.text.trim(),
+                  price: price,
+                );
                 setState(() => _cart.add(item));
                 Navigator.pop(ctx);
                 FeedbackService.selection();
@@ -435,22 +505,32 @@ class _HomeScreenState extends State<HomeScreen> {
   void _openCheckoutModal() {
     if (_cart.isEmpty) return;
 
-    final settingsProvider = Provider.of<SettingsProvider>(context, listen: false);
+    final settingsProvider = Provider.of<SettingsProvider>(
+      context,
+      listen: false,
+    );
     final currencySymbol = settingsProvider.currencySymbol;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     String selectedMethod = 'Cash';
-    final cashController = TextEditingController(text: _grandTotal.toStringAsFixed(2));
+    final cashController = TextEditingController(
+      text: _grandTotal.toStringAsFixed(2),
+    );
     double tenderedCash = _grandTotal;
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setModalState) {
-          final changeDue = (tenderedCash - _grandTotal).clamp(0.0, double.infinity);
+          final changeDue = (tenderedCash - _grandTotal).clamp(
+            0.0,
+            double.infinity,
+          );
 
           return Padding(
             padding: EdgeInsets.only(
@@ -468,13 +548,24 @@ class _HomeScreenState extends State<HomeScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('Complete Checkout', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                      IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                      const Text(
+                        'Complete Checkout',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 12),
                   PosCard(
-                    gradient: isDark ? AppColors.darkCardGradient : AppColors.primaryGradient,
+                    gradient: isDark
+                        ? AppColors.darkCardGradient
+                        : AppColors.primaryGradient,
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -483,24 +574,41 @@ class _HomeScreenState extends State<HomeScreen> {
                           children: [
                             Text(
                               'Total Amount Due',
-                              style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 13),
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.8),
+                                fontSize: 13,
+                              ),
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              FormatService.formatCurrency(_grandTotal, symbol: currencySymbol),
-                              style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold),
+                              FormatService.formatCurrency(
+                                _grandTotal,
+                                symbol: currencySymbol,
+                              ),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 28,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ],
                         ),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.white.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
                             '${_cart.length} Items',
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
                           ),
                         ),
                       ],
@@ -509,10 +617,15 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 16),
 
                   // Payment Method Selector
-                  const Text('Payment Method', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                  const Text(
+                    'Payment Method',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                  ),
                   const SizedBox(height: 8),
                   Row(
-                    children: ['Cash', 'Card', 'Mobile', 'Credit'].map((method) {
+                    children: ['Cash', 'Card', 'Mobile', 'Credit'].map((
+                      method,
+                    ) {
                       final isSelected = selectedMethod == method;
                       return Expanded(
                         child: Padding(
@@ -520,13 +633,19 @@ class _HomeScreenState extends State<HomeScreen> {
                           child: OutlinedButton(
                             style: OutlinedButton.styleFrom(
                               backgroundColor: isSelected
-                                  ? (isDark ? AppColors.primaryLight : AppColors.primary)
+                                  ? (isDark
+                                        ? AppColors.primaryLight
+                                        : AppColors.primary)
                                   : null,
                               foregroundColor: isSelected ? Colors.white : null,
                               side: BorderSide(
                                 color: isSelected
-                                    ? (isDark ? AppColors.primaryLight : AppColors.primary)
-                                    : (isDark ? AppColors.darkBorder : AppColors.lightBorder),
+                                    ? (isDark
+                                          ? AppColors.primaryLight
+                                          : AppColors.primary)
+                                    : (isDark
+                                          ? AppColors.darkBorder
+                                          : AppColors.lightBorder),
                               ),
                               padding: const EdgeInsets.symmetric(vertical: 12),
                             ),
@@ -534,7 +653,13 @@ class _HomeScreenState extends State<HomeScreen> {
                               setModalState(() => selectedMethod = method);
                               FeedbackService.lightTap();
                             },
-                            child: Text(method, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                            child: Text(
+                              method,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ),
                         ),
                       );
@@ -544,11 +669,19 @@ class _HomeScreenState extends State<HomeScreen> {
 
                   // Cash Denomination Helpers (When Cash is selected)
                   if (selectedMethod == 'Cash') ...[
-                    const Text('Cash Tendered & Change', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                    const Text(
+                      'Cash Tendered & Change',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     const SizedBox(height: 8),
                     TextField(
                       controller: cashController,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
                       decoration: InputDecoration(
                         labelText: 'Received Amount',
                         prefixText: '$currencySymbol ',
@@ -570,30 +703,57 @@ class _HomeScreenState extends State<HomeScreen> {
                             cashController.text = amt.toStringAsFixed(2);
                           });
                         }),
-                        ...[5, 10, 20, 50, 100, 500].where((d) => d >= _grandTotal).take(4).map(
-                          (denom) => _buildTenderChip('$currencySymbol $denom', denom.toDouble(), (amt) {
-                            setModalState(() {
-                              tenderedCash = amt;
-                              cashController.text = amt.toStringAsFixed(2);
-                            });
-                          }),
-                        ),
+                        ...[5, 10, 20, 50, 100, 500]
+                            .where((d) => d >= _grandTotal)
+                            .take(4)
+                            .map(
+                              (denom) => _buildTenderChip(
+                                '$currencySymbol $denom',
+                                denom.toDouble(),
+                                (amt) {
+                                  setModalState(() {
+                                    tenderedCash = amt;
+                                    cashController.text = amt.toStringAsFixed(
+                                      2,
+                                    );
+                                  });
+                                },
+                              ),
+                            ),
                       ],
                     ),
                     const SizedBox(height: 12),
                     PosCard(
-                      backgroundColor: isDark ? AppColors.darkBackground : AppColors.lightBackground,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      backgroundColor: isDark
+                          ? AppColors.darkBackground
+                          : AppColors.lightBackground,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('Change to Return:', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                          const Text(
+                            'Change to Return:',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                           Text(
-                            FormatService.formatCurrency(changeDue, symbol: currencySymbol),
+                            FormatService.formatCurrency(
+                              changeDue,
+                              symbol: currencySymbol,
+                            ),
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
-                              color: changeDue > 0 ? AppColors.success : (isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary),
+                              color: changeDue > 0
+                                  ? AppColors.success
+                                  : (isDark
+                                        ? AppColors.darkTextPrimary
+                                        : AppColors.lightTextPrimary),
                             ),
                           ),
                         ],
@@ -609,17 +769,25 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: ElevatedButton(
                       onPressed: () => _processCompletedSale(
                         paymentMethod: selectedMethod,
-                        cashTendered: selectedMethod == 'Cash' ? tenderedCash : _grandTotal,
+                        cashTendered: selectedMethod == 'Cash'
+                            ? tenderedCash
+                            : _grandTotal,
                         changeDue: selectedMethod == 'Cash' ? changeDue : 0.0,
                         modalContext: ctx,
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.success,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
                       ),
                       child: const Text(
                         'Confirm & Complete Sale',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ),
@@ -633,9 +801,16 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildTenderChip(String label, double amount, Function(double) onSelected) {
+  Widget _buildTenderChip(
+    String label,
+    double amount,
+    Function(double) onSelected,
+  ) {
     return ActionChip(
-      label: Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+      label: Text(
+        label,
+        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+      ),
       onPressed: () => onSelected(amount),
     );
   }
@@ -652,23 +827,31 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final receiptNumber = 'REC-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}';
+      final receiptNumber =
+          'REC-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}';
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      final settingsProvider = Provider.of<SettingsProvider>(context, listen: false);
+      final settingsProvider = Provider.of<SettingsProvider>(
+        context,
+        listen: false,
+      );
       final currencySymbol = settingsProvider.currencySymbol;
 
       // 1. Record Sale in Firebase
       await _firebaseService.processSale(
-        cartItems: _cart.map((c) => Product(
-          id: c.productId,
-          name: c.name,
-          price: c.unitPrice,
-          costPrice: c.costPrice,
-          stock: c.quantity,
-          minStock: 0,
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-        )).toList(),
+        cartItems: _cart
+            .map(
+              (c) => Product(
+                id: c.productId,
+                name: c.name,
+                price: c.unitPrice,
+                costPrice: c.costPrice,
+                stock: c.quantity,
+                minStock: 0,
+                createdAt: DateTime.now(),
+                updatedAt: DateTime.now(),
+              ),
+            )
+            .toList(),
         paymentMethod: paymentMethod,
         totalAmount: _grandTotal,
         totalProfit: _totalProfit,
@@ -693,7 +876,9 @@ class _HomeScreenState extends State<HomeScreen> {
       for (final cartItem in _cart) {
         final cached = _cache.getProductById(cartItem.productId);
         if (cached != null) {
-          final updated = cached.copyWith(stock: (cached.stock - cartItem.quantity).clamp(0, 99999));
+          final updated = cached.copyWith(
+            stock: (cached.stock - cartItem.quantity).clamp(0, 99999),
+          );
           _cache.upsertProduct(updated);
         }
       }
@@ -733,7 +918,11 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() => _isLoading = false);
         FeedbackService.error();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to process sale: $e'), backgroundColor: AppColors.error, behavior: SnackBarBehavior.floating),
+          SnackBar(
+            content: Text('Failed to process sale: $e'),
+            backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     }
@@ -769,12 +958,22 @@ class _HomeScreenState extends State<HomeScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Receipt #: $receiptNumber', style: const TextStyle(fontWeight: FontWeight.bold)),
+            Text(
+              'Receipt #: $receiptNumber',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 6),
-            Text('Total Paid: ${FormatService.formatCurrency(grandTotal, symbol: currencySymbol)} ($paymentMethod)'),
-            if (changeDue > 0) Text('Change Given: ${FormatService.formatCurrency(changeDue, symbol: currencySymbol)}'),
+            Text(
+              'Total Paid: ${FormatService.formatCurrency(grandTotal, symbol: currencySymbol)} ($paymentMethod)',
+            ),
+            if (changeDue > 0)
+              Text(
+                'Change Given: ${FormatService.formatCurrency(changeDue, symbol: currencySymbol)}',
+              ),
             const SizedBox(height: 12),
-            const Text('Customer receipt is ready for thermal printing or digital delivery.'),
+            const Text(
+              'Customer receipt is ready for thermal printing or digital delivery.',
+            ),
           ],
         ),
         actions: [
@@ -786,12 +985,16 @@ class _HomeScreenState extends State<HomeScreen> {
                 date: DateTime.now(),
                 cashierName: cashierName,
                 customerName: customerName,
-                items: items.map((i) => {
-                  'name': i.name,
-                  'qty': i.quantity,
-                  'price': i.unitPrice,
-                  'total': i.total,
-                }).toList(),
+                items: items
+                    .map(
+                      (i) => {
+                        'name': i.name,
+                        'qty': i.quantity,
+                        'price': i.unitPrice,
+                        'total': i.total,
+                      },
+                    )
+                    .toList(),
                 subtotal: subtotal,
                 tax: tax,
                 discount: discount,
@@ -827,7 +1030,10 @@ class _HomeScreenState extends State<HomeScreen> {
             if (p != null) {
               _addToCart(p);
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Added ${p.name} to cart!'), behavior: SnackBarBehavior.floating),
+                SnackBar(
+                  content: Text('Added ${p.name} to cart!'),
+                  behavior: SnackBarBehavior.floating,
+                ),
               );
             } else {
               _searchController.text = code;
@@ -849,7 +1055,10 @@ class _HomeScreenState extends State<HomeScreen> {
             if (p != null) {
               _addToCart(p);
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Added ${p.name} to cart!'), behavior: SnackBarBehavior.floating),
+                SnackBar(
+                  content: Text('Added ${p.name} to cart!'),
+                  behavior: SnackBarBehavior.floating,
+                ),
               );
             } else {
               _searchController.text = code;
@@ -954,7 +1163,9 @@ class _HomeScreenState extends State<HomeScreen> {
       decoration: BoxDecoration(
         color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
         border: Border(
-          bottom: BorderSide(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
+          bottom: BorderSide(
+            color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+          ),
         ),
       ),
       child: Row(
@@ -976,7 +1187,10 @@ class _HomeScreenState extends State<HomeScreen> {
                         },
                       )
                     : null,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
               ),
             ),
           ),
@@ -1081,13 +1295,18 @@ class _HomeScreenState extends State<HomeScreen> {
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
-                        color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                        color: isDark
+                            ? AppColors.darkTextSecondary
+                            : AppColors.lightTextSecondary,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  StatBadge.stock(stock: product.stock, minStock: product.minStock),
+                  StatBadge.stock(
+                    stock: product.stock,
+                    minStock: product.minStock,
+                  ),
                 ],
               ),
               const Spacer(),
@@ -1113,7 +1332,10 @@ class _HomeScreenState extends State<HomeScreen> {
               // Product Name & Price
               Text(
                 product.name,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -1122,7 +1344,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    FormatService.formatCurrency(product.salePrice ?? product.price, symbol: currencySymbol),
+                    FormatService.formatCurrency(
+                      product.salePrice ?? product.price,
+                      symbol: currencySymbol,
+                    ),
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.bold,
@@ -1132,7 +1357,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   Container(
                     padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
-                      color: isDark ? AppColors.primaryLight : AppColors.primary,
+                      color: isDark
+                          ? AppColors.primaryLight
+                          : AppColors.primary,
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(Icons.add, size: 14, color: Colors.white),
@@ -1163,13 +1390,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 ? const EmptyStateView(
                     icon: Icons.shopping_cart_outlined,
                     title: 'Cart is Empty',
-                    description: 'Select products from the catalog or scan a barcode to begin checkout.',
+                    description:
+                        'Select products from the catalog or scan a barcode to begin checkout.',
                   )
                 : ListView.separated(
                     padding: const EdgeInsets.all(12),
                     itemCount: _cart.length,
                     separatorBuilder: (_, _) => const SizedBox(height: 8),
-                    itemBuilder: (ctx, i) => _buildCartItemTile(_cart[i], i, currencySymbol, isDark),
+                    itemBuilder: (ctx, i) =>
+                        _buildCartItemTile(_cart[i], i, currencySymbol, isDark),
                   ),
           ),
 
@@ -1194,7 +1423,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(width: 8),
                   Text(
                     'Order Cart (${_cart.length})',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
               ),
@@ -1215,7 +1447,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     onPressed: _parkActiveSale,
                   ),
                   IconButton(
-                    icon: const Icon(Icons.delete_sweep_outlined, color: AppColors.error),
+                    icon: const Icon(
+                      Icons.delete_sweep_outlined,
+                      color: AppColors.error,
+                    ),
                     tooltip: 'Clear Cart',
                     onPressed: _clearCart,
                   ),
@@ -1233,7 +1468,9 @@ class _HomeScreenState extends State<HomeScreen> {
               decoration: BoxDecoration(
                 color: isDark ? AppColors.darkCard : AppColors.lightBackground,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
+                border: Border.all(
+                  color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+                ),
               ),
               child: Row(
                 children: [
@@ -1246,7 +1483,9 @@ class _HomeScreenState extends State<HomeScreen> {
                           : 'Guest Customer (Tap to attach customer)',
                       style: TextStyle(
                         fontSize: 13,
-                        fontWeight: _selectedCustomer != null ? FontWeight.bold : FontWeight.normal,
+                        fontWeight: _selectedCustomer != null
+                            ? FontWeight.bold
+                            : FontWeight.normal,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -1270,7 +1509,12 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildCartItemTile(CartItem item, int index, String currencySymbol, bool isDark) {
+  Widget _buildCartItemTile(
+    CartItem item,
+    int index,
+    String currencySymbol,
+    bool isDark,
+  ) {
     return PosCard(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       child: Row(
@@ -1281,16 +1525,24 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 Text(
                   item.name,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  FormatService.formatCurrency(item.unitPrice, symbol: currencySymbol),
+                  FormatService.formatCurrency(
+                    item.unitPrice,
+                    symbol: currencySymbol,
+                  ),
                   style: TextStyle(
                     fontSize: 12,
-                    color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                    color: isDark
+                        ? AppColors.darkTextSecondary
+                        : AppColors.lightTextSecondary,
                   ),
                 ),
               ],
@@ -1309,12 +1561,17 @@ class _HomeScreenState extends State<HomeScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
-                  color: isDark ? AppColors.darkBackground : AppColors.lightBackground,
+                  color: isDark
+                      ? AppColors.darkBackground
+                      : AppColors.lightBackground,
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
                   '${item.quantity}',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
                 ),
               ),
               IconButton(
@@ -1349,15 +1606,31 @@ class _HomeScreenState extends State<HomeScreen> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: isDark ? AppColors.darkCard : AppColors.lightCard,
-        border: Border(top: BorderSide(color: isDark ? AppColors.darkBorder : AppColors.lightBorder)),
+        border: Border(
+          top: BorderSide(
+            color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+          ),
+        ),
       ),
       child: Column(
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Subtotal', style: TextStyle(color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary)),
-              Text(FormatService.formatCurrency(_cartSubtotal, symbol: currencySymbol)),
+              Text(
+                'Subtotal',
+                style: TextStyle(
+                  color: isDark
+                      ? AppColors.darkTextSecondary
+                      : AppColors.lightTextSecondary,
+                ),
+              ),
+              Text(
+                FormatService.formatCurrency(
+                  _cartSubtotal,
+                  symbol: currencySymbol,
+                ),
+              ),
             ],
           ),
           if (_totalDiscount > 0) ...[
@@ -1365,8 +1638,14 @@ class _HomeScreenState extends State<HomeScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Discounts', style: TextStyle(color: AppColors.error)),
-                Text('-${FormatService.formatCurrency(_totalDiscount, symbol: currencySymbol)}', style: const TextStyle(color: AppColors.error)),
+                const Text(
+                  'Discounts',
+                  style: TextStyle(color: AppColors.error),
+                ),
+                Text(
+                  '-${FormatService.formatCurrency(_totalDiscount, symbol: currencySymbol)}',
+                  style: const TextStyle(color: AppColors.error),
+                ),
               ],
             ),
           ],
@@ -1374,9 +1653,15 @@ class _HomeScreenState extends State<HomeScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Grand Total', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const Text(
+                'Grand Total',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
               Text(
-                FormatService.formatCurrency(_grandTotal, symbol: currencySymbol),
+                FormatService.formatCurrency(
+                  _grandTotal,
+                  symbol: currencySymbol,
+                ),
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
@@ -1392,7 +1677,10 @@ class _HomeScreenState extends State<HomeScreen> {
             child: ElevatedButton.icon(
               onPressed: _openCheckoutModal,
               icon: const Icon(Icons.payment, size: 20),
-              label: const Text('Charge & Checkout', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              label: const Text(
+                'Charge & Checkout',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
             ),
           ),
         ],
@@ -1424,11 +1712,22 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 Text(
                   '${_cart.length} items in cart',
-                  style: TextStyle(fontSize: 12, color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark
+                        ? AppColors.darkTextSecondary
+                        : AppColors.lightTextSecondary,
+                  ),
                 ),
                 Text(
-                  FormatService.formatCurrency(_grandTotal, symbol: currencySymbol),
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  FormatService.formatCurrency(
+                    _grandTotal,
+                    symbol: currencySymbol,
+                  ),
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ],
             ),
@@ -1438,8 +1737,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 showModalBottomSheet(
                   context: context,
                   isScrollControlled: true,
-                  backgroundColor: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-                  shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+                  backgroundColor: isDark
+                      ? AppColors.darkSurface
+                      : AppColors.lightSurface,
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(20),
+                    ),
+                  ),
                   builder: (_) => SizedBox(
                     height: MediaQuery.of(context).size.height * 0.8,
                     child: _buildCartPane(currencySymbol, isDark),

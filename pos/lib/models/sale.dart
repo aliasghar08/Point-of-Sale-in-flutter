@@ -12,7 +12,7 @@ class Sale {
   final DateTime saleDate;
   final String paymentMethod;
   final String receiptNumber;
-  
+
   // ✅ Customer Info (Embedded)
   final String customerId;
   final String customerName;
@@ -129,7 +129,7 @@ class Sale {
   }
 
   // ========== HELPER GETTERS ==========
-  
+
   // Get customer display name
   String get customerDisplayName {
     if (customerName.isNotEmpty && customerName != 'Guest Customer') {
@@ -143,11 +143,12 @@ class Sale {
 
   // Check if sale has valid customer
   bool get hasValidCustomer => customerId != 'guest' && customerId.isNotEmpty;
-  
+
   // Get customer contact info
   String get customerContact {
     if (customerPhone.isNotEmpty) return customerPhone;
-    if (customerEmail != null && customerEmail!.isNotEmpty) return customerEmail!;
+    if (customerEmail != null && customerEmail!.isNotEmpty)
+      return customerEmail!;
     return 'No contact info';
   }
 
@@ -156,7 +157,8 @@ class Sale {
     if (isGuestCustomer) return 'Guest Customer';
     String info = customerName;
     if (customerPhone.isNotEmpty) info += ' | $customerPhone';
-    if (customerEmail != null && customerEmail!.isNotEmpty) info += ' | ${customerEmail!}';
+    if (customerEmail != null && customerEmail!.isNotEmpty)
+      info += ' | ${customerEmail!}';
     return info;
   }
 }

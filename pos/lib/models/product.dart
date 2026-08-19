@@ -7,13 +7,13 @@ class Product {
   final String description;
   final String brand;
   final String sku;
-  
+
   // ===== PRICING =====
   final double price;
   final double costPrice;
   final double? salePrice;
   final double? wholesalePrice;
-  
+
   // ===== STOCK & INVENTORY =====
   final int stock;
   final int minStock;
@@ -23,36 +23,46 @@ class Product {
   final String? weightUnit; // 'kg', 'g', 'lbs', 'oz'
   final int? reorderPoint;
   final int? reorderQuantity;
-  
+
   // ===== EXPIRY & DATES =====
   final DateTime? manufactureDate;
   final DateTime? expiryDate;
   final DateTime? bestBeforeDate;
-  
+
   // ===== IDENTIFICATION =====
   final String barcode;
   final String qrCode;
-  
+
   // ===== CATEGORIZATION =====
   final String category;
   final String? subCategory;
   final String? taxClass;
-  
+
   // ===== SUPPLIER =====
   final String? supplierId;
   final String? supplierName;
   final String? supplierSku;
-  
+
   // ===== MEDIA =====
   final String imageUrl;
   final List<String>? additionalImages;
-  
+
   // ===== STATUS =====
   final bool isActive;
   final bool isFeatured;
   final bool isDigital;
   final bool hasVariants;
-  
+
+  // ===== CATEGORY-SPECIFIC DETAILS =====
+  /// Stores medicine-specific fields when category == 'Medicine & Pharma'.
+  /// Keys: dosageForm, strength, genericName, drugRegNo, rxRequired,
+  ///       controlledDrug, storageCondition, routeOfAdmin, manufacturer
+  final Map<String, dynamic>? medicineDetails;
+
+  /// Stores food-specific fields when category == 'Food & Grocery'.
+  /// Keys: halalCertified, organicCertified, countryOfOrigin
+  final Map<String, dynamic>? foodDetails;
+
   // ===== TIMESTAMPS =====
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -92,17 +102,25 @@ class Product {
     this.isFeatured = false,
     this.isDigital = false,
     this.hasVariants = false,
+    this.medicineDetails,
+    this.foodDetails,
     required this.createdAt,
     required this.updatedAt,
   });
 
   // ===== COMPUTED PROPERTIES =====
   double get profit => price - costPrice;
-  double get profitMargin => costPrice > 0 ? ((price - costPrice) / price) * 100 : 0;
+  double get profitMargin =>
+      costPrice > 0 ? ((price - costPrice) / price) * 100 : 0;
   bool get isLowStock => stock <= minStock;
   bool get isOutOfStock => stock <= 0;
-  bool get isExpired => expiryDate != null && expiryDate!.isBefore(DateTime.now());
-  bool get isExpiringSoon => expiryDate != null && expiryDate!.difference(DateTime.now()).inDays <= 30;
+  bool get isExpired =>
+      expiryDate != null && expiryDate!.isBefore(DateTime.now());
+  bool get isExpiringSoon =>
+      expiryDate != null && expiryDate!.difference(DateTime.now()).inDays <= 30;
+  bool get isMedicine => category == 'Medicine & Pharma';
+  bool get isFood => category == 'Food & Grocery';
+
   String get stockStatus {
     if (isOutOfStock) return 'Out of Stock';
     if (isLowStock) return 'Low Stock';
@@ -145,6 +163,8 @@ class Product {
       'isFeatured': isFeatured,
       'isDigital': isDigital,
       'hasVariants': hasVariants,
+      'medicineDetails': medicineDetails,
+      'foodDetails': foodDetails,
       'createdAt': createdAt,
       'updatedAt': updatedAt,
     };
@@ -181,13 +201,19 @@ class Product {
       supplierName: map['supplierName'],
       supplierSku: map['supplierSku'],
       imageUrl: map['imageUrl'] ?? '',
-      additionalImages: map['additionalImages'] != null 
-          ? List<String>.from(map['additionalImages']) 
+      additionalImages: map['additionalImages'] != null
+          ? List<String>.from(map['additionalImages'])
           : null,
       isActive: map['isActive'] ?? true,
       isFeatured: map['isFeatured'] ?? false,
       isDigital: map['isDigital'] ?? false,
       hasVariants: map['hasVariants'] ?? false,
+      medicineDetails: map['medicineDetails'] != null
+          ? Map<String, dynamic>.from(map['medicineDetails'])
+          : null,
+      foodDetails: map['foodDetails'] != null
+          ? Map<String, dynamic>.from(map['foodDetails'])
+          : null,
       createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       updatedAt: (map['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
@@ -228,6 +254,8 @@ class Product {
     bool? isFeatured,
     bool? isDigital,
     bool? hasVariants,
+    Map<String, dynamic>? medicineDetails,
+    Map<String, dynamic>? foodDetails,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -266,6 +294,8 @@ class Product {
       isFeatured: isFeatured ?? this.isFeatured,
       isDigital: isDigital ?? this.isDigital,
       hasVariants: hasVariants ?? this.hasVariants,
+      medicineDetails: medicineDetails ?? this.medicineDetails,
+      foodDetails: foodDetails ?? this.foodDetails,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

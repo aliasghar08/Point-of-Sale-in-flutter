@@ -9,6 +9,7 @@ import 'package:pos/services/feedback_service.dart';
 import 'package:pos/theme/app_colors.dart';
 import 'package:pos/widgets/pos_card.dart';
 import 'package:pos/screens/login_screen.dart';
+import 'package:pos/services/local_auth_service.dart';
 
 /// Modern Settings & System Configuration Screen.
 class SettingsScreen extends StatefulWidget {
@@ -36,10 +37,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Seed Sample Catalog?'),
-        content: const Text('This will populate your catalog with 12+ pre-configured items with barcodes and images.'),
+        content: const Text(
+          'This will populate your catalog with 12+ pre-configured items with barcodes and images.',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Seed Catalog')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Seed Catalog'),
+          ),
         ],
       ),
     );
@@ -52,7 +61,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       FeedbackService.success();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Successfully loaded $count demo items!'), backgroundColor: AppColors.success),
+          SnackBar(
+            content: Text('Successfully loaded $count demo items!'),
+            backgroundColor: AppColors.success,
+          ),
         );
       }
     } catch (e) {
@@ -110,15 +122,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     _buildCrmConfigCard(settingsProvider, settings, isDark),
                     const SizedBox(height: 16),
 
-                    // 6. Demo Data & Developer Tools
+                    // 6. Security
+                    _buildSecurityCard(settingsProvider, settings, isDark),
+                    const SizedBox(height: 16),
+
+                    // 7. Demo Data & Developer Tools
                     _buildDemoDataCard(isDark),
                     const SizedBox(height: 16),
 
-                    // 7. About Info
+                    // 8. About Info
                     _buildAboutCard(isDark),
                     const SizedBox(height: 24),
 
-                    // 8. Logout
+                    // 9. Logout
                     _buildLogoutButton(authProvider, isDark),
                     const SizedBox(height: 32),
                   ],
@@ -138,7 +154,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         children: [
           CircleAvatar(
             radius: 28,
-            backgroundColor: (isDark ? AppColors.primaryLight : AppColors.primary).withValues(alpha: 0.15),
+            backgroundColor:
+                (isDark ? AppColors.primaryLight : AppColors.primary)
+                    .withValues(alpha: 0.15),
             child: Text(
               user.name.isNotEmpty ? user.name[0].toUpperCase() : 'U',
               style: TextStyle(
@@ -153,19 +171,40 @@ class _SettingsScreenState extends State<SettingsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(user.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                Text(
+                  user.name,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
                 const SizedBox(height: 2),
-                Text(user.email, style: TextStyle(fontSize: 13, color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary)),
+                Text(
+                  user.email,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: isDark
+                        ? AppColors.darkTextSecondary
+                        : AppColors.lightTextSecondary,
+                  ),
+                ),
                 const SizedBox(height: 6),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.primary.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
                     user.roleDisplay,
-                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primary),
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primary,
+                    ),
                   ),
                 ),
               ],
@@ -184,15 +223,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
         children: [
           Row(
             children: [
-              Icon(Icons.palette_outlined, color: isDark ? AppColors.primaryLight : AppColors.primary),
+              Icon(
+                Icons.palette_outlined,
+                color: isDark ? AppColors.primaryLight : AppColors.primary,
+              ),
               const SizedBox(width: 10),
-              const Text('Theme & Appearance', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              const Text(
+                'Theme & Appearance',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
             ],
           ),
           const SizedBox(height: 12),
           SwitchListTile(
             title: const Text('Dark Mode'),
-            subtitle: const Text('High-contrast sleek slate theme for low-light environments'),
+            subtitle: const Text(
+              'High-contrast sleek slate theme for low-light environments',
+            ),
             value: themeProvider.isDarkMode,
             onChanged: (_) => themeProvider.toggleTheme(),
             contentPadding: EdgeInsets.zero,
@@ -202,7 +249,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildCurrencyCard(SettingsProvider provider, AppSettings settings, bool isDark) {
+  Widget _buildCurrencyCard(
+    SettingsProvider provider,
+    AppSettings settings,
+    bool isDark,
+  ) {
     return PosCard(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -210,15 +261,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
         children: [
           Row(
             children: [
-              Icon(Icons.attach_money, color: isDark ? AppColors.primaryLight : AppColors.primary),
+              Icon(
+                Icons.attach_money,
+                color: isDark ? AppColors.primaryLight : AppColors.primary,
+              ),
               const SizedBox(width: 10),
-              const Text('Currency & Regional', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              const Text(
+                'Currency & Regional',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
             ],
           ),
           const SizedBox(height: 14),
           DropdownButtonFormField<String>(
             initialValue: settings.currencyCode,
-            decoration: const InputDecoration(labelText: 'Primary Currency', border: OutlineInputBorder()),
+            decoration: const InputDecoration(
+              labelText: 'Primary Currency',
+              border: OutlineInputBorder(),
+            ),
             items: _currencyOptions.map((c) {
               return DropdownMenuItem<String>(
                 value: c['code'],
@@ -227,7 +287,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             }).toList(),
             onChanged: (val) {
               if (val != null) {
-                final match = _currencyOptions.firstWhere((e) => e['code'] == val);
+                final match = _currencyOptions.firstWhere(
+                  (e) => e['code'] == val,
+                );
                 provider.updateCurrency(match['symbol']!, match['code']!);
               }
             },
@@ -237,7 +299,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildPosConfigCard(SettingsProvider provider, AppSettings settings, bool isDark) {
+  Widget _buildPosConfigCard(
+    SettingsProvider provider,
+    AppSettings settings,
+    bool isDark,
+  ) {
     return PosCard(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -245,22 +311,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
         children: [
           Row(
             children: [
-              Icon(Icons.point_of_sale_outlined, color: isDark ? AppColors.primaryLight : AppColors.primary),
+              Icon(
+                Icons.point_of_sale_outlined,
+                color: isDark ? AppColors.primaryLight : AppColors.primary,
+              ),
               const SizedBox(width: 10),
-              const Text('POS Register Behavior', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              const Text(
+                'POS Register Behavior',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
             ],
           ),
           const SizedBox(height: 10),
           SwitchListTile(
             title: const Text('Audio & Haptic Feedback'),
-            subtitle: const Text('Play sound and vibrate when scanning items or parking orders'),
+            subtitle: const Text(
+              'Play sound and vibrate when scanning items or parking orders',
+            ),
             value: settings.enableSound,
             onChanged: (_) => provider.toggleSound(),
             contentPadding: EdgeInsets.zero,
           ),
           SwitchListTile(
             title: const Text('Auto-Print Thermal Receipt'),
-            subtitle: const Text('Automatically generate PDF receipt on successful checkout'),
+            subtitle: const Text(
+              'Automatically generate PDF receipt on successful checkout',
+            ),
             value: settings.autoPrintReceipt,
             onChanged: (_) => provider.toggleAutoPrint(),
             contentPadding: EdgeInsets.zero,
@@ -270,7 +346,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildCrmConfigCard(SettingsProvider provider, AppSettings settings, bool isDark) {
+  Widget _buildCrmConfigCard(
+    SettingsProvider provider,
+    AppSettings settings,
+    bool isDark,
+  ) {
     return PosCard(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -278,17 +358,96 @@ class _SettingsScreenState extends State<SettingsScreen> {
         children: [
           Row(
             children: [
-              Icon(Icons.card_membership_outlined, color: isDark ? AppColors.primaryLight : AppColors.primary),
+              Icon(
+                Icons.card_membership_outlined,
+                color: isDark ? AppColors.primaryLight : AppColors.primary,
+              ),
               const SizedBox(width: 10),
-              const Text('Customer Loyalty Program', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              const Text(
+                'Customer Loyalty Program',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
             ],
           ),
           const SizedBox(height: 10),
           SwitchListTile(
             title: const Text('Enable Loyalty Points'),
-            subtitle: const Text('Earn points on completed transactions for registered clients'),
+            subtitle: const Text(
+              'Earn points on completed transactions for registered clients',
+            ),
             value: settings.enableCustomerLoyalty,
             onChanged: (_) => provider.toggleCustomerLoyalty(),
+            contentPadding: EdgeInsets.zero,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSecurityCard(
+    SettingsProvider provider,
+    AppSettings settings,
+    bool isDark,
+  ) {
+    return PosCard(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.security,
+                color: isDark ? AppColors.primaryLight : AppColors.primary,
+              ),
+              const SizedBox(width: 10),
+              const Text(
+                'Security',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          SwitchListTile(
+            title: const Text('Biometric Login'),
+            subtitle: const Text(
+              'Use Face ID or Fingerprint to unlock the app quickly',
+            ),
+            value: settings.enableBiometrics,
+            onChanged: (val) async {
+              if (val) {
+                // Check if device supports biometrics
+                final hasBio = await LocalAuthService.hasBiometrics();
+                if (!hasBio) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Biometrics not available on this device',
+                        ),
+                      ),
+                    );
+                  }
+                  return;
+                }
+
+                // Prompt user to test it before enabling
+                final authenticated = await LocalAuthService.authenticate();
+                if (authenticated) {
+                  provider.toggleBiometrics();
+                  FeedbackService.success();
+                } else {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Authentication failed')),
+                    );
+                  }
+                }
+              } else {
+                // Just disable
+                provider.toggleBiometrics();
+              }
+            },
             contentPadding: EdgeInsets.zero,
           ),
         ],
@@ -304,23 +463,40 @@ class _SettingsScreenState extends State<SettingsScreen> {
         children: [
           Row(
             children: [
-              Icon(Icons.dataset_outlined, color: isDark ? AppColors.primaryLight : AppColors.primary),
+              Icon(
+                Icons.dataset_outlined,
+                color: isDark ? AppColors.primaryLight : AppColors.primary,
+              ),
               const SizedBox(width: 10),
-              const Text('Sample Catalog & Seed Data', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              const Text(
+                'Sample Catalog & Seed Data',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
             ],
           ),
           const SizedBox(height: 8),
           Text(
             'Need realistic catalog products for testing? Load pre-configured items with categories, barcodes, and prices in one tap.',
-            style: TextStyle(fontSize: 13, color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+            style: TextStyle(
+              fontSize: 13,
+              color: isDark
+                  ? AppColors.darkTextSecondary
+                  : AppColors.lightTextSecondary,
+            ),
           ),
           const SizedBox(height: 12),
           ElevatedButton.icon(
             onPressed: _isSeeding ? null : _seedDemoData,
             icon: _isSeeding
-                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
                 : const Icon(Icons.auto_awesome),
-            label: Text(_isSeeding ? 'Loading Catalog...' : 'Load Sample Retail Catalog'),
+            label: Text(
+              _isSeeding ? 'Loading Catalog...' : 'Load Sample Retail Catalog',
+            ),
           ),
         ],
       ),
@@ -335,15 +511,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
         children: [
           Row(
             children: [
-              Icon(Icons.info_outline, color: isDark ? AppColors.primaryLight : AppColors.primary),
+              Icon(
+                Icons.info_outline,
+                color: isDark ? AppColors.primaryLight : AppColors.primary,
+              ),
               const SizedBox(width: 10),
-              const Text('About POS Enterprise', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              const Text(
+                'About POS Enterprise',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
             ],
           ),
           const SizedBox(height: 8),
           Text(
             'Version 2.0.0 (Native Dart Architecture)\nDesigned for high-throughput retail stores and tablets with zero lag and offline cache support.',
-            style: TextStyle(fontSize: 12, color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+            style: TextStyle(
+              fontSize: 12,
+              color: isDark
+                  ? AppColors.darkTextSecondary
+                  : AppColors.lightTextSecondary,
+            ),
           ),
         ],
       ),
@@ -359,12 +546,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
             context: context,
             builder: (ctx) => AlertDialog(
               title: const Text('Log Out'),
-              content: const Text('Are you sure you want to sign out of this POS terminal?'),
+              content: const Text(
+                'Are you sure you want to sign out of this POS terminal?',
+              ),
               actions: [
-                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('Cancel'),
+                ),
                 ElevatedButton(
                   onPressed: () => Navigator.pop(ctx, true),
-                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.error,
+                  ),
                   child: const Text('Sign Out'),
                 ),
               ],
@@ -387,7 +581,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           padding: const EdgeInsets.symmetric(vertical: 14),
         ),
         icon: const Icon(Icons.logout, color: Colors.white),
-        label: const Text('Sign Out Terminal', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        label: const Text(
+          'Sign Out Terminal',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
       ),
     );
   }
@@ -399,7 +596,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         title: const Text('Reset Settings'),
         content: const Text('Restore default application settings?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
           ElevatedButton(
             onPressed: () async {
               await provider.resetToDefault();

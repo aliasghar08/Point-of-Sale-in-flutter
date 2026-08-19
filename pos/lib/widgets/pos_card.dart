@@ -27,7 +27,8 @@ class PosCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = backgroundColor ?? (isDark ? AppColors.darkCard : AppColors.lightCard);
+    final bg =
+        backgroundColor ?? (isDark ? AppColors.darkCard : AppColors.lightCard);
     final defaultBorder = Border.all(
       color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
       width: 1,

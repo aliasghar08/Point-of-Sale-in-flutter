@@ -10,7 +10,7 @@ class ReceiptDialog extends StatelessWidget {
   final double totalProfit;
   final String selectedPaymentMethod;
   final String receiptNumber;
-  
+
   // ✅ Customer Info
   final String customerName;
   final String customerPhone;
@@ -32,7 +32,10 @@ class ReceiptDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final settingsProvider = Provider.of<SettingsProvider>(context, listen: false);
+    final settingsProvider = Provider.of<SettingsProvider>(
+      context,
+      listen: false,
+    );
     final currencySymbol = settingsProvider.currencySymbol;
     final showProfit = settingsProvider.showProfitInPOS;
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
@@ -73,7 +76,7 @@ class ReceiptDialog extends StatelessWidget {
                 fontSize: 12,
               ),
             ),
-            
+
             // ✅ Customer Info Section
             const SizedBox(height: 4),
             if (!isGuestCustomer) ...[
@@ -89,7 +92,9 @@ class ReceiptDialog extends StatelessWidget {
                 Text(
                   'Phone: $customerPhone',
                   style: TextStyle(
-                    color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                    color: isDarkMode
+                        ? Colors.grey.shade400
+                        : Colors.grey.shade600,
                     fontSize: 12,
                   ),
                 ),
@@ -97,7 +102,9 @@ class ReceiptDialog extends StatelessWidget {
                 Text(
                   'Email: $customerEmail',
                   style: TextStyle(
-                    color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                    color: isDarkMode
+                        ? Colors.grey.shade400
+                        : Colors.grey.shade600,
                     fontSize: 12,
                   ),
                 ),
@@ -105,21 +112,25 @@ class ReceiptDialog extends StatelessWidget {
               Text(
                 'Customer: Guest',
                 style: TextStyle(
-                  color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                  color: isDarkMode
+                      ? Colors.grey.shade400
+                      : Colors.grey.shade600,
                   fontSize: 12,
                 ),
               ),
-            
+
             const Divider(),
             const SizedBox(height: 8),
-            
+
             // Items List
             if (cartItems.isEmpty)
               Center(
                 child: Text(
                   'No items in receipt',
                   style: TextStyle(
-                    color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                    color: isDarkMode
+                        ? Colors.grey.shade400
+                        : Colors.grey.shade600,
                   ),
                 ),
               )
@@ -151,9 +162,9 @@ class ReceiptDialog extends StatelessWidget {
                   ),
                 ),
               ),
-            
+
             const Divider(),
-            
+
             // Total
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -176,7 +187,7 @@ class ReceiptDialog extends StatelessWidget {
                 ),
               ],
             ),
-            
+
             // Profit (if enabled)
             if (showProfit) ...[
               const SizedBox(height: 4),
@@ -186,14 +197,18 @@ class ReceiptDialog extends StatelessWidget {
                   Text(
                     'Profit:',
                     style: TextStyle(
-                      color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                      color: isDarkMode
+                          ? Colors.grey.shade400
+                          : Colors.grey.shade600,
                       fontSize: 14,
                     ),
                   ),
                   Text(
                     '$currencySymbol${totalProfit.toStringAsFixed(2)}',
                     style: TextStyle(
-                      color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+                      color: isDarkMode
+                          ? Colors.blue.shade400
+                          : Colors.blue.shade700,
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
                     ),
@@ -201,7 +216,7 @@ class ReceiptDialog extends StatelessWidget {
                 ],
               ),
             ],
-            
+
             // Payment Method
             const SizedBox(height: 4),
             Row(
@@ -210,14 +225,18 @@ class ReceiptDialog extends StatelessWidget {
                 Text(
                   'Payment:',
                   style: TextStyle(
-                    color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                    color: isDarkMode
+                        ? Colors.grey.shade400
+                        : Colors.grey.shade600,
                     fontSize: 14,
                   ),
                 ),
                 Text(
                   selectedPaymentMethod,
                   style: TextStyle(
-                    color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                    color: isDarkMode
+                        ? Colors.grey.shade400
+                        : Colors.grey.shade600,
                     fontSize: 14,
                   ),
                 ),
@@ -246,7 +265,9 @@ class ReceiptDialog extends StatelessWidget {
           icon: const Icon(Icons.print),
           label: const Text('Print'),
           style: ElevatedButton.styleFrom(
-            backgroundColor: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+            backgroundColor: isDarkMode
+                ? Colors.blue.shade400
+                : Colors.blue.shade700,
             foregroundColor: Colors.white,
           ),
         ),

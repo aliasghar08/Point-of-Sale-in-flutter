@@ -15,11 +15,7 @@ class AppDrawer extends StatelessWidget {
   final int currentIndex;
   final Function(int)? onItemSelected;
 
-  const AppDrawer({
-    super.key,
-    required this.currentIndex,
-    this.onItemSelected,
-  });
+  const AppDrawer({super.key, required this.currentIndex, this.onItemSelected});
 
   @override
   Widget build(BuildContext context) {
@@ -46,7 +42,9 @@ class AppDrawer extends StatelessWidget {
               bottom: 20,
             ),
             decoration: BoxDecoration(
-              gradient: isDark ? AppColors.darkCardGradient : AppColors.primaryGradient,
+              gradient: isDark
+                  ? AppColors.darkCardGradient
+                  : AppColors.primaryGradient,
               borderRadius: const BorderRadius.only(
                 bottomLeft: Radius.circular(24),
                 bottomRight: Radius.circular(24),
@@ -74,7 +72,9 @@ class AppDrawer extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.bold,
-                          color: isDark ? AppColors.primaryLight : AppColors.primary,
+                          color: isDark
+                              ? AppColors.primaryLight
+                              : AppColors.primary,
                         ),
                       ),
                     ),
@@ -112,7 +112,10 @@ class AppDrawer extends StatelessWidget {
                 Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(12),
@@ -129,7 +132,10 @@ class AppDrawer extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(12),
@@ -137,7 +143,11 @@ class AppDrawer extends StatelessWidget {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.currency_exchange, size: 12, color: Colors.white),
+                          const Icon(
+                            Icons.currency_exchange,
+                            size: 12,
+                            color: Colors.white,
+                          ),
                           const SizedBox(width: 4),
                           Text(
                             settingsProvider.currencySymbol,
@@ -187,7 +197,9 @@ class AppDrawer extends StatelessWidget {
                     Navigator.pop(context);
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const SalesHistoryScreen()),
+                      MaterialPageRoute(
+                        builder: (_) => const SalesHistoryScreen(),
+                      ),
                     );
                   },
                 ),
@@ -244,19 +256,27 @@ class AppDrawer extends StatelessWidget {
                 ),
                 ListTile(
                   leading: Icon(
-                    themeProvider.isDarkMode ? Icons.light_mode : Icons.dark_mode,
+                    themeProvider.isDarkMode
+                        ? Icons.light_mode
+                        : Icons.dark_mode,
                     color: isDark ? AppColors.warning : AppColors.primary,
                     size: 22,
                   ),
                   title: Text(
-                    themeProvider.isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode',
+                    themeProvider.isDarkMode
+                        ? 'Switch to Light Mode'
+                        : 'Switch to Dark Mode',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
-                      color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                      color: isDark
+                          ? AppColors.darkTextPrimary
+                          : AppColors.lightTextPrimary,
                     ),
                   ),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                   onTap: () => themeProvider.toggleTheme(),
                 ),
               ],
@@ -274,7 +294,11 @@ class AppDrawer extends StatelessWidget {
               ),
             ),
             child: ListTile(
-              leading: const Icon(Icons.logout, color: AppColors.error, size: 22),
+              leading: const Icon(
+                Icons.logout,
+                color: AppColors.error,
+                size: 22,
+              ),
               title: const Text(
                 'Sign Out',
                 style: TextStyle(
@@ -283,7 +307,9 @@ class AppDrawer extends StatelessWidget {
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
               tileColor: AppColors.error.withValues(alpha: isDark ? 0.1 : 0.06),
               onTap: () => _handleLogout(context, authProvider, isDark),
             ),
@@ -311,7 +337,9 @@ class AppDrawer extends StatelessWidget {
           icon,
           color: isSelected
               ? (isDark ? Colors.white : primaryColor)
-              : (isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+              : (isDark
+                    ? AppColors.darkTextSecondary
+                    : AppColors.lightTextSecondary),
           size: 22,
         ),
         title: Text(
@@ -321,7 +349,9 @@ class AppDrawer extends StatelessWidget {
             fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
             color: isSelected
                 ? (isDark ? Colors.white : primaryColor)
-                : (isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary),
+                : (isDark
+                      ? AppColors.darkTextPrimary
+                      : AppColors.lightTextPrimary),
           ),
         ),
         selected: isSelected,
@@ -341,12 +371,18 @@ class AppDrawer extends StatelessWidget {
     }
   }
 
-  Future<void> _handleLogout(BuildContext context, AuthProvider authProvider, bool isDark) async {
+  Future<void> _handleLogout(
+    BuildContext context,
+    AuthProvider authProvider,
+    bool isDark,
+  ) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Sign Out'),
-        content: const Text('Are you sure you want to sign out from the POS system?'),
+        content: const Text(
+          'Are you sure you want to sign out from the POS system?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),

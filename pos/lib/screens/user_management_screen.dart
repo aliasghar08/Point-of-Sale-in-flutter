@@ -65,29 +65,32 @@ class _UserManagementContentState extends State<_UserManagementContent> {
       }
 
       final appUser = await _authService.getCurrentUserData();
-      
-      if (appUser != null && (appUser.role == 'owner' || appUser.role == 'manager')) {
+
+      if (appUser != null &&
+          (appUser.role == 'owner' || appUser.role == 'manager')) {
         _businessId = appUser.businessId;
         _isOwner = appUser.role == 'owner';
-        
+
         if (_businessId == null || _businessId!.isEmpty) {
           setState(() {
-            _errorMessage = 'You are not associated with any business. Please contact support.';
+            _errorMessage =
+                'You are not associated with any business. Please contact support.';
             _isLoading = false;
           });
           return;
         }
-        
+
         setState(() {
           _hasPermission = true;
           _errorMessage = null;
           _isLoading = false;
         });
-        
+
         _loadBusinessUsers();
       } else {
         setState(() {
-          _errorMessage = 'You need owner or manager permissions to access this screen. Your role: ${appUser?.role ?? 'unknown'}';
+          _errorMessage =
+              'You need owner or manager permissions to access this screen. Your role: ${appUser?.role ?? 'unknown'}';
           _isLoading = false;
         });
       }
@@ -103,14 +106,14 @@ class _UserManagementContentState extends State<_UserManagementContent> {
   // ========== LOAD BUSINESS USERS ==========
   Future<void> _loadBusinessUsers() async {
     if (_businessId == null) return;
-    
+
     setState(() {
       _isLoadingUsers = true;
     });
 
     try {
       final users = await _firebaseService.getBusinessUsers(_businessId!);
-      
+
       final appUsers = users.map((userData) {
         return AppUser(
           id: userData['id'] ?? '',
@@ -119,16 +122,17 @@ class _UserManagementContentState extends State<_UserManagementContent> {
           role: userData['role'] ?? 'worker',
           phone: userData['phone'] ?? '',
           businessId: _businessId,
-          createdAt: (userData['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+          createdAt:
+              (userData['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
           isActive: userData['isActive'] ?? true,
         );
       }).toList();
-      
+
       appUsers.sort((a, b) {
         final roleOrder = {'owner': 0, 'manager': 1, 'worker': 2};
         return (roleOrder[a.role] ?? 3).compareTo(roleOrder[b.role] ?? 3);
       });
-      
+
       setState(() {
         _businessUsers = appUsers;
         _isLoadingUsers = false;
@@ -149,7 +153,9 @@ class _UserManagementContentState extends State<_UserManagementContent> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('User Management'),
-        backgroundColor: isDarkMode ? Colors.blue.shade800 : Colors.blue.shade700,
+        backgroundColor: isDarkMode
+            ? Colors.blue.shade800
+            : Colors.blue.shade700,
         foregroundColor: Colors.white,
         elevation: 0,
       ),
@@ -160,15 +166,17 @@ class _UserManagementContentState extends State<_UserManagementContent> {
               ),
             )
           : _errorMessage != null
-              ? _buildErrorScreen(isDarkMode)
-              : _hasPermission
-                  ? _buildUserList(isDarkMode)
-                  : _buildPermissionDeniedScreen(isDarkMode),
+          ? _buildErrorScreen(isDarkMode)
+          : _hasPermission
+          ? _buildUserList(isDarkMode)
+          : _buildPermissionDeniedScreen(isDarkMode),
       // ✅ ADDED: Floating Action Button so users can always be added
       floatingActionButton: (_hasPermission && !_isLoading && !_isLoadingUsers)
           ? FloatingActionButton.extended(
               onPressed: () => _showAddUserDialog(context),
-              backgroundColor: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+              backgroundColor: isDarkMode
+                  ? Colors.blue.shade400
+                  : Colors.blue.shade700,
               foregroundColor: Colors.white,
               icon: const Icon(Icons.person_add),
               label: const Text('Add User'),
@@ -214,7 +222,9 @@ class _UserManagementContentState extends State<_UserManagementContent> {
               icon: const Icon(Icons.refresh),
               label: const Text('Retry'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+                backgroundColor: isDarkMode
+                    ? Colors.blue.shade400
+                    : Colors.blue.shade700,
                 foregroundColor: Colors.white,
               ),
             ),
@@ -261,7 +271,9 @@ class _UserManagementContentState extends State<_UserManagementContent> {
               icon: const Icon(Icons.refresh),
               label: const Text('Retry'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+                backgroundColor: isDarkMode
+                    ? Colors.blue.shade400
+                    : Colors.blue.shade700,
                 foregroundColor: Colors.white,
               ),
             ),
@@ -312,30 +324,43 @@ class _UserManagementContentState extends State<_UserManagementContent> {
             constraints: const BoxConstraints(maxWidth: 1000),
             child: isWide
                 ? GridView.builder(
-                    padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 80),
-                    gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                      maxCrossAxisExtent: 450,
-                      mainAxisExtent: 130,
-                      crossAxisSpacing: 16,
-                      mainAxisSpacing: 12,
+                    padding: const EdgeInsets.only(
+                      left: 16,
+                      right: 16,
+                      top: 16,
+                      bottom: 80,
                     ),
+                    gridDelegate:
+                        const SliverGridDelegateWithMaxCrossAxisExtent(
+                          maxCrossAxisExtent: 450,
+                          mainAxisExtent: 130,
+                          crossAxisSpacing: 16,
+                          mainAxisSpacing: 12,
+                        ),
                     itemCount: _businessUsers.length,
                     itemBuilder: (context, index) {
                       final user = _businessUsers[index];
                       return InkWell(
-                        onTap: () => _showUserDetailsDialog(context, user, isDarkMode),
+                        onTap: () =>
+                            _showUserDetailsDialog(context, user, isDarkMode),
                         borderRadius: BorderRadius.circular(12),
                         child: _buildUserCard(context, user, isDarkMode),
                       );
                     },
                   )
                 : ListView.builder(
-                    padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 80),
+                    padding: const EdgeInsets.only(
+                      left: 16,
+                      right: 16,
+                      top: 16,
+                      bottom: 80,
+                    ),
                     itemCount: _businessUsers.length,
                     itemBuilder: (context, index) {
                       final user = _businessUsers[index];
                       return InkWell(
-                        onTap: () => _showUserDetailsDialog(context, user, isDarkMode),
+                        onTap: () =>
+                            _showUserDetailsDialog(context, user, isDarkMode),
                         borderRadius: BorderRadius.circular(12),
                         child: _buildUserCard(context, user, isDarkMode),
                       );
@@ -351,7 +376,8 @@ class _UserManagementContentState extends State<_UserManagementContent> {
   bool _canManageUser(AppUser targetUser, bool isCurrentUser) {
     if (isCurrentUser) return false; // Can't delete/edit yourself here
     if (_isOwner) return true; // Owner can manage anyone else
-    if (targetUser.role == 'worker') return true; // Managers can only manage workers
+    if (targetUser.role == 'worker')
+      return true; // Managers can only manage workers
     return false;
   }
 
@@ -361,13 +387,13 @@ class _UserManagementContentState extends State<_UserManagementContent> {
     final isCurrentUser = authProvider.currentUser?.id == user.id;
     final canManage = _canManageUser(user, isCurrentUser);
 
-    final initial = user.name.isNotEmpty ? user.name.substring(0, 1).toUpperCase() : 'U';
+    final initial = user.name.isNotEmpty
+        ? user.name.substring(0, 1).toUpperCase()
+        : 'U';
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       color: isDarkMode ? Colors.grey.shade800 : Colors.white,
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -403,7 +429,9 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                   Text(
                     user.email,
                     style: TextStyle(
-                      color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                      color: isDarkMode
+                          ? Colors.grey.shade400
+                          : Colors.grey.shade600,
                       fontSize: 14,
                     ),
                   ),
@@ -411,7 +439,9 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                     Text(
                       user.phone,
                       style: TextStyle(
-                        color: isDarkMode ? Colors.grey.shade500 : Colors.grey.shade500,
+                        color: isDarkMode
+                            ? Colors.grey.shade500
+                            : Colors.grey.shade500,
                         fontSize: 12,
                       ),
                     ),
@@ -426,7 +456,10 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: _getRoleColor(user.role, isDarkMode).withValues(alpha: 0.2),
+                          color: _getRoleColor(
+                            user.role,
+                            isDarkMode,
+                          ).withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
@@ -453,7 +486,9 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                           child: Text(
                             'Inactive',
                             style: TextStyle(
-                              color: isDarkMode ? Colors.red.shade400 : Colors.red,
+                              color: isDarkMode
+                                  ? Colors.red.shade400
+                                  : Colors.red,
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
                             ),
@@ -474,7 +509,9 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                           child: Text(
                             'You',
                             style: TextStyle(
-                              color: isDarkMode ? Colors.blue.shade400 : Colors.blue,
+                              color: isDarkMode
+                                  ? Colors.blue.shade400
+                                  : Colors.blue,
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
                             ),
@@ -516,12 +553,16 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                           Icon(
                             Icons.edit,
                             size: 20,
-                            color: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+                            color: isDarkMode
+                                ? Colors.blue.shade400
+                                : Colors.blue.shade700,
                           ),
                           const SizedBox(width: 8),
                           Text(
                             'Edit Role',
-                            style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                            style: TextStyle(
+                              color: isDarkMode ? Colors.white : Colors.black,
+                            ),
                           ),
                         ],
                       ),
@@ -535,12 +576,16 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                           size: 20,
                           color: user.isActive
                               ? (isDarkMode ? Colors.red.shade400 : Colors.red)
-                              : (isDarkMode ? Colors.green.shade400 : Colors.green),
+                              : (isDarkMode
+                                    ? Colors.green.shade400
+                                    : Colors.green),
                         ),
                         const SizedBox(width: 8),
                         Text(
                           user.isActive ? 'Deactivate' : 'Activate',
-                          style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                          style: TextStyle(
+                            color: isDarkMode ? Colors.white : Colors.black,
+                          ),
                         ),
                       ],
                     ),
@@ -557,7 +602,11 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                         const SizedBox(width: 8),
                         Text(
                           'Delete',
-                          style: TextStyle(color: isDarkMode ? Colors.red.shade400 : Colors.red),
+                          style: TextStyle(
+                            color: isDarkMode
+                                ? Colors.red.shade400
+                                : Colors.red,
+                          ),
                         ),
                       ],
                     ),
@@ -578,7 +627,11 @@ class _UserManagementContentState extends State<_UserManagementContent> {
   }
 
   // ========== USER DETAILS DIALOG ==========
-  void _showUserDetailsDialog(BuildContext context, AppUser user, bool isDarkMode) {
+  void _showUserDetailsDialog(
+    BuildContext context,
+    AppUser user,
+    bool isDarkMode,
+  ) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -590,7 +643,9 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                   : (isDarkMode ? Colors.red.shade900 : Colors.red.shade100),
               radius: 24,
               child: Text(
-                user.name.isNotEmpty ? user.name.substring(0, 1).toUpperCase() : 'U',
+                user.name.isNotEmpty
+                    ? user.name.substring(0, 1).toUpperCase()
+                    : 'U',
                 style: TextStyle(
                   color: user.isActive
                       ? (isDarkMode ? Colors.green.shade400 : Colors.green)
@@ -656,7 +711,9 @@ class _UserManagementContentState extends State<_UserManagementContent> {
               _buildDetailItem(
                 icon: Icons.calendar_today,
                 label: 'Joined',
-                value: DateFormat('dd MMM yyyy, hh:mm a').format(user.createdAt),
+                value: DateFormat(
+                  'dd MMM yyyy, hh:mm a',
+                ).format(user.createdAt),
                 isDarkMode: isDarkMode,
               ),
               _buildDetailItem(
@@ -717,7 +774,9 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                   label,
                   style: TextStyle(
                     fontSize: 12,
-                    color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                    color: isDarkMode
+                        ? Colors.grey.shade400
+                        : Colors.grey.shade600,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -726,8 +785,12 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                   value,
                   style: TextStyle(
                     fontSize: isMultiline ? 13 : 14,
-                    fontWeight: isMultiline ? FontWeight.normal : FontWeight.w500,
-                    color: valueColor ?? (isDarkMode ? Colors.white : Colors.black),
+                    fontWeight: isMultiline
+                        ? FontWeight.normal
+                        : FontWeight.w500,
+                    color:
+                        valueColor ??
+                        (isDarkMode ? Colors.white : Colors.black),
                     fontFamily: isCode ? 'monospace' : null,
                   ),
                 ),
@@ -741,12 +804,12 @@ class _UserManagementContentState extends State<_UserManagementContent> {
 
   String _getPermissionsList(AppUser user) {
     List<String> permissions = [];
-    
+
     if (user.canProcessSales) permissions.add('Process Sales');
     if (user.canManageInventory) permissions.add('Manage Inventory');
     if (user.canViewReports) permissions.add('View Reports');
     if (user.canManageUsers) permissions.add('Manage Users');
-    
+
     return permissions.isEmpty ? 'No permissions' : permissions.join('\n• ');
   }
 
@@ -771,9 +834,11 @@ class _UserManagementContentState extends State<_UserManagementContent> {
     final emailController = TextEditingController();
     final passwordController = TextEditingController();
     final phoneController = TextEditingController();
-    
+
     // ✅ Set available roles based on current user's role
-    final List<String> availableRoles = _isOwner ? ['worker', 'manager'] : ['worker'];
+    final List<String> availableRoles = _isOwner
+        ? ['worker', 'manager']
+        : ['worker'];
     String selectedRole = availableRoles.first;
 
     showDialog(
@@ -793,30 +858,41 @@ class _UserManagementContentState extends State<_UserManagementContent> {
               children: [
                 TextFormField(
                   controller: nameController,
-                  style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.white : Colors.black,
+                  ),
                   decoration: InputDecoration(
                     labelText: 'Full Name *',
-                    labelStyle: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                    labelStyle: TextStyle(
+                      color: isDarkMode ? Colors.white : Colors.black,
+                    ),
                     border: const OutlineInputBorder(),
                     fillColor: isDarkMode ? Colors.grey.shade700 : Colors.white,
                     filled: true,
                   ),
-                  validator: (value) => (value == null || value.isEmpty) ? 'Please enter name' : null,
+                  validator: (value) => (value == null || value.isEmpty)
+                      ? 'Please enter name'
+                      : null,
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: emailController,
-                  style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.white : Colors.black,
+                  ),
                   decoration: InputDecoration(
                     labelText: 'Email *',
-                    labelStyle: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                    labelStyle: TextStyle(
+                      color: isDarkMode ? Colors.white : Colors.black,
+                    ),
                     border: const OutlineInputBorder(),
                     fillColor: isDarkMode ? Colors.grey.shade700 : Colors.white,
                     filled: true,
                   ),
                   keyboardType: TextInputType.emailAddress,
                   validator: (value) {
-                    if (value == null || value.isEmpty) return 'Please enter email';
+                    if (value == null || value.isEmpty)
+                      return 'Please enter email';
                     if (!value.contains('@')) return 'Please enter valid email';
                     return null;
                   },
@@ -824,28 +900,38 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: passwordController,
-                  style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.white : Colors.black,
+                  ),
                   decoration: InputDecoration(
                     labelText: 'Temporary Password *',
-                    labelStyle: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                    labelStyle: TextStyle(
+                      color: isDarkMode ? Colors.white : Colors.black,
+                    ),
                     border: const OutlineInputBorder(),
                     fillColor: isDarkMode ? Colors.grey.shade700 : Colors.white,
                     filled: true,
                   ),
                   obscureText: true,
                   validator: (value) {
-                    if (value == null || value.isEmpty) return 'Please enter password';
-                    if (value.length < 6) return 'Password must be at least 6 characters';
+                    if (value == null || value.isEmpty)
+                      return 'Please enter password';
+                    if (value.length < 6)
+                      return 'Password must be at least 6 characters';
                     return null;
                   },
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: phoneController,
-                  style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.white : Colors.black,
+                  ),
                   decoration: InputDecoration(
                     labelText: 'Phone Number',
-                    labelStyle: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                    labelStyle: TextStyle(
+                      color: isDarkMode ? Colors.white : Colors.black,
+                    ),
                     border: const OutlineInputBorder(),
                     fillColor: isDarkMode ? Colors.grey.shade700 : Colors.white,
                     filled: true,
@@ -859,12 +945,18 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                     labelText: 'Role *',
                     border: OutlineInputBorder(),
                   ),
-                  dropdownColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
-                  style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                  dropdownColor: isDarkMode
+                      ? Colors.grey.shade800
+                      : Colors.white,
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.white : Colors.black,
+                  ),
                   items: availableRoles.map((role) {
                     return DropdownMenuItem(
                       value: role,
-                      child: Text(role[0].toUpperCase() + role.substring(1)), // Capitalize
+                      child: Text(
+                        role[0].toUpperCase() + role.substring(1),
+                      ), // Capitalize
                     );
                   }).toList(),
                   onChanged: (value) => selectedRole = value!,
@@ -886,7 +978,10 @@ class _UserManagementContentState extends State<_UserManagementContent> {
               if (formKey.currentState?.validate() ?? false) {
                 try {
                   // ✅ Generate a valid ID so Firestore doesn't crash on document('')
-                  final newUserId = FirebaseFirestore.instance.collection('users').doc().id;
+                  final newUserId = FirebaseFirestore.instance
+                      .collection('users')
+                      .doc()
+                      .id;
                   final nav = Navigator.of(context);
                   await _firebaseService.addUserToBusiness(
                     userId: newUserId,
@@ -896,19 +991,27 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                     phone: phoneController.text.trim(),
                     businessId: _businessId!,
                   );
-                  
+
                   if (mounted) {
                     nav.pop();
-                    _showSnackBar('✅ User added successfully! They must use the temporary password to log in.', isError: false);
+                    _showSnackBar(
+                      '✅ User added successfully! They must use the temporary password to log in.',
+                      isError: false,
+                    );
                     _loadBusinessUsers();
                   }
                 } catch (e) {
-                  _showSnackBar('Error: ${e.toString().replaceFirst('Exception: ', '')}', isError: true);
+                  _showSnackBar(
+                    'Error: ${e.toString().replaceFirst('Exception: ', '')}',
+                    isError: true,
+                  );
                 }
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+              backgroundColor: isDarkMode
+                  ? Colors.blue.shade400
+                  : Colors.blue.shade700,
               foregroundColor: Colors.white,
             ),
             child: const Text('Add User'),
@@ -921,7 +1024,10 @@ class _UserManagementContentState extends State<_UserManagementContent> {
   // ========== EDIT USER ROLE DIALOG (Only for Owner) ==========
   void _showEditUserDialog(BuildContext context, AppUser user) {
     if (!_isOwner) {
-      _showSnackBar('Only the business owner can edit user roles.', isError: true);
+      _showSnackBar(
+        'Only the business owner can edit user roles.',
+        isError: true,
+      );
       return;
     }
 
@@ -967,7 +1073,9 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                   value: role,
                   child: Text(
                     role.toUpperCase(),
-                    style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                    style: TextStyle(
+                      color: isDarkMode ? Colors.white : Colors.black,
+                    ),
                   ),
                 );
               }).toList(),
@@ -992,18 +1100,26 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                   userId: user.id,
                   newRole: selectedRole,
                 );
-                
+
                 if (mounted) {
                   nav.pop();
-                  _showSnackBar('✅ User role updated successfully!', isError: false);
+                  _showSnackBar(
+                    '✅ User role updated successfully!',
+                    isError: false,
+                  );
                   _loadBusinessUsers();
                 }
               } catch (e) {
-                _showSnackBar('Error: ${e.toString().replaceFirst('Exception: ', '')}', isError: true);
+                _showSnackBar(
+                  'Error: ${e.toString().replaceFirst('Exception: ', '')}',
+                  isError: true,
+                );
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700,
+              backgroundColor: isDarkMode
+                  ? Colors.blue.shade400
+                  : Colors.blue.shade700,
               foregroundColor: Colors.white,
             ),
             child: const Text('Update'),
@@ -1048,19 +1164,22 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                   userId: user.id,
                   isActive: !user.isActive,
                 );
-                
+
                 if (mounted) {
                   nav.pop();
                   _showSnackBar(
-                    user.isActive 
-                        ? '✅ User deactivated successfully!' 
+                    user.isActive
+                        ? '✅ User deactivated successfully!'
                         : '✅ User activated successfully!',
                     isError: false,
                   );
                   _loadBusinessUsers();
                 }
               } catch (e) {
-                _showSnackBar('Error: ${e.toString().replaceFirst('Exception: ', '')}', isError: true);
+                _showSnackBar(
+                  'Error: ${e.toString().replaceFirst('Exception: ', '')}',
+                  isError: true,
+                );
               }
             },
             style: ElevatedButton.styleFrom(
@@ -1108,18 +1227,23 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                   businessId: _businessId!,
                   userId: user.id,
                 );
-                
+
                 if (mounted) {
                   nav.pop();
                   _showSnackBar('✅ User deleted successfully!', isError: false);
                   _loadBusinessUsers();
                 }
               } catch (e) {
-                _showSnackBar('Error: ${e.toString().replaceFirst('Exception: ', '')}', isError: true);
+                _showSnackBar(
+                  'Error: ${e.toString().replaceFirst('Exception: ', '')}',
+                  isError: true,
+                );
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: isDarkMode ? Colors.red.shade400 : Colors.red.shade700,
+              backgroundColor: isDarkMode
+                  ? Colors.red.shade400
+                  : Colors.red.shade700,
               foregroundColor: Colors.white,
             ),
             child: const Text('Delete'),
@@ -1132,7 +1256,7 @@ class _UserManagementContentState extends State<_UserManagementContent> {
   // ========== SNACKBAR ==========
   void _showSnackBar(String message, {bool isError = false}) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(

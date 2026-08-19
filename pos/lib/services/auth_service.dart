@@ -34,7 +34,7 @@ class AuthService {
       if (user == null) throw Exception('Failed to create user');
 
       final uid = user.uid;
-      
+
       // Update Firebase Auth profile
       await user.updateDisplayName(name);
 
@@ -52,7 +52,9 @@ class AuthService {
           'isActive': true,
         };
 
-        businessRef = await _firestore.collection('businesses').add(businessData);
+        businessRef = await _firestore
+            .collection('businesses')
+            .add(businessData);
         businessId = businessRef.id;
 
         // Create default business settings ONLY for the new business
@@ -72,7 +74,9 @@ class AuthService {
 
         if (businessQuery.docs.isEmpty) {
           // If they somehow bypass the UI validation, catch it here
-          throw Exception('Business "$storeName" not found. Please check spelling or contact the owner.');
+          throw Exception(
+            'Business "$storeName" not found. Please check spelling or contact the owner.',
+          );
         }
 
         businessId = businessQuery.docs.first.id;
@@ -171,7 +175,7 @@ class AuthService {
       }
 
       var data = userDoc.data() as Map<String, dynamic>;
-      
+
       // Check if user is active
       if (data['isActive'] == false) {
         await _auth.signOut();
@@ -229,9 +233,15 @@ class AuthService {
   }
 
   // ✅ UPDATED: Update user profile safely across all collections
-  Future<void> updateUserProfile(String userId, Map<String, dynamic> data) async {
+  Future<void> updateUserProfile(
+    String userId,
+    Map<String, dynamic> data,
+  ) async {
     try {
-      final lookupDoc = await _firestore.collection('userBusinessLookup').doc(userId).get();
+      final lookupDoc = await _firestore
+          .collection('userBusinessLookup')
+          .doc(userId)
+          .get();
       if (!lookupDoc.exists) throw Exception('User not found');
 
       final businessId = lookupDoc.data()?['businessId'] as String;
@@ -245,7 +255,7 @@ class AuthService {
           .collection('members')
           .doc(userId)
           .update(data);
-          
+
       // Keep root users in sync
       await _firestore.collection('users').doc(userId).update(data);
     } catch (e) {
@@ -264,7 +274,7 @@ class AuthService {
 
     // Use the optimized FirebaseService method
     final rawUsers = await _firebaseService.getBusinessUsers(businessId);
-    
+
     return rawUsers.map((data) {
       data['businessId'] = businessId;
       return AppUser.fromMap(data, data['id']);
@@ -274,24 +284,24 @@ class AuthService {
   Future<void> updateUserRole(String userId, String newRole) async {
     final businessId = await _firebaseService.getCurrentBusinessId();
     if (businessId == null) throw Exception('Business not found');
-    
+
     // Delegate to FirebaseService
     await _firebaseService.updateUserRoleInBusiness(
-      businessId: businessId, 
-      userId: userId, 
-      newRole: newRole
+      businessId: businessId,
+      userId: userId,
+      newRole: newRole,
     );
   }
 
   Future<void> toggleUserActive(String userId, bool isActive) async {
     final businessId = await _firebaseService.getCurrentBusinessId();
     if (businessId == null) throw Exception('Business not found');
-    
+
     // Delegate to FirebaseService
     await _firebaseService.toggleUserActiveInBusiness(
-      businessId: businessId, 
-      userId: userId, 
-      isActive: isActive
+      businessId: businessId,
+      userId: userId,
+      isActive: isActive,
     );
   }
 

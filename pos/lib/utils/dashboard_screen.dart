@@ -68,7 +68,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(_getTitle()),
-        backgroundColor: isDarkMode ? Colors.blue.shade800 : Colors.blue.shade700,
+        backgroundColor: isDarkMode
+            ? Colors.blue.shade800
+            : Colors.blue.shade700,
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [

@@ -16,11 +16,14 @@ class AppSettings {
   final bool enableOfflineMode;
   final bool autoSyncData;
   final bool autoDetectCurrency;
-  
+
   // ✅ Customer related settings
   final bool enableCustomerLoyalty;
   final bool requireCustomerInfo;
   final int pointsPerCurrency;
+
+  // ✅ Security settings
+  final bool enableBiometrics;
 
   AppSettings({
     this.currencySymbol = 'Rs',
@@ -40,6 +43,7 @@ class AppSettings {
     this.enableCustomerLoyalty = true,
     this.requireCustomerInfo = false,
     this.pointsPerCurrency = 1,
+    this.enableBiometrics = false,
   });
 
   Map<String, dynamic> toMap() {
@@ -61,6 +65,7 @@ class AppSettings {
       'enableCustomerLoyalty': enableCustomerLoyalty,
       'requireCustomerInfo': requireCustomerInfo,
       'pointsPerCurrency': pointsPerCurrency,
+      'enableBiometrics': enableBiometrics,
     };
   }
 
@@ -83,6 +88,7 @@ class AppSettings {
       enableCustomerLoyalty: map['enableCustomerLoyalty'] ?? true,
       requireCustomerInfo: map['requireCustomerInfo'] ?? false,
       pointsPerCurrency: map['pointsPerCurrency'] ?? 1,
+      enableBiometrics: map['enableBiometrics'] ?? false,
     );
   }
 
@@ -104,6 +110,7 @@ class AppSettings {
     bool? enableCustomerLoyalty,
     bool? requireCustomerInfo,
     int? pointsPerCurrency,
+    bool? enableBiometrics,
   }) {
     return AppSettings(
       currencySymbol: currencySymbol ?? this.currencySymbol,
@@ -120,9 +127,11 @@ class AppSettings {
       autoSyncData: autoSyncData ?? this.autoSyncData,
       autoDetectCurrency: autoDetectCurrency ?? this.autoDetectCurrency,
       // ✅ Customer settings
-      enableCustomerLoyalty: enableCustomerLoyalty ?? this.enableCustomerLoyalty,
+      enableCustomerLoyalty:
+          enableCustomerLoyalty ?? this.enableCustomerLoyalty,
       requireCustomerInfo: requireCustomerInfo ?? this.requireCustomerInfo,
       pointsPerCurrency: pointsPerCurrency ?? this.pointsPerCurrency,
+      enableBiometrics: enableBiometrics ?? this.enableBiometrics,
     );
   }
 
@@ -248,7 +257,7 @@ class AppSettings {
     'NG': {'symbol': '₦', 'code': 'NGN'},
     'NO': {'symbol': 'kr', 'code': 'NOK'},
     'OM': {'symbol': 'ر.ع.', 'code': 'OMR'},
-    'PK': {'symbol': '₨', 'code': 'PKR'},  // ✅ Pakistan
+    'PK': {'symbol': '₨', 'code': 'PKR'}, // ✅ Pakistan
     'PW': {'symbol': '\$', 'code': 'USD'},
     'PA': {'symbol': 'B/.', 'code': 'PAB'},
     'PG': {'symbol': 'K', 'code': 'PGK'},
@@ -351,7 +360,7 @@ class AppSettings {
     try {
       // Try to detect country from IP
       String? countryCode = await detectCountryFromIP();
-      
+
       // If IP detection fails, try device locale
       if (countryCode == null || countryCode.isEmpty) {
         countryCode = detectCountryFromLocale();
@@ -361,7 +370,9 @@ class AppSettings {
       if (countryCode != null && countryCode.isNotEmpty) {
         final currency = getCurrencyForCountry(countryCode);
         if (currency != null) {
-          debugPrint('✅ Currency detected: ${currency['symbol']} (${currency['code']}) for $countryCode');
+          debugPrint(
+            '✅ Currency detected: ${currency['symbol']} (${currency['code']}) for $countryCode',
+          );
           return currency;
         }
       }
@@ -386,6 +397,7 @@ class AppSettings {
       enableCustomerLoyalty: true,
       requireCustomerInfo: false,
       pointsPerCurrency: 1,
+      enableBiometrics: false,
     );
   }
 

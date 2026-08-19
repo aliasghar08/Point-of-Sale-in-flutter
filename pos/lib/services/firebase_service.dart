@@ -18,7 +18,7 @@ class FirebaseService {
   bool get isAuthenticated => _currentUserId != null;
 
   // ==================== HASHING UTILITY ====================
-  
+
   /// ✅ Generates a deterministic 20-character ID based on input details
   String _generateHashId(String data) {
     final bytes = utf8.encode(data);
@@ -59,7 +59,7 @@ class FirebaseService {
       if (businessesSnapshot.docs.isNotEmpty) {
         // The document ID is the businessId
         final businessId = businessesSnapshot.docs.first.id;
-        
+
         // Save the businessId to the user's document for future use
         await _firestore.collection('users').doc(_currentUserId).set({
           'businessId': businessId,
@@ -70,22 +70,22 @@ class FirebaseService {
           'createdAt': FieldValue.serverTimestamp(),
           'updatedAt': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
-        
+
         return businessId;
       }
 
       // Also check if user exists in any business's members sub-collection
       final allBusinesses = await _firestore.collection('businesses').get();
-      
+
       for (var businessDoc in allBusinesses.docs) {
         final userInBusiness = await businessDoc.reference
             .collection('members')
             .doc(_currentUserId)
             .get();
-        
+
         if (userInBusiness.exists) {
           final businessId = businessDoc.id;
-          
+
           await _firestore.collection('users').doc(_currentUserId).set({
             'businessId': businessId,
             'role': 'owner',
@@ -95,7 +95,7 @@ class FirebaseService {
             'createdAt': FieldValue.serverTimestamp(),
             'updatedAt': FieldValue.serverTimestamp(),
           }, SetOptions(merge: true));
-          
+
           return businessId;
         }
       }
@@ -115,20 +115,23 @@ class FirebaseService {
 
       final searchTerm = query.toLowerCase().trim();
       final snapshot = await _firestore.collection('businesses').get();
-      
-      final results = snapshot.docs.where((doc) {
-        final data = doc.data();
-        final name = (data['name'] ?? '').toString().toLowerCase();
-        return name.contains(searchTerm);
-      }).map((doc) {
-        final data = doc.data();
-        return {
-          'id': doc.id,
-          'name': data['name'] ?? 'Unknown Business',
-          'ownerId': data['ownerId'] ?? '',
-          'isActive': data['isActive'] ?? true,
-        };
-      }).toList();
+
+      final results = snapshot.docs
+          .where((doc) {
+            final data = doc.data();
+            final name = (data['name'] ?? '').toString().toLowerCase();
+            return name.contains(searchTerm);
+          })
+          .map((doc) {
+            final data = doc.data();
+            return {
+              'id': doc.id,
+              'name': data['name'] ?? 'Unknown Business',
+              'ownerId': data['ownerId'] ?? '',
+              'isActive': data['isActive'] ?? true,
+            };
+          })
+          .toList();
 
       return results;
     } catch (e) {
@@ -143,7 +146,7 @@ class FirebaseService {
 
       final searchTerm = name.toLowerCase().trim();
       final snapshot = await _firestore.collection('businesses').get();
-      
+
       for (var doc in snapshot.docs) {
         final data = doc.data();
         final businessName = (data['name'] ?? '').toString().toLowerCase();
@@ -222,7 +225,10 @@ class FirebaseService {
     }
   }
 
-  Future<Map<String, dynamic>?> getBusinessUser(String businessId, String userId) async {
+  Future<Map<String, dynamic>?> getBusinessUser(
+    String businessId,
+    String userId,
+  ) async {
     try {
       final doc = await _firestore
           .collection('businesses')
@@ -258,7 +264,10 @@ class FirebaseService {
     required String businessId,
   }) async {
     try {
-      final businessDoc = await _firestore.collection('businesses').doc(businessId).get();
+      final businessDoc = await _firestore
+          .collection('businesses')
+          .doc(businessId)
+          .get();
       if (!businessDoc.exists) {
         throw Exception('Business not found');
       }
@@ -284,7 +293,9 @@ class FirebaseService {
             .get();
 
         if (managerSnapshot.docs.isNotEmpty) {
-          throw Exception('This business already has a manager. Only one manager is allowed.');
+          throw Exception(
+            'This business already has a manager. Only one manager is allowed.',
+          );
         }
       }
 
@@ -321,7 +332,7 @@ class FirebaseService {
         'name': name,
         'createdAt': FieldValue.serverTimestamp(),
       });
-      
+
       debugPrint('✅ User $name added to business $businessId as $role');
     } catch (e) {
       throw Exception('Failed to add user to business: $e');
@@ -334,7 +345,10 @@ class FirebaseService {
     required String newRole,
   }) async {
     try {
-      final businessDoc = await _firestore.collection('businesses').doc(businessId).get();
+      final businessDoc = await _firestore
+          .collection('businesses')
+          .doc(businessId)
+          .get();
       if (!businessDoc.exists) {
         throw Exception('Business not found');
       }
@@ -359,8 +373,11 @@ class FirebaseService {
             .limit(1)
             .get();
 
-        if (managerSnapshot.docs.isNotEmpty && managerSnapshot.docs.first.id != userId) {
-          throw Exception('This business already has a manager. Only one manager is allowed.');
+        if (managerSnapshot.docs.isNotEmpty &&
+            managerSnapshot.docs.first.id != userId) {
+          throw Exception(
+            'This business already has a manager. Only one manager is allowed.',
+          );
         }
       }
 
@@ -369,10 +386,7 @@ class FirebaseService {
           .doc(businessId)
           .collection('members')
           .doc(userId)
-          .update({
-            'role': newRole,
-            'updatedAt': FieldValue.serverTimestamp(),
-          });
+          .update({'role': newRole, 'updatedAt': FieldValue.serverTimestamp()});
 
       await _firestore.collection('users').doc(userId).update({
         'role': newRole,
@@ -411,7 +425,9 @@ class FirebaseService {
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
-      debugPrint('✅ User active status updated to $isActive in business $businessId');
+      debugPrint(
+        '✅ User active status updated to $isActive in business $businessId',
+      );
     } catch (e) {
       throw Exception('Failed to toggle user status: $e');
     }
@@ -449,7 +465,7 @@ class FirebaseService {
       if (businessId == null) {
         debugPrint('⚠️ No business found');
         return Stream.fromFuture(
-          _firestore.collection('_empty').limit(1).get()
+          _firestore.collection('_empty').limit(1).get(),
         );
       }
 
@@ -484,14 +500,16 @@ class FirebaseService {
 
       // Create a deterministic hash for the product
       final name = (productData['name'] ?? '').toString().trim().toLowerCase();
-      final barcode = (productData['barcode'] ?? productData['qrCode'] ?? '').toString().trim();
-      
+      final barcode = (productData['barcode'] ?? productData['qrCode'] ?? '')
+          .toString()
+          .trim();
+
       final uniqueString = '${businessId}_${name}_$barcode';
       final productId = _generateHashId(uniqueString);
 
       DocumentReference docRef = productsRef.doc(productId);
       await docRef.set(productData);
-      
+
       return docRef;
     } catch (e) {
       throw Exception('Failed to add product: $e');
@@ -615,7 +633,9 @@ class FirebaseService {
     }
   }
 
-  Future<Map<String, DocumentSnapshot>> getProductsByIds(List<String> productIds) async {
+  Future<Map<String, DocumentSnapshot>> getProductsByIds(
+    List<String> productIds,
+  ) async {
     try {
       if (!isAuthenticated) {
         throw Exception('User not authenticated');
@@ -632,14 +652,14 @@ class FirebaseService {
           .collection('products');
 
       final Map<String, DocumentSnapshot> result = {};
-      
+
       for (var id in productIds) {
         final doc = await productsRef.doc(id).get();
         if (doc.exists) {
           result[id] = doc;
         }
       }
-      
+
       return result;
     } catch (e) {
       throw Exception('Failed to get products: $e');
@@ -671,7 +691,9 @@ class FirebaseService {
     }
   }
 
-  Future<void> updateMultipleProductsStock(Map<String, int> productStockChanges) async {
+  Future<void> updateMultipleProductsStock(
+    Map<String, int> productStockChanges,
+  ) async {
     try {
       if (!isAuthenticated) {
         throw Exception('User not authenticated');
@@ -688,7 +710,7 @@ class FirebaseService {
           .collection('products');
 
       final batch = _firestore.batch();
-      
+
       for (var entry in productStockChanges.entries) {
         final productRef = productsRef.doc(entry.key);
         batch.update(productRef, {
@@ -696,7 +718,7 @@ class FirebaseService {
           'updatedAt': FieldValue.serverTimestamp(),
         });
       }
-      
+
       await batch.commit();
     } catch (e) {
       throw Exception('Failed to update products stock: $e');
@@ -753,7 +775,9 @@ class FirebaseService {
 
   Future<List<Product>> getProducts() async {
     final snap = await getAllProducts();
-    return snap.docs.map((d) => Product.fromMap(d.data() as Map<String, dynamic>, d.id)).toList();
+    return snap.docs
+        .map((d) => Product.fromMap(d.data() as Map<String, dynamic>, d.id))
+        .toList();
   }
 
   Future<String> processSale({
@@ -769,24 +793,28 @@ class FirebaseService {
     String? customerAddress,
     bool isGuestCustomer = false,
   }) async {
-    final salesList = cartItems.map((item) => {
-      'productId': item.id,
-      'productName': item.name,
-      'quantity': item.stock,
-      'price': item.price,
-      'costPrice': item.costPrice,
-      'profit': (item.price - item.costPrice) * item.stock,
-      'total': item.price * item.stock,
-      'paymentMethod': paymentMethod,
-      'receiptNumber': receiptNumber,
-      'customerId': customerId,
-      'customerName': customerName,
-      'customerPhone': customerPhone ?? '',
-      'customerEmail': customerEmail ?? '',
-      'customerAddress': customerAddress ?? '',
-      'isGuestCustomer': isGuestCustomer,
-      'saleDate': FieldValue.serverTimestamp(),
-    }).toList();
+    final salesList = cartItems
+        .map(
+          (item) => {
+            'productId': item.id,
+            'productName': item.name,
+            'quantity': item.stock,
+            'price': item.price,
+            'costPrice': item.costPrice,
+            'profit': (item.price - item.costPrice) * item.stock,
+            'total': item.price * item.stock,
+            'paymentMethod': paymentMethod,
+            'receiptNumber': receiptNumber,
+            'customerId': customerId,
+            'customerName': customerName,
+            'customerPhone': customerPhone ?? '',
+            'customerEmail': customerEmail ?? '',
+            'customerAddress': customerAddress ?? '',
+            'isGuestCustomer': isGuestCustomer,
+            'saleDate': FieldValue.serverTimestamp(),
+          },
+        )
+        .toList();
 
     await addMultipleSales(salesList);
     return receiptNumber;
@@ -799,7 +827,7 @@ class FirebaseService {
       if (businessId == null) {
         debugPrint('⚠️ No business found');
         return Stream.fromFuture(
-          _firestore.collection('_empty').limit(1).get()
+          _firestore.collection('_empty').limit(1).get(),
         );
       }
 
@@ -817,7 +845,7 @@ class FirebaseService {
       if (businessId == null) {
         debugPrint('⚠️ No business found');
         return Stream.fromFuture(
-          _firestore.collection('_empty').limit(1).get()
+          _firestore.collection('_empty').limit(1).get(),
         );
       }
 
@@ -843,20 +871,25 @@ class FirebaseService {
 
       // 1. Prepare Sale Document with explicit User IDs
       saleData['createdBy'] = _currentUserId; // Legacy compatibility
-      saleData['userId'] = _currentUserId; 
-      saleData['sellerName'] = _auth.currentUser?.displayName ?? 'Unknown'; 
+      saleData['userId'] = _currentUserId;
+      saleData['sellerName'] = _auth.currentUser?.displayName ?? 'Unknown';
       saleData['createdAt'] = FieldValue.serverTimestamp();
 
       final receipt = (saleData['receiptNumber'] ?? '').toString().trim();
-      final timeSuffix = receipt.isEmpty ? DateTime.now().millisecondsSinceEpoch.toString() : '';
+      final timeSuffix = receipt.isEmpty
+          ? DateTime.now().millisecondsSinceEpoch.toString()
+          : '';
       final saleId = _generateHashId('${businessId}_${receipt}_$timeSuffix');
-      
+
       final saleRef = businessRef.collection('sales').doc(saleId);
       batch.set(saleRef, saleData);
 
       // 2. Prepare Product Stock Deduction
-      if (saleData.containsKey('productId') && saleData.containsKey('quantity')) {
-        final productRef = businessRef.collection('products').doc(saleData['productId']);
+      if (saleData.containsKey('productId') &&
+          saleData.containsKey('quantity')) {
+        final productRef = businessRef
+            .collection('products')
+            .doc(saleData['productId']);
         batch.update(productRef, {
           'stock': FieldValue.increment(-(saleData['quantity'] as int)),
           'updatedAt': FieldValue.serverTimestamp(),
@@ -866,8 +899,11 @@ class FirebaseService {
       // 3. Prepare Customer CRM Stat Update
       final customerId = saleData['customerId'] as String?;
       final isGuest = saleData['isGuestCustomer'] as bool? ?? false;
-      
-      if (customerId != null && customerId.isNotEmpty && customerId != 'guest' && !isGuest) {
+
+      if (customerId != null &&
+          customerId.isNotEmpty &&
+          customerId != 'guest' &&
+          !isGuest) {
         final customerRef = businessRef.collection('customers').doc(customerId);
         batch.set(customerRef, {
           // ✅ ADDED: Include the customer's personal details to prevent empty docs
@@ -875,9 +911,12 @@ class FirebaseService {
           'phone': saleData['customerPhone'] ?? '',
           'email': saleData['customerEmail'] ?? '',
           'address': saleData['customerAddress'] ?? '',
-          'totalSpent': FieldValue.increment((saleData['total'] ?? 0.0).toDouble()),
+          'totalSpent': FieldValue.increment(
+            (saleData['total'] ?? 0.0).toDouble(),
+          ),
           'totalOrders': FieldValue.increment(1),
-          'lastPurchaseDate': saleData['saleDate'] ?? FieldValue.serverTimestamp(),
+          'lastPurchaseDate':
+              saleData['saleDate'] ?? FieldValue.serverTimestamp(),
           'updatedAt': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
       }
@@ -900,22 +939,26 @@ class FirebaseService {
 
       final batch = _firestore.batch();
       final businessRef = _firestore.collection('businesses').doc(businessId);
-      
+
       for (var sale in salesData) {
         sale['createdBy'] = _currentUserId;
-        sale['userId'] = _currentUserId; 
+        sale['userId'] = _currentUserId;
         sale['sellerName'] = _auth.currentUser?.displayName ?? 'Unknown';
         sale['createdAt'] = FieldValue.serverTimestamp();
-        
+
         final receipt = (sale['receiptNumber'] ?? '').toString().trim();
-        final timeSuffix = receipt.isEmpty ? DateTime.now().millisecondsSinceEpoch.toString() : '';
+        final timeSuffix = receipt.isEmpty
+            ? DateTime.now().millisecondsSinceEpoch.toString()
+            : '';
         final saleId = _generateHashId('${businessId}_${receipt}_$timeSuffix');
-        
+
         final saleRef = businessRef.collection('sales').doc(saleId);
         batch.set(saleRef, sale);
 
         if (sale.containsKey('productId') && sale.containsKey('quantity')) {
-          final productRef = businessRef.collection('products').doc(sale['productId']);
+          final productRef = businessRef
+              .collection('products')
+              .doc(sale['productId']);
           batch.update(productRef, {
             'stock': FieldValue.increment(-(sale['quantity'] as int)),
             'updatedAt': FieldValue.serverTimestamp(),
@@ -924,30 +967,41 @@ class FirebaseService {
 
         final customerId = sale['customerId'] as String?;
         final isGuest = sale['isGuestCustomer'] as bool? ?? false;
-        
-        if (customerId != null && customerId.isNotEmpty && customerId != 'guest' && !isGuest) {
-          final customerRef = businessRef.collection('customers').doc(customerId);
+
+        if (customerId != null &&
+            customerId.isNotEmpty &&
+            customerId != 'guest' &&
+            !isGuest) {
+          final customerRef = businessRef
+              .collection('customers')
+              .doc(customerId);
           batch.set(customerRef, {
             // ✅ ADDED: Include the customer's personal details to prevent empty docs
             'name': sale['customerName'] ?? 'Unknown',
             'phone': sale['customerPhone'] ?? '',
             'email': sale['customerEmail'] ?? '',
             'address': sale['customerAddress'] ?? '',
-            'totalSpent': FieldValue.increment((sale['total'] ?? 0.0).toDouble()),
+            'totalSpent': FieldValue.increment(
+              (sale['total'] ?? 0.0).toDouble(),
+            ),
             'totalOrders': FieldValue.increment(1),
-            'lastPurchaseDate': sale['saleDate'] ?? FieldValue.serverTimestamp(),
+            'lastPurchaseDate':
+                sale['saleDate'] ?? FieldValue.serverTimestamp(),
             'updatedAt': FieldValue.serverTimestamp(),
           }, SetOptions(merge: true));
         }
       }
-      
+
       await batch.commit();
     } catch (e) {
       throw Exception('Failed to add sales: $e');
     }
   }
 
-  Future<QuerySnapshot> getSalesByDate(DateTime startDate, DateTime endDate) async {
+  Future<QuerySnapshot> getSalesByDate(
+    DateTime startDate,
+    DateTime endDate,
+  ) async {
     try {
       if (!isAuthenticated) {
         throw Exception('User not authenticated');
@@ -1014,9 +1068,7 @@ class FirebaseService {
           .doc(businessId)
           .collection('sales');
 
-      return await salesRef
-          .orderBy('saleDate', descending: true)
-          .get();
+      return await salesRef.orderBy('saleDate', descending: true).get();
     } catch (e) {
       throw Exception('Failed to get sales: $e');
     }
@@ -1116,8 +1168,15 @@ class FirebaseService {
       final today = DateTime(now.year, now.month, now.day);
       final weekStart = today.subtract(Duration(days: now.weekday - 1));
       final weekEnd = today.add(Duration(days: 7 - now.weekday));
-      final endOfDay = DateTime(weekEnd.year, weekEnd.month, weekEnd.day, 23, 59, 59);
-      
+      final endOfDay = DateTime(
+        weekEnd.year,
+        weekEnd.month,
+        weekEnd.day,
+        23,
+        59,
+        59,
+      );
+
       return await getSalesByDateRange(
         startDate: weekStart,
         endDate: endOfDay,
@@ -1133,7 +1192,7 @@ class FirebaseService {
       final now = DateTime.now();
       final monthStart = DateTime(now.year, now.month, 1);
       final monthEnd = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
-      
+
       return await getSalesByDateRange(
         startDate: monthStart,
         endDate: monthEnd,
@@ -1146,44 +1205,61 @@ class FirebaseService {
 
   // ==================== CUSTOMERS (CRM) ====================
 
-  Future<DocumentReference> addCustomer(Map<String, dynamic> customerData) async {
+  Future<DocumentReference> addCustomer(
+    Map<String, dynamic> customerData,
+  ) async {
     try {
       if (!isAuthenticated) throw Exception('User not authenticated');
       final businessId = await getCurrentBusinessId();
       if (businessId == null) throw Exception('Business not found');
 
-      final customersRef = _firestore.collection('businesses').doc(businessId).collection('customers');
+      final customersRef = _firestore
+          .collection('businesses')
+          .doc(businessId)
+          .collection('customers');
 
       customerData['createdBy'] = _currentUserId;
       customerData['createdAt'] = FieldValue.serverTimestamp();
       customerData['updatedAt'] = FieldValue.serverTimestamp();
-      
+
       customerData['totalSpent'] ??= 0.0;
       customerData['totalOrders'] ??= 0;
       customerData['isActive'] ??= true;
 
       final phone = (customerData['phone'] ?? '').toString().trim();
       final email = (customerData['email'] ?? '').toString().trim();
-      final uniqueIdentifier = phone.isNotEmpty ? phone : (email.isNotEmpty ? email : DateTime.now().millisecondsSinceEpoch.toString());
-      
+      final uniqueIdentifier = phone.isNotEmpty
+          ? phone
+          : (email.isNotEmpty
+                ? email
+                : DateTime.now().millisecondsSinceEpoch.toString());
+
       final customerId = _generateHashId('${businessId}_$uniqueIdentifier');
 
       final docRef = customersRef.doc(customerId);
       await docRef.set(customerData);
-      
+
       return docRef;
     } catch (e) {
       throw Exception('Failed to add customer: $e');
     }
   }
 
-  Future<void> updateCustomer(String customerId, Map<String, dynamic> data) async {
+  Future<void> updateCustomer(
+    String customerId,
+    Map<String, dynamic> data,
+  ) async {
     try {
       final businessId = await getCurrentBusinessId();
       if (businessId == null) throw Exception('Business not found');
 
       data['updatedAt'] = FieldValue.serverTimestamp();
-      await _firestore.collection('businesses').doc(businessId).collection('customers').doc(customerId).update(data);
+      await _firestore
+          .collection('businesses')
+          .doc(businessId)
+          .collection('customers')
+          .doc(customerId)
+          .update(data);
     } catch (e) {
       throw Exception('Failed to update customer: $e');
     }
@@ -1247,14 +1323,18 @@ class FirebaseService {
   Future<List<Map<String, dynamic>>> searchCustomers(String query) async {
     try {
       if (query.isEmpty) return [];
-      
+
       final allCustomers = await getCustomers();
       final searchTerm = query.toLowerCase().trim();
-      
+
       return allCustomers.where((customer) {
-        return (customer['name'] ?? '').toString().toLowerCase().contains(searchTerm) ||
+        return (customer['name'] ?? '').toString().toLowerCase().contains(
+              searchTerm,
+            ) ||
             (customer['phone'] ?? '').toString().contains(searchTerm) ||
-            (customer['email'] ?? '').toString().toLowerCase().contains(searchTerm);
+            (customer['email'] ?? '').toString().toLowerCase().contains(
+              searchTerm,
+            );
       }).toList();
     } catch (e) {
       throw Exception('Failed to search customers: $e');
@@ -1303,7 +1383,7 @@ class FirebaseService {
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       };
-      
+
       final businessRef = _firestore.collection('businesses').doc(businessId);
       await businessRef.set(businessData);
 
@@ -1327,13 +1407,16 @@ class FirebaseService {
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
-      await _firestore.collection('userBusinessLookup').doc(_currentUserId).set({
-        'businessId': businessId,
-        'role': 'owner',
-        'email': _auth.currentUser?.email ?? '',
-        'name': _auth.currentUser?.displayName ?? 'User',
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+      await _firestore
+          .collection('userBusinessLookup')
+          .doc(_currentUserId)
+          .set({
+            'businessId': businessId,
+            'role': 'owner',
+            'email': _auth.currentUser?.email ?? '',
+            'name': _auth.currentUser?.displayName ?? 'User',
+            'createdAt': FieldValue.serverTimestamp(),
+          });
 
       return businessId;
     } catch (e) {

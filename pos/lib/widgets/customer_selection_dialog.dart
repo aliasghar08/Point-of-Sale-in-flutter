@@ -34,12 +34,13 @@ class CustomerSelectionDialog extends StatefulWidget {
   });
 
   @override
-  State<CustomerSelectionDialog> createState() => _CustomerSelectionDialogState();
+  State<CustomerSelectionDialog> createState() =>
+      _CustomerSelectionDialogState();
 }
 
 class _CustomerSelectionDialogState extends State<CustomerSelectionDialog> {
   final FirebaseService _firebaseService = FirebaseService();
-  
+
   final TextEditingController _searchController = TextEditingController();
   late TextEditingController _nameController;
   late TextEditingController _phoneController;
@@ -60,7 +61,9 @@ class _CustomerSelectionDialogState extends State<CustomerSelectionDialog> {
     );
     _phoneController = TextEditingController(text: widget.initialPhone);
     _emailController = TextEditingController(text: widget.initialEmail ?? '');
-    _addressController = TextEditingController(text: widget.initialAddress ?? '');
+    _addressController = TextEditingController(
+      text: widget.initialAddress ?? '',
+    );
 
     _loadCustomers();
   }
@@ -101,25 +104,42 @@ class _CustomerSelectionDialogState extends State<CustomerSelectionDialog> {
     }
 
     setState(() {
-      _suggestions = _allCustomers.where((customer) {
-        final name = (customer['name'] ?? customer['customerName'] ?? '').toString().toLowerCase();
-        final phone = (customer['phone'] ?? customer['customerPhone'] ?? '').toString().toLowerCase();
-        final email = (customer['email'] ?? customer['customerEmail'] ?? '').toString().toLowerCase();
-        return name.contains(cleanQuery) || phone.contains(cleanQuery) || email.contains(cleanQuery);
-      }).take(5).toList();
+      _suggestions = _allCustomers
+          .where((customer) {
+            final name = (customer['name'] ?? customer['customerName'] ?? '')
+                .toString()
+                .toLowerCase();
+            final phone = (customer['phone'] ?? customer['customerPhone'] ?? '')
+                .toString()
+                .toLowerCase();
+            final email = (customer['email'] ?? customer['customerEmail'] ?? '')
+                .toString()
+                .toLowerCase();
+            return name.contains(cleanQuery) ||
+                phone.contains(cleanQuery) ||
+                email.contains(cleanQuery);
+          })
+          .take(5)
+          .toList();
     });
   }
 
   void _selectCustomer(Map<String, dynamic> customer) {
     setState(() {
       _selectedCustomerId = customer['id'] as String?;
-      _selectedCustomerName = (customer['name'] ?? customer['customerName'] ?? 'Customer').toString();
-      
-      _nameController.text = (customer['name'] ?? customer['customerName'] ?? '').toString();
-      _phoneController.text = (customer['phone'] ?? customer['customerPhone'] ?? '').toString();
-      _emailController.text = (customer['email'] ?? customer['customerEmail'] ?? '').toString();
-      _addressController.text = (customer['address'] ?? customer['customerAddress'] ?? '').toString();
-      
+      _selectedCustomerName =
+          (customer['name'] ?? customer['customerName'] ?? 'Customer')
+              .toString();
+
+      _nameController.text =
+          (customer['name'] ?? customer['customerName'] ?? '').toString();
+      _phoneController.text =
+          (customer['phone'] ?? customer['customerPhone'] ?? '').toString();
+      _emailController.text =
+          (customer['email'] ?? customer['customerEmail'] ?? '').toString();
+      _addressController.text =
+          (customer['address'] ?? customer['customerAddress'] ?? '').toString();
+
       _searchController.clear();
       _suggestions = [];
     });
@@ -135,7 +155,9 @@ class _CustomerSelectionDialogState extends State<CustomerSelectionDialog> {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final primaryColor = isDarkMode ? Colors.blue.shade400 : Colors.blue.shade700;
+    final primaryColor = isDarkMode
+        ? Colors.blue.shade400
+        : Colors.blue.shade700;
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -164,7 +186,12 @@ class _CustomerSelectionDialogState extends State<CustomerSelectionDialog> {
                     ),
                   ),
                   IconButton(
-                    icon: Icon(Icons.close, color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600),
+                    icon: Icon(
+                      Icons.close,
+                      color: isDarkMode
+                          ? Colors.grey.shade400
+                          : Colors.grey.shade600,
+                    ),
                     onPressed: () => Navigator.pop(context, null),
                   ),
                 ],
@@ -175,13 +202,23 @@ class _CustomerSelectionDialogState extends State<CustomerSelectionDialog> {
               // Search Bar for Existing Customers
               TextField(
                 controller: _searchController,
-                style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                style: TextStyle(
+                  color: isDarkMode ? Colors.white : Colors.black,
+                ),
                 onChanged: _onSearchChanged,
                 decoration: InputDecoration(
                   labelText: 'Search Existing Customers',
                   hintText: 'Type name, phone, or email...',
-                  labelStyle: TextStyle(color: isDarkMode ? Colors.grey.shade300 : Colors.grey.shade700),
-                  hintStyle: TextStyle(color: isDarkMode ? Colors.grey.shade500 : Colors.grey.shade400),
+                  labelStyle: TextStyle(
+                    color: isDarkMode
+                        ? Colors.grey.shade300
+                        : Colors.grey.shade700,
+                  ),
+                  hintStyle: TextStyle(
+                    color: isDarkMode
+                        ? Colors.grey.shade500
+                        : Colors.grey.shade400,
+                  ),
                   prefixIcon: Icon(Icons.search, color: primaryColor),
                   suffixIcon: _isLoading
                       ? const SizedBox(
@@ -193,15 +230,17 @@ class _CustomerSelectionDialogState extends State<CustomerSelectionDialog> {
                           ),
                         )
                       : (_searchController.text.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.clear),
-                              onPressed: () {
-                                _searchController.clear();
-                                _onSearchChanged('');
-                              },
-                            )
-                          : null),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                            ? IconButton(
+                                icon: const Icon(Icons.clear),
+                                onPressed: () {
+                                  _searchController.clear();
+                                  _onSearchChanged('');
+                                },
+                              )
+                            : null),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                     borderSide: BorderSide(color: primaryColor, width: 2),
@@ -215,22 +254,36 @@ class _CustomerSelectionDialogState extends State<CustomerSelectionDialog> {
                 Container(
                   constraints: const BoxConstraints(maxHeight: 180),
                   decoration: BoxDecoration(
-                    color: isDarkMode ? Colors.grey.shade800 : Colors.grey.shade100,
+                    color: isDarkMode
+                        ? Colors.grey.shade800
+                        : Colors.grey.shade100,
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: primaryColor.withValues(alpha: 0.5)),
+                    border: Border.all(
+                      color: primaryColor.withValues(alpha: 0.5),
+                    ),
                   ),
                   child: ListView.separated(
                     shrinkWrap: true,
                     itemCount: _suggestions.length,
                     separatorBuilder: (context, index) => Divider(
                       height: 1,
-                      color: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade300,
+                      color: isDarkMode
+                          ? Colors.grey.shade700
+                          : Colors.grey.shade300,
                     ),
                     itemBuilder: (context, index) {
                       final customer = _suggestions[index];
-                      final name = (customer['name'] ?? customer['customerName'] ?? 'Unknown').toString();
-                      final phone = (customer['phone'] ?? customer['customerPhone'] ?? '').toString();
-                      final email = (customer['email'] ?? customer['customerEmail'] ?? '').toString();
+                      final name =
+                          (customer['name'] ??
+                                  customer['customerName'] ??
+                                  'Unknown')
+                              .toString();
+                      final phone =
+                          (customer['phone'] ?? customer['customerPhone'] ?? '')
+                              .toString();
+                      final email =
+                          (customer['email'] ?? customer['customerEmail'] ?? '')
+                              .toString();
 
                       return ListTile(
                         dense: true,
@@ -239,7 +292,10 @@ class _CustomerSelectionDialogState extends State<CustomerSelectionDialog> {
                           backgroundColor: primaryColor.withValues(alpha: 0.2),
                           child: Text(
                             name.isNotEmpty ? name[0].toUpperCase() : '?',
-                            style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold),
+                            style: TextStyle(
+                              color: primaryColor,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                         title: Text(
@@ -256,10 +312,16 @@ class _CustomerSelectionDialogState extends State<CustomerSelectionDialog> {
                           ].join(' • '),
                           style: TextStyle(
                             fontSize: 12,
-                            color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                            color: isDarkMode
+                                ? Colors.grey.shade400
+                                : Colors.grey.shade600,
                           ),
                         ),
-                        trailing: Icon(Icons.arrow_forward_ios, size: 14, color: primaryColor),
+                        trailing: Icon(
+                          Icons.arrow_forward_ios,
+                          size: 14,
+                          color: primaryColor,
+                        ),
                         onTap: () => _selectCustomer(customer),
                       );
                     },
@@ -271,7 +333,10 @@ class _CustomerSelectionDialogState extends State<CustomerSelectionDialog> {
               if (_selectedCustomerId != null) ...[
                 const SizedBox(height: 10),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.green.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(8),
@@ -279,13 +344,19 @@ class _CustomerSelectionDialogState extends State<CustomerSelectionDialog> {
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.check_circle, color: Colors.green.shade400, size: 18),
+                      Icon(
+                        Icons.check_circle,
+                        color: Colors.green.shade400,
+                        size: 18,
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           'Existing Customer Selected: $_selectedCustomerName',
                           style: TextStyle(
-                            color: isDarkMode ? Colors.green.shade300 : Colors.green.shade800,
+                            color: isDarkMode
+                                ? Colors.green.shade300
+                                : Colors.green.shade800,
                             fontWeight: FontWeight.w600,
                             fontSize: 13,
                           ),
@@ -295,7 +366,9 @@ class _CustomerSelectionDialogState extends State<CustomerSelectionDialog> {
                         icon: const Icon(Icons.close, size: 18),
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(),
-                        color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                        color: isDarkMode
+                            ? Colors.grey.shade400
+                            : Colors.grey.shade600,
                         onPressed: _clearSelectedCustomer,
                       ),
                     ],
@@ -311,10 +384,14 @@ class _CustomerSelectionDialogState extends State<CustomerSelectionDialog> {
                       // Name Field
                       TextField(
                         controller: _nameController,
-                        style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                        style: TextStyle(
+                          color: isDarkMode ? Colors.white : Colors.black,
+                        ),
                         decoration: InputDecoration(
                           labelText: 'Customer Name',
-                          labelStyle: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                          labelStyle: TextStyle(
+                            color: isDarkMode ? Colors.white : Colors.black,
+                          ),
                           border: const OutlineInputBorder(),
                           prefixIcon: const Icon(Icons.person),
                         ),
@@ -324,10 +401,14 @@ class _CustomerSelectionDialogState extends State<CustomerSelectionDialog> {
                       // Phone Field
                       TextField(
                         controller: _phoneController,
-                        style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                        style: TextStyle(
+                          color: isDarkMode ? Colors.white : Colors.black,
+                        ),
                         decoration: InputDecoration(
                           labelText: 'Phone Number',
-                          labelStyle: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                          labelStyle: TextStyle(
+                            color: isDarkMode ? Colors.white : Colors.black,
+                          ),
                           border: const OutlineInputBorder(),
                           prefixIcon: const Icon(Icons.phone),
                         ),
@@ -338,10 +419,14 @@ class _CustomerSelectionDialogState extends State<CustomerSelectionDialog> {
                       // Email Field
                       TextField(
                         controller: _emailController,
-                        style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                        style: TextStyle(
+                          color: isDarkMode ? Colors.white : Colors.black,
+                        ),
                         decoration: InputDecoration(
                           labelText: 'Email (optional)',
-                          labelStyle: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                          labelStyle: TextStyle(
+                            color: isDarkMode ? Colors.white : Colors.black,
+                          ),
                           border: const OutlineInputBorder(),
                           prefixIcon: const Icon(Icons.email),
                         ),
@@ -352,10 +437,14 @@ class _CustomerSelectionDialogState extends State<CustomerSelectionDialog> {
                       // Address Field
                       TextField(
                         controller: _addressController,
-                        style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                        style: TextStyle(
+                          color: isDarkMode ? Colors.white : Colors.black,
+                        ),
                         decoration: InputDecoration(
                           labelText: 'Address (optional)',
-                          labelStyle: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                          labelStyle: TextStyle(
+                            color: isDarkMode ? Colors.white : Colors.black,
+                          ),
                           border: const OutlineInputBorder(),
                           prefixIcon: const Icon(Icons.home),
                         ),
@@ -387,7 +476,11 @@ class _CustomerSelectionDialogState extends State<CustomerSelectionDialog> {
                     },
                     child: Text(
                       'Skip (Guest)',
-                      style: TextStyle(color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade700),
+                      style: TextStyle(
+                        color: isDarkMode
+                            ? Colors.grey.shade400
+                            : Colors.grey.shade700,
+                      ),
                     ),
                   ),
                   const Spacer(),
@@ -396,7 +489,9 @@ class _CustomerSelectionDialogState extends State<CustomerSelectionDialog> {
                     onPressed: () => Navigator.pop(context, null),
                     child: Text(
                       'Cancel',
-                      style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                      style: TextStyle(
+                        color: isDarkMode ? Colors.white : Colors.black,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -411,7 +506,8 @@ class _CustomerSelectionDialogState extends State<CustomerSelectionDialog> {
                       final isGuest = name.isEmpty || name == 'Guest Customer';
                       final customerId = isGuest
                           ? 'guest'
-                          : (_selectedCustomerId ?? 'customer_${DateTime.now().millisecondsSinceEpoch}');
+                          : (_selectedCustomerId ??
+                                'customer_${DateTime.now().millisecondsSinceEpoch}');
 
                       Navigator.pop(
                         context,
@@ -428,7 +524,10 @@ class _CustomerSelectionDialogState extends State<CustomerSelectionDialog> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: primaryColor,
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 12,
+                      ),
                     ),
                     child: const Text('Save Customer'),
                   ),

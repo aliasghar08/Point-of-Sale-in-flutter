@@ -31,7 +31,7 @@ class Customer {
 
   // Helper getters
   String get displayName => name.isNotEmpty ? name : 'Unknown Customer';
-  
+
   String get initials {
     if (name.isEmpty) return '?';
     final parts = name.trim().split(' ');
@@ -91,9 +91,13 @@ class Customer {
       'totalSpent': totalSpent,
       'totalOrders': totalOrders,
       'averageOrderValue': averageOrderValue,
-      'lastPurchaseDate': lastPurchaseDate != null ? Timestamp.fromDate(lastPurchaseDate!) : null,
+      'lastPurchaseDate': lastPurchaseDate != null
+          ? Timestamp.fromDate(lastPurchaseDate!)
+          : null,
       'createdAt': Timestamp.fromDate(createdAt),
-      'updatedAt': updatedAt != null ? Timestamp.fromDate(updatedAt!) : FieldValue.serverTimestamp(),
+      'updatedAt': updatedAt != null
+          ? Timestamp.fromDate(updatedAt!)
+          : FieldValue.serverTimestamp(),
       'isActive': isActive,
     };
   }

@@ -158,3 +158,20 @@ lib/
    ```bash
    flutter run
    ```
+
+---
+
+## 🚀 CI/CD & Deployment
+
+This project comes pre-configured with **Codemagic CI/CD** for automated iOS builds.
+
+1. Connect your repository to [Codemagic](https://codemagic.io/).
+2. The `codemagic.yaml` at the root of the project defines an `ios-release` workflow.
+3. Configure iOS Code Signing inside the Codemagic UI for TestFlight/App Store deployment.
+
+---
+
+## 📜 License & Security
+
+* **License:** This project is licensed under the MIT License - see the [`LICENSE`](LICENSE) file for details.
+* **Security:** See our [`SECURITY.md`](SECURITY.md) policy for information on supported versions and vulnerability reporting.

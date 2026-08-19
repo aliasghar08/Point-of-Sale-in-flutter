@@ -126,12 +126,18 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Close'),
+          ),
           ElevatedButton.icon(
             onPressed: () {
               Navigator.pop(ctx);
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Transactions copied to clipboard / exported!'), behavior: SnackBarBehavior.floating),
+                const SnackBar(
+                  content: Text('Transactions copied to clipboard / exported!'),
+                  behavior: SnackBarBehavior.floating,
+                ),
               );
             },
             icon: const Icon(Icons.check),
@@ -143,7 +149,10 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
   }
 
   Future<void> _reprintReceipt(Sale sale) async {
-    final settingsProvider = Provider.of<SettingsProvider>(context, listen: false);
+    final settingsProvider = Provider.of<SettingsProvider>(
+      context,
+      listen: false,
+    );
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
     final pdf = await ReceiptService.generatePdfReceipt(
@@ -158,7 +167,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
           'qty': sale.quantity,
           'price': sale.price,
           'total': sale.total,
-        }
+        },
       ],
       subtotal: sale.total,
       tax: 0.0,
@@ -218,17 +227,22 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : _filteredSales.isEmpty
-                    ? const EmptyStateView(
-                        icon: Icons.receipt_long_outlined,
-                        title: 'No sales records found',
-                        description: 'Try changing your date filter or search query.',
-                      )
-                    : ListView.separated(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: _filteredSales.length,
-                        separatorBuilder: (_, _) => const SizedBox(height: 10),
-                        itemBuilder: (ctx, i) => _buildSaleCard(_filteredSales[i], currencySymbol, isDark),
-                      ),
+                ? const EmptyStateView(
+                    icon: Icons.receipt_long_outlined,
+                    title: 'No sales records found',
+                    description:
+                        'Try changing your date filter or search query.',
+                  )
+                : ListView.separated(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _filteredSales.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 10),
+                    itemBuilder: (ctx, i) => _buildSaleCard(
+                      _filteredSales[i],
+                      currencySymbol,
+                      isDark,
+                    ),
+                  ),
           ),
         ],
       ),
@@ -242,7 +256,11 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-        border: Border(bottom: BorderSide(color: isDark ? AppColors.darkBorder : AppColors.lightBorder)),
+        border: Border(
+          bottom: BorderSide(
+            color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+          ),
+        ),
       ),
       child: Column(
         children: [
@@ -256,7 +274,10 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
             decoration: InputDecoration(
               hintText: 'Search by Receipt #, Customer, or Product...',
               prefixIcon: const Icon(Icons.search),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 10,
+              ),
             ),
           ),
           const SizedBox(height: 10),
@@ -266,7 +287,9 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
             child: Row(
               children: options.map((opt) {
                 final isSelected = _filterType == opt;
-                final primaryColor = isDark ? AppColors.primaryLight : AppColors.primary;
+                final primaryColor = isDark
+                    ? AppColors.primaryLight
+                    : AppColors.primary;
 
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
@@ -276,7 +299,9 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                     selectedColor: primaryColor.withValues(alpha: 0.2),
                     checkmarkColor: primaryColor,
                     labelStyle: TextStyle(
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                      fontWeight: isSelected
+                          ? FontWeight.bold
+                          : FontWeight.normal,
                       color: isSelected ? primaryColor : null,
                     ),
                     onSelected: (_) {
@@ -313,31 +338,25 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Total Sales', style: TextStyle(fontSize: 11, color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary)),
-                  const SizedBox(height: 4),
                   Text(
-                    FormatService.formatCurrency(revenue, symbol: currencySymbol),
-                    style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppColors.success),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: PosCard(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Net Profit', style: TextStyle(fontSize: 11, color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary)),
-                  const SizedBox(height: 4),
-                  Text(
-                    FormatService.formatCurrency(profit, symbol: currencySymbol),
+                    'Total Sales',
                     style: TextStyle(
+                      fontSize: 11,
+                      color: isDark
+                          ? AppColors.darkTextSecondary
+                          : AppColors.lightTextSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    FormatService.formatCurrency(
+                      revenue,
+                      symbol: currencySymbol,
+                    ),
+                    style: const TextStyle(
                       fontSize: 17,
                       fontWeight: FontWeight.bold,
-                      color: isDark ? AppColors.primaryLight : AppColors.primary,
+                      color: AppColors.success,
                     ),
                   ),
                 ],
@@ -351,11 +370,56 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Orders', style: TextStyle(fontSize: 11, color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary)),
+                  Text(
+                    'Net Profit',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: isDark
+                          ? AppColors.darkTextSecondary
+                          : AppColors.lightTextSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    FormatService.formatCurrency(
+                      profit,
+                      symbol: currencySymbol,
+                    ),
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                      color: isDark
+                          ? AppColors.primaryLight
+                          : AppColors.primary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: PosCard(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Orders',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: isDark
+                          ? AppColors.darkTextSecondary
+                          : AppColors.lightTextSecondary,
+                    ),
+                  ),
                   const SizedBox(height: 4),
                   Text(
                     '$count',
-                    style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
               ),
@@ -378,7 +442,10 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
                     decoration: BoxDecoration(
                       color: isDark
                           ? AppColors.primaryLight.withValues(alpha: 0.15)
@@ -391,7 +458,9 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                         fontFamily: 'monospace',
                         fontWeight: FontWeight.bold,
                         fontSize: 12,
-                        color: isDark ? AppColors.primaryLight : AppColors.primary,
+                        color: isDark
+                            ? AppColors.primaryLight
+                            : AppColors.primary,
                       ),
                     ),
                   ),
@@ -400,8 +469,14 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                 ],
               ),
               Text(
-                FormatService.formatCurrency(sale.total, symbol: currencySymbol),
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                FormatService.formatCurrency(
+                  sale.total,
+                  symbol: currencySymbol,
+                ),
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ],
           ),
@@ -412,14 +487,22 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
               Expanded(
                 child: Text(
                   '${sale.quantity}x ${sale.productName}',
-                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
               Text(
                 FormatService.formatDateTime(sale.saleDate),
-                style: TextStyle(fontSize: 11, color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+                style: TextStyle(
+                  fontSize: 11,
+                  color: isDark
+                      ? AppColors.darkTextSecondary
+                      : AppColors.lightTextSecondary,
+                ),
               ),
             ],
           ),
@@ -429,13 +512,21 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
             children: [
               Text(
                 'Customer: ${sale.customerDisplayName}',
-                style: TextStyle(fontSize: 12, color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isDark
+                      ? AppColors.darkTextSecondary
+                      : AppColors.lightTextSecondary,
+                ),
               ),
               TextButton.icon(
                 onPressed: () => _reprintReceipt(sale),
                 icon: const Icon(Icons.print, size: 14),
                 label: const Text('Re-Print', style: TextStyle(fontSize: 12)),
-                style: TextButton.styleFrom(padding: EdgeInsets.zero, visualDensity: VisualDensity.compact),
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  visualDensity: VisualDensity.compact,
+                ),
               ),
             ],
           ),

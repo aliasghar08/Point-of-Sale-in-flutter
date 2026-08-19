@@ -103,7 +103,9 @@ class AppDrawer extends StatelessWidget {
                     context,
                     icon: Icons.admin_panel_settings,
                     // ✅ CHANGED: Dynamically display title based on role
-                    title: user.role == 'owner' ? 'User Management' : 'Team Members',
+                    title: user.role == 'owner'
+                        ? 'User Management'
+                        : 'Team Members',
                     isSelected: currentIndex == 2,
                     isDarkMode: isDarkMode,
                     onTap: () {
@@ -203,7 +205,12 @@ class AppDrawer extends StatelessWidget {
     bool isDarkMode,
   ) {
     return Container(
-      padding: const EdgeInsets.only(top: 48, left: 24, right: 24, bottom: 24), // Added top padding for status bar
+      padding: const EdgeInsets.only(
+        top: 48,
+        left: 24,
+        right: 24,
+        bottom: 24,
+      ), // Added top padding for status bar
       decoration: BoxDecoration(
         color: isDarkMode ? Colors.blue.shade900 : Colors.blue.shade700,
         borderRadius: const BorderRadius.only(
@@ -218,7 +225,9 @@ class AppDrawer extends StatelessWidget {
             radius: 35,
             backgroundColor: Colors.white,
             child: Text(
-              user.name.isNotEmpty ? user.name.substring(0, 1).toUpperCase() : 'U',
+              user.name.isNotEmpty
+                  ? user.name.substring(0, 1).toUpperCase()
+                  : 'U',
               style: TextStyle(
                 fontSize: 30,
                 color: isDarkMode ? Colors.blue.shade700 : Colors.blue.shade700,
@@ -420,7 +429,7 @@ class AppDrawer extends StatelessWidget {
             onPressed: () async {
               Navigator.pop(context); // close dialog
               await authProvider.signOut();
-              
+
               if (context.mounted) {
                 // Clears the entire navigation stack so back button can't bypass login
                 Navigator.pushAndRemoveUntil(
@@ -431,7 +440,9 @@ class AppDrawer extends StatelessWidget {
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: isDarkMode ? Colors.red.shade400 : Colors.red.shade700,
+              backgroundColor: isDarkMode
+                  ? Colors.red.shade400
+                  : Colors.red.shade700,
               foregroundColor: Colors.white,
             ),
             child: const Text('Logout'),
@@ -444,18 +455,14 @@ class AppDrawer extends StatelessWidget {
   void _showSalesHistory(BuildContext context, bool isDarkMode) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => const SalesHistoryScreen(),
-      ),
+      MaterialPageRoute(builder: (context) => const SalesHistoryScreen()),
     );
   }
 
   void _showReports(BuildContext context, bool isDarkMode) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => const ReportsScreen(),
-      ),
+      MaterialPageRoute(builder: (context) => const ReportsScreen()),
     );
   }
 

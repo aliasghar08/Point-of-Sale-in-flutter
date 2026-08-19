@@ -30,9 +30,7 @@ class AppDrawer extends StatelessWidget {
         child: Center(
           child: Text(
             'No user logged in',
-            style: TextStyle(
-              color: isDarkMode ? Colors.white : Colors.black,
-            ),
+            style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
           ),
         ),
       );
@@ -89,7 +87,9 @@ class AppDrawer extends StatelessWidget {
                     onTap: () => _navigateTo(context, 2),
                   ),
                 Divider(
-                  color: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade300,
+                  color: isDarkMode
+                      ? Colors.grey.shade700
+                      : Colors.grey.shade300,
                 ),
                 _buildDrawerItem(
                   context,
@@ -112,7 +112,9 @@ class AppDrawer extends StatelessWidget {
                   },
                 ),
                 Divider(
-                  color: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade300,
+                  color: isDarkMode
+                      ? Colors.grey.shade700
+                      : Colors.grey.shade300,
                 ),
                 _buildDrawerItem(
                   context,
@@ -125,7 +127,9 @@ class AppDrawer extends StatelessWidget {
                   },
                 ),
                 Divider(
-                  color: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade300,
+                  color: isDarkMode
+                      ? Colors.grey.shade700
+                      : Colors.grey.shade300,
                 ),
                 _buildDrawerItem(
                   context,
@@ -311,7 +315,9 @@ class AppDrawer extends StatelessWidget {
             backgroundColor: isDarkMode
                 ? Colors.red.shade900.withValues(alpha: 0.5)
                 : Colors.red.shade50,
-            foregroundColor: isDarkMode ? Colors.red.shade400 : Colors.red.shade700,
+            foregroundColor: isDarkMode
+                ? Colors.red.shade400
+                : Colors.red.shade700,
             elevation: 0,
             padding: const EdgeInsets.symmetric(vertical: 12),
             shape: RoundedRectangleBorder(
@@ -361,15 +367,11 @@ class AppDrawer extends StatelessWidget {
       builder: (context) => AlertDialog(
         title: Text(
           'Logout',
-          style: TextStyle(
-            color: isDarkMode ? Colors.white : Colors.black,
-          ),
+          style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
         ),
         content: Text(
           'Are you sure you want to logout?',
-          style: TextStyle(
-            color: isDarkMode ? Colors.white : Colors.black,
-          ),
+          style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
         ),
         backgroundColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
         actions: [
@@ -377,9 +379,7 @@ class AppDrawer extends StatelessWidget {
             onPressed: () => Navigator.pop(context),
             child: Text(
               'Cancel',
-              style: TextStyle(
-                color: isDarkMode ? Colors.white : Colors.black,
-              ),
+              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
             ),
           ),
           ElevatedButton(
@@ -394,7 +394,9 @@ class AppDrawer extends StatelessWidget {
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: isDarkMode ? Colors.red.shade400 : Colors.red.shade700,
+              backgroundColor: isDarkMode
+                  ? Colors.red.shade400
+                  : Colors.red.shade700,
               foregroundColor: Colors.white,
             ),
             child: const Text('Logout'),
@@ -409,9 +411,7 @@ class AppDrawer extends StatelessWidget {
       SnackBar(
         content: Text(
           'Sales History coming soon!',
-          style: TextStyle(
-            color: isDarkMode ? Colors.white : Colors.black,
-          ),
+          style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
         ),
         behavior: SnackBarBehavior.floating,
         backgroundColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
@@ -424,9 +424,7 @@ class AppDrawer extends StatelessWidget {
       SnackBar(
         content: Text(
           'Reports coming soon!',
-          style: TextStyle(
-            color: isDarkMode ? Colors.white : Colors.black,
-          ),
+          style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
         ),
         behavior: SnackBarBehavior.floating,
         backgroundColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
@@ -440,9 +438,7 @@ class AppDrawer extends StatelessWidget {
       builder: (context) => AlertDialog(
         title: Text(
           'Help & Support',
-          style: TextStyle(
-            color: isDarkMode ? Colors.white : Colors.black,
-          ),
+          style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
         ),
         backgroundColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
         content: Column(
@@ -451,23 +447,17 @@ class AppDrawer extends StatelessWidget {
           children: [
             Text(
               '📧 Email: support@posapp.com',
-              style: TextStyle(
-                color: isDarkMode ? Colors.white : Colors.black,
-              ),
+              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
             ),
             const SizedBox(height: 8),
             Text(
               '📞 Phone: +92 300 1234567',
-              style: TextStyle(
-                color: isDarkMode ? Colors.white : Colors.black,
-              ),
+              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
             ),
             const SizedBox(height: 8),
             Text(
               '🌐 Website: www.posapp.com',
-              style: TextStyle(
-                color: isDarkMode ? Colors.white : Colors.black,
-              ),
+              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
             ),
             const SizedBox(height: 16),
             Text(
@@ -484,9 +474,7 @@ class AppDrawer extends StatelessWidget {
             onPressed: () => Navigator.pop(context),
             child: Text(
               'Close',
-              style: TextStyle(
-                color: isDarkMode ? Colors.white : Colors.black,
-              ),
+              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
             ),
           ),
         ],
@@ -507,9 +495,7 @@ class AppDrawer extends StatelessWidget {
             const SizedBox(width: 8),
             Text(
               'About POS System',
-              style: TextStyle(
-                color: isDarkMode ? Colors.white : Colors.black,
-              ),
+              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
             ),
           ],
         ),
@@ -567,9 +553,7 @@ class AppDrawer extends StatelessWidget {
             onPressed: () => Navigator.pop(context),
             child: Text(
               'Close',
-              style: TextStyle(
-                color: isDarkMode ? Colors.white : Colors.black,
-              ),
+              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
             ),
           ),
         ],

@@ -1,14 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:pos/theme/app_colors.dart';
 
-enum BadgeType {
-  success,
-  warning,
-  error,
-  info,
-  neutral,
-  primary,
-}
+enum BadgeType { success, warning, error, info, neutral, primary }
 
 /// Stylish status chip / badge for stock, tiers, payment methods, and roles.
 class StatBadge extends StatelessWidget {
@@ -64,10 +57,7 @@ class StatBadge extends StatelessWidget {
         type: BadgeType.warning,
       );
     }
-    return StatBadge(
-      label: tier,
-      type: BadgeType.neutral,
-    );
+    return StatBadge(label: tier, type: BadgeType.neutral);
   }
 
   @override
@@ -106,8 +96,12 @@ class StatBadge extends StatelessWidget {
         bg = fg.withValues(alpha: isDark ? 0.15 : 0.1);
         break;
       case BadgeType.neutral:
-        fg = isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary;
-        bg = isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.05);
+        fg = isDark
+            ? AppColors.darkTextSecondary
+            : AppColors.lightTextSecondary;
+        bg = isDark
+            ? Colors.white.withValues(alpha: 0.06)
+            : Colors.black.withValues(alpha: 0.05);
         break;
     }
 

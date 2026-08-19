@@ -78,7 +78,8 @@ class CartItem {
     return 0.0;
   }
 
-  double get total => (subtotal - calculatedDiscount).clamp(0.0, double.infinity);
+  double get total =>
+      (subtotal - calculatedDiscount).clamp(0.0, double.infinity);
 
   double get profit => total - (costPrice * quantity);
 

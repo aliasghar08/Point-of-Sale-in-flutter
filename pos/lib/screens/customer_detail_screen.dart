@@ -43,7 +43,11 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
   Future<void> _loadCustomerAndSales() async {
     setState(() => _isLoading = true);
     try {
-      final effectiveId = widget.customerId ?? widget.customer?['id'] ?? widget.customer?['customerId'] ?? '';
+      final effectiveId =
+          widget.customerId ??
+          widget.customer?['id'] ??
+          widget.customer?['customerId'] ??
+          '';
 
       if (widget.customer != null) {
         _customer = Customer.fromMap(widget.customer!, effectiveId);
@@ -74,7 +78,8 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
     final currencySymbol = settingsProvider.currencySymbol;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final customerName = _customer?.name ?? widget.customerName ?? 'Customer Profile';
+    final customerName =
+        _customer?.name ?? widget.customerName ?? 'Customer Profile';
 
     return Scaffold(
       appBar: AppBar(
@@ -91,56 +96,66 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _customer == null
-              ? const EmptyStateView(
-                  icon: Icons.person_off_outlined,
-                  title: 'Customer not found',
-                  description: 'Unable to load customer profile details from database.',
-                )
-              : ListView(
-                  padding: const EdgeInsets.all(16),
+          ? const EmptyStateView(
+              icon: Icons.person_off_outlined,
+              title: 'Customer not found',
+              description:
+                  'Unable to load customer profile details from database.',
+            )
+          : ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                // Client Header Card
+                _buildProfileHeader(_customer!, currencySymbol, isDark),
+                const SizedBox(height: 16),
+
+                // Lifetime Stats Banner
+                _buildStatsRow(_customer!, currencySymbol, isDark),
+                const SizedBox(height: 20),
+
+                // Purchase History Title
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    // Client Header Card
-                    _buildProfileHeader(_customer!, currencySymbol, isDark),
-                    const SizedBox(height: 16),
-
-                    // Lifetime Stats Banner
-                    _buildStatsRow(_customer!, currencySymbol, isDark),
-                    const SizedBox(height: 20),
-
-                    // Purchase History Title
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Purchase & Order History',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                        ),
-                        Text(
-                          '${_purchaseHistory.length} Transactions',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-                          ),
-                        ),
-                      ],
+                    const Text(
+                      'Purchase & Order History',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
                     ),
-                    const SizedBox(height: 12),
-
-                    // Orders List
-                    if (_purchaseHistory.isEmpty)
-                      const PosCard(
-                        padding: EdgeInsets.all(24),
-                        child: Center(
-                          child: Text('No previous transactions recorded for this customer.'),
-                        ),
-                      )
-                    else
-                      ..._purchaseHistory.map((s) => Padding(
-                            padding: const EdgeInsets.only(bottom: 10),
-                            child: _buildOrderCard(s, currencySymbol, isDark),
-                          )),
+                    Text(
+                      '${_purchaseHistory.length} Transactions',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark
+                            ? AppColors.darkTextSecondary
+                            : AppColors.lightTextSecondary,
+                      ),
+                    ),
                   ],
                 ),
+                const SizedBox(height: 12),
+
+                // Orders List
+                if (_purchaseHistory.isEmpty)
+                  const PosCard(
+                    padding: EdgeInsets.all(24),
+                    child: Center(
+                      child: Text(
+                        'No previous transactions recorded for this customer.',
+                      ),
+                    ),
+                  )
+                else
+                  ..._purchaseHistory.map(
+                    (s) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _buildOrderCard(s, currencySymbol, isDark),
+                    ),
+                  ),
+              ],
+            ),
     );
   }
 
@@ -154,7 +169,9 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
             children: [
               CircleAvatar(
                 radius: 30,
-                backgroundColor: (isDark ? AppColors.primaryLight : AppColors.primary).withValues(alpha: 0.15),
+                backgroundColor:
+                    (isDark ? AppColors.primaryLight : AppColors.primary)
+                        .withValues(alpha: 0.15),
                 child: Text(
                   c.name.isNotEmpty ? c.name[0].toUpperCase() : 'C',
                   style: TextStyle(
@@ -174,7 +191,10 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                         Expanded(
                           child: Text(
                             c.name,
-                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                         StatBadge.tier(c.customerValueCategory),
@@ -183,13 +203,23 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                     const SizedBox(height: 4),
                     Text(
                       c.phone.isNotEmpty ? c.phone : 'No Phone Provided',
-                      style: TextStyle(fontSize: 13, color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: isDark
+                            ? AppColors.darkTextSecondary
+                            : AppColors.lightTextSecondary,
+                      ),
                     ),
                     if (c.email.isNotEmpty) ...[
                       const SizedBox(height: 2),
                       Text(
                         c.email,
-                        style: TextStyle(fontSize: 12, color: isDark ? AppColors.darkTextMuted : AppColors.lightTextMuted),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isDark
+                              ? AppColors.darkTextMuted
+                              : AppColors.lightTextMuted,
+                        ),
                       ),
                     ],
                   ],
@@ -201,12 +231,21 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
             const Divider(height: 24),
             Row(
               children: [
-                const Icon(Icons.location_on_outlined, size: 16, color: AppColors.primary),
+                const Icon(
+                  Icons.location_on_outlined,
+                  size: 16,
+                  color: AppColors.primary,
+                ),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
                     c.address,
-                    style: TextStyle(fontSize: 12, color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isDark
+                          ? AppColors.darkTextSecondary
+                          : AppColors.lightTextSecondary,
+                    ),
                   ),
                 ),
               ],
@@ -226,11 +265,26 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Total Spend (LTV)', style: TextStyle(fontSize: 11, color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary)),
+                Text(
+                  'Total Spend (LTV)',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isDark
+                        ? AppColors.darkTextSecondary
+                        : AppColors.lightTextSecondary,
+                  ),
+                ),
                 const SizedBox(height: 4),
                 Text(
-                  FormatService.formatCurrency(c.totalSpent, symbol: currencySymbol),
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.success),
+                  FormatService.formatCurrency(
+                    c.totalSpent,
+                    symbol: currencySymbol,
+                  ),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.success,
+                  ),
                 ),
               ],
             ),
@@ -243,11 +297,22 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Total Orders', style: TextStyle(fontSize: 11, color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary)),
+                Text(
+                  'Total Orders',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isDark
+                        ? AppColors.darkTextSecondary
+                        : AppColors.lightTextSecondary,
+                  ),
+                ),
                 const SizedBox(height: 4),
                 Text(
                   '${c.totalOrders}',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ],
             ),
@@ -260,7 +325,15 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Loyalty Pts', style: TextStyle(fontSize: 11, color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary)),
+                Text(
+                  'Loyalty Pts',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isDark
+                        ? AppColors.darkTextSecondary
+                        : AppColors.lightTextSecondary,
+                  ),
+                ),
                 const SizedBox(height: 4),
                 Text(
                   '${c.loyaltyPoints}',
@@ -308,14 +381,22 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
               children: [
                 Text(
                   '${s.quantity}x ${s.productName}',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 2),
                 Text(
                   '${FormatService.formatDateTime(s.saleDate)} • ${s.paymentMethod}',
-                  style: TextStyle(fontSize: 11, color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isDark
+                        ? AppColors.darkTextSecondary
+                        : AppColors.lightTextSecondary,
+                  ),
                 ),
               ],
             ),

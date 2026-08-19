@@ -55,7 +55,9 @@ class ModernTextField extends StatelessWidget {
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w600,
-              color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+              color: isDark
+                  ? AppColors.darkTextSecondary
+                  : AppColors.lightTextSecondary,
             ),
           ),
           const SizedBox(height: 6),
@@ -75,7 +77,9 @@ class ModernTextField extends StatelessWidget {
           onTap: onTap,
           style: TextStyle(
             fontSize: 14,
-            color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+            color: isDark
+                ? AppColors.darkTextPrimary
+                : AppColors.lightTextPrimary,
           ),
           decoration: InputDecoration(
             hintText: hintText,
@@ -83,7 +87,9 @@ class ModernTextField extends StatelessWidget {
                 ? Icon(
                     prefixIcon,
                     size: 20,
-                    color: isDark ? AppColors.darkTextMuted : AppColors.lightTextMuted,
+                    color: isDark
+                        ? AppColors.darkTextMuted
+                        : AppColors.lightTextMuted,
                   )
                 : null,
             suffixIcon: suffixIcon,

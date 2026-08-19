@@ -52,21 +52,23 @@ class _BarcodeScannerState extends State<BarcodeScanner>
       detectionSpeed: DetectionSpeed.noDuplicates,
       returnImage: false,
       autoStart: true,
-      formats: widget.formats ?? const [
-        BarcodeFormat.qrCode,
-        BarcodeFormat.code128,
-        BarcodeFormat.code39,
-        BarcodeFormat.code93,
-        BarcodeFormat.ean13,
-        BarcodeFormat.ean8,
-        BarcodeFormat.upcA,
-        BarcodeFormat.upcE,
-        BarcodeFormat.codabar,
-        BarcodeFormat.itf14,
-        BarcodeFormat.dataMatrix,
-        BarcodeFormat.aztec,
-        BarcodeFormat.pdf417,
-      ],
+      formats:
+          widget.formats ??
+          const [
+            BarcodeFormat.qrCode,
+            BarcodeFormat.code128,
+            BarcodeFormat.code39,
+            BarcodeFormat.code93,
+            BarcodeFormat.ean13,
+            BarcodeFormat.ean8,
+            BarcodeFormat.upcA,
+            BarcodeFormat.upcE,
+            BarcodeFormat.codabar,
+            BarcodeFormat.itf14,
+            BarcodeFormat.dataMatrix,
+            BarcodeFormat.aztec,
+            BarcodeFormat.pdf417,
+          ],
     );
 
     _laserAnimationController = AnimationController(
@@ -80,7 +82,8 @@ class _BarcodeScannerState extends State<BarcodeScanner>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (!_controller.value.isInitialized) return;
-    if (state == AppLifecycleState.inactive || state == AppLifecycleState.paused) {
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused) {
       _controller.stop();
     } else if (state == AppLifecycleState.resumed) {
       _controller.start();
@@ -119,7 +122,8 @@ class _BarcodeScannerState extends State<BarcodeScanner>
     final String? rawValue = barcode.rawValue;
 
     if (rawValue != null && rawValue.isNotEmpty) {
-      final isQr = barcode.format == BarcodeFormat.qrCode ||
+      final isQr =
+          barcode.format == BarcodeFormat.qrCode ||
           barcode.format == BarcodeFormat.dataMatrix ||
           barcode.format == BarcodeFormat.aztec;
 
@@ -181,7 +185,10 @@ class _BarcodeScannerState extends State<BarcodeScanner>
           children: [
             Icon(Icons.edit_note, color: Colors.blue),
             SizedBox(width: 8),
-            Text('Enter Code Manually', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text(
+              'Enter Code Manually',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
           ],
         ),
         content: Column(
@@ -199,7 +206,9 @@ class _BarcodeScannerState extends State<BarcodeScanner>
               keyboardType: TextInputType.text,
               decoration: InputDecoration(
                 hintText: 'e.g. 8901234567890',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
                 prefixIcon: const Icon(Icons.barcode_reader),
               ),
             ),
@@ -214,7 +223,9 @@ class _BarcodeScannerState extends State<BarcodeScanner>
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.blue.shade700,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
             onPressed: () {
               final text = codeController.text.trim();
@@ -282,7 +293,9 @@ class _BarcodeScannerState extends State<BarcodeScanner>
                                   ),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: _activeBorderColor.withValues(alpha: 0.8),
+                                      color: _activeBorderColor.withValues(
+                                        alpha: 0.8,
+                                      ),
                                       blurRadius: 10,
                                       spreadRadius: 2,
                                     ),
@@ -306,7 +319,10 @@ class _BarcodeScannerState extends State<BarcodeScanner>
                 // Header Bar (Back button, Title badge)
                 SafeArea(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -316,14 +332,20 @@ class _BarcodeScannerState extends State<BarcodeScanner>
                           shape: const CircleBorder(),
                           clipBehavior: Clip.antiAlias,
                           child: IconButton(
-                            icon: const Icon(Icons.arrow_back, color: Colors.white),
+                            icon: const Icon(
+                              Icons.arrow_back,
+                              color: Colors.white,
+                            ),
                             onPressed: () => Navigator.pop(context),
                           ),
                         ),
 
                         // Title Badge
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.black.withValues(alpha: 0.6),
                             borderRadius: BorderRadius.circular(20),
@@ -331,7 +353,11 @@ class _BarcodeScannerState extends State<BarcodeScanner>
                           ),
                           child: Row(
                             children: [
-                              const Icon(Icons.qr_code_scanner, color: Colors.cyanAccent, size: 18),
+                              const Icon(
+                                Icons.qr_code_scanner,
+                                color: Colors.cyanAccent,
+                                size: 18,
+                              ),
                               const SizedBox(width: 8),
                               Text(
                                 widget.title,
@@ -362,14 +388,24 @@ class _BarcodeScannerState extends State<BarcodeScanner>
                       child: _errorMessage != null
                           ? Container(
                               key: const ValueKey('error_banner'),
-                              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 18,
+                                vertical: 12,
+                              ),
                               decoration: BoxDecoration(
-                                color: Colors.red.shade900.withValues(alpha: 0.92),
+                                color: Colors.red.shade900.withValues(
+                                  alpha: 0.92,
+                                ),
                                 borderRadius: BorderRadius.circular(20),
-                                border: Border.all(color: Colors.redAccent, width: 1.5),
+                                border: Border.all(
+                                  color: Colors.redAccent,
+                                  width: 1.5,
+                                ),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.redAccent.withValues(alpha: 0.4),
+                                    color: Colors.redAccent.withValues(
+                                      alpha: 0.4,
+                                    ),
                                     blurRadius: 12,
                                     spreadRadius: 2,
                                   ),
@@ -378,7 +414,11 @@ class _BarcodeScannerState extends State<BarcodeScanner>
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  const Icon(Icons.error_outline, color: Colors.white, size: 22),
+                                  const Icon(
+                                    Icons.error_outline,
+                                    color: Colors.white,
+                                    size: 22,
+                                  ),
                                   const SizedBox(width: 8),
                                   Flexible(
                                     child: Text(
@@ -396,7 +436,10 @@ class _BarcodeScannerState extends State<BarcodeScanner>
                             )
                           : Container(
                               key: const ValueKey('hint_banner'),
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 8,
+                              ),
                               decoration: BoxDecoration(
                                 color: Colors.black.withValues(alpha: 0.65),
                                 borderRadius: BorderRadius.circular(20),
@@ -421,7 +464,10 @@ class _BarcodeScannerState extends State<BarcodeScanner>
                   left: 24,
                   right: 24,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.black.withValues(alpha: 0.75),
                       borderRadius: BorderRadius.circular(30),
@@ -567,8 +613,13 @@ class _BarcodeScannerState extends State<BarcodeScanner>
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blue.shade700,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 14,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
             ),
           ],
@@ -591,7 +642,8 @@ class _ScannerOverlayPainter extends CustomPainter {
     final double top = (size.height - boxSize) / 2;
     final Rect cutoutRect = Rect.fromLTWH(left, top, boxSize, boxSize);
 
-    final Paint backgroundPaint = Paint()..color = Colors.black.withValues(alpha: 0.65);
+    final Paint backgroundPaint = Paint()
+      ..color = Colors.black.withValues(alpha: 0.65);
 
     final Path backgroundPath = Path()
       ..addRect(Rect.fromLTWH(0, 0, size.width, size.height))

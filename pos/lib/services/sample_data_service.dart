@@ -165,7 +165,10 @@ class SampleDataService {
   static Future<int> seedSampleProducts() async {
     final firebaseService = FirebaseService();
     final businessId = await firebaseService.getCurrentBusinessId();
-    if (businessId == null) throw Exception('No business active. Please create or join a business first.');
+    if (businessId == null)
+      throw Exception(
+        'No business active. Please create or join a business first.',
+      );
 
     int count = 0;
     final batch = FirebaseFirestore.instance.batch();
