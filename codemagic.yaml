@@ -6,31 +6,20 @@ workflows:
     environment:
       flutter: stable
       xcode: latest
-      cocoapods: default
     scripts:
       - name: Install dependencies
         script: flutter pub get
-      - name: Install CocoaPods
-        script: |
-          flutter build ios --config-only --no-codesign
-          cd ios
-          pod install
       - name: Build iOS App
         script: |
-          # Note: Code signing is required to produce an IPA for TestFlight or App Store.
-          # You will need to configure code signing in Codemagic UI (or via env variables).
           # For testing the build process without signing, use:
           flutter build ios --release --no-codesign
-          
-          # Once code signing is configured in Codemagic UI, replace the above line with:
-          # flutter build ipa --release --export-options-plist=/Users/builder/export_options.plist
     artifacts:
       - build/ios/iphoneos/*.app
       - build/ios/ipa/*.ipa
     publishing:
       email:
         recipients:
-          - your.email@example.com # <-- Change this to your actual email address
+          - aliasgharinnocent@yahoo.com 
         notify:
           success: true
           failure: true
