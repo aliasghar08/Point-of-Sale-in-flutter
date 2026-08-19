@@ -12,6 +12,7 @@ workflows:
         script: flutter pub get
       - name: Install CocoaPods
         script: |
+          flutter build ios --config-only
           cd ios
           pod install
       - name: Build iOS App
@@ -29,7 +30,7 @@ workflows:
     publishing:
       email:
         recipients:
-          - admin@example.com
+          - your.email@example.com # <-- Change this to your actual email address
         notify:
           success: true
           failure: true
