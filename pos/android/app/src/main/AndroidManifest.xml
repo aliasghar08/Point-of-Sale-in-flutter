@@ -8,15 +8,14 @@
     <!-- Storage Permissions -->
     <!-- For Android 13+ (API 33) -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
-    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+
     <!-- For Android 12 and below -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" 
         android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" 
         android:maxSdkVersion="29" />
     
-    <!-- Microphone permission for voice input -->
-    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
 
     <!-- Internet permissions -->
     <uses-permission android:name="android.permission.INTERNET" />
@@ -25,11 +24,7 @@
     <!-- Biometric permission -->
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
 
-    <!-- Location permissions (Optional - for country detection) -->
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    <!-- For background location (if needed) -->
-    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+
     
     <!-- For vibration feedback during scanning -->
     <uses-permission android:name="android.permission.VIBRATE" />
