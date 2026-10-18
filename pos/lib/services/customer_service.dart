@@ -9,7 +9,7 @@ class CustomerService {
   factory CustomerService() => _instance;
   CustomerService._internal();
 
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  FirebaseFirestore get _firestore => FirebaseFirestore.instance;
   final FirebaseService _firebaseService = FirebaseService();
   final CacheService _cache = CacheService();
 

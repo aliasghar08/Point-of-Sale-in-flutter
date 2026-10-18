@@ -66,10 +66,10 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyA6bSbyyb25Hujd14eerXYEgdNTxidr9Cs',
-    appId: '1:652844599136:ios:b3bd71e2a8f3a7f9d9c005',
+    appId: '1:652844599136:ios:69c7f8dbb8855e46d9c005',
     messagingSenderId: '652844599136',
     projectId: 'point-of-sale-b7963',
     storageBucket: 'point-of-sale-b7963.firebasestorage.app',
-    iosBundleId: 'com.example.pos',
+    iosBundleId: 'com.dartnexuslab.poshub',
   );
 }

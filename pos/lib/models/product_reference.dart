@@ -737,10 +737,12 @@ class ProductReference {
 
       if (aLower == searchTerm && bLower != searchTerm) return -1;
       if (bLower == searchTerm && aLower != searchTerm) return 1;
-      if (aLower.startsWith(searchTerm) && !bLower.startsWith(searchTerm))
+      if (aLower.startsWith(searchTerm) && !bLower.startsWith(searchTerm)) {
         return -1;
-      if (bLower.startsWith(searchTerm) && !aLower.startsWith(searchTerm))
+      }
+      if (bLower.startsWith(searchTerm) && !aLower.startsWith(searchTerm)) {
         return 1;
+      }
       return a.compareTo(b);
     });
 
@@ -817,10 +819,12 @@ class ProductReference {
 
       if (aLower == searchTerm) return -1;
       if (bLower == searchTerm) return 1;
-      if (aLower.startsWith(searchTerm) && !bLower.startsWith(searchTerm))
+      if (aLower.startsWith(searchTerm) && !bLower.startsWith(searchTerm)) {
         return -1;
-      if (bLower.startsWith(searchTerm) && !aLower.startsWith(searchTerm))
+      }
+      if (bLower.startsWith(searchTerm) && !aLower.startsWith(searchTerm)) {
         return 1;
+      }
       return a.compareTo(b);
     });
 

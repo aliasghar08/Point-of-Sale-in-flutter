@@ -53,7 +53,10 @@ We implement reasonable administrative, technical, and physical security measure
 ## 5. Data Retention and Deletion
 
 We will retain your personal information only for as long as is necessary for the purposes set out in this Privacy Policy. 
-If you wish to delete your account or request the removal of your data, you can do so by contacting us directly. Upon request, we will securely delete your account and associated business data from our servers.
+
+You have full control over your data:
+- **In-App Account Deletion (Apple Guideline 5.1.1(v)):** You can permanently delete your account, authentication credentials, and all associated business and sales data directly inside the App by navigating to **Settings > Account & Data Privacy > Delete Account & Data**.
+- **Email Request:** You may also request data deletion by contacting us at support@dartnexuslab.com. Upon confirmation, your data will be permanently and irreversibly removed from our cloud servers.
 
 ## 6. Children's Privacy
 

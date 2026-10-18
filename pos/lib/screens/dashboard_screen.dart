@@ -144,15 +144,49 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _currentIndex = 0;
     }
 
-    return Scaffold(
-      drawer: AppDrawer(
-        currentIndex: _currentIndex,
-        onItemSelected: (index) {
-          if (index < tabs.length) {
-            setState(() => _currentIndex = index);
-          }
-        },
+    final isWide = MediaQuery.of(context).size.width >= 720;
+
+    final railDestinations = [
+      const NavigationRailDestination(
+        icon: Icon(Icons.point_of_sale_outlined),
+        selectedIcon: Icon(Icons.point_of_sale),
+        label: Text('POS'),
       ),
+      if (user.canManageInventory)
+        const NavigationRailDestination(
+          icon: Icon(Icons.inventory_2_outlined),
+          selectedIcon: Icon(Icons.inventory_2),
+          label: Text('Inventory'),
+        ),
+      const NavigationRailDestination(
+        icon: Icon(Icons.analytics_outlined),
+        selectedIcon: Icon(Icons.analytics),
+        label: Text('Analytics'),
+      ),
+      const NavigationRailDestination(
+        icon: Icon(Icons.people_alt_outlined),
+        selectedIcon: Icon(Icons.people_alt),
+        label: Text('CRM'),
+      ),
+      if (user.canManageUsers)
+        const NavigationRailDestination(
+          icon: Icon(Icons.manage_accounts_outlined),
+          selectedIcon: Icon(Icons.manage_accounts),
+          label: Text('Staff'),
+        ),
+    ];
+
+    return Scaffold(
+      drawer: isWide
+          ? null
+          : AppDrawer(
+              currentIndex: _currentIndex,
+              onItemSelected: (index) {
+                if (index < tabs.length) {
+                  setState(() => _currentIndex = index);
+                }
+              },
+            ),
       appBar: AppBar(
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -202,15 +236,164 @@ class _DashboardScreenState extends State<DashboardScreen> {
               );
             },
           ),
+          PopupMenuButton<String>(
+            tooltip: 'User Profile & Actions',
+            icon: CircleAvatar(
+              radius: 14,
+              backgroundColor: isDark ? AppColors.primaryLight : AppColors.primary,
+              child: Text(
+                user.name.isNotEmpty ? user.name[0].toUpperCase() : 'U',
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            onSelected: (val) {
+              if (val == 'settings') {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                );
+              } else if (val == 'logout') {
+                authProvider.signOut();
+              }
+            },
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                enabled: false,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      user.name,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white : Colors.black,
+                      ),
+                    ),
+                    Text(
+                      '${user.email} (${user.roleDisplay})',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark
+                            ? AppColors.darkTextSecondary
+                            : AppColors.lightTextSecondary,
+                      ),
+                    ),
+                    const Divider(),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'settings',
+                child: Row(
+                  children: [
+                    Icon(Icons.settings, size: 18),
+                    SizedBox(width: 8),
+                    Text('Settings'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'logout',
+                child: Row(
+                  children: [
+                    Icon(Icons.logout, size: 18, color: AppColors.error),
+                    SizedBox(width: 8),
+                    Text('Sign Out', style: TextStyle(color: AppColors.error)),
+                  ],
+                ),
+              ),
+            ],
+          ),
           const SizedBox(width: 8),
         ],
       ),
-      body: IndexedStack(index: _currentIndex, children: tabs),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _currentIndex,
-        onDestinationSelected: (index) => setState(() => _currentIndex = index),
-        destinations: destinations,
-      ),
+      body: isWide
+          ? Row(
+              children: [
+                NavigationRail(
+                  selectedIndex: _currentIndex,
+                  onDestinationSelected: (index) =>
+                      setState(() => _currentIndex = index),
+                  labelType: NavigationRailLabelType.all,
+                  backgroundColor:
+                      isDark ? AppColors.darkSurface : AppColors.lightSurface,
+                  indicatorColor: (isDark
+                          ? AppColors.primaryLight
+                          : AppColors.primary)
+                      .withValues(alpha: 0.16),
+                  selectedIconTheme: IconThemeData(
+                    color: isDark ? AppColors.primaryLight : AppColors.primary,
+                    size: 24,
+                  ),
+                  unselectedIconTheme: IconThemeData(
+                    color: isDark
+                        ? AppColors.darkTextSecondary
+                        : AppColors.lightTextSecondary,
+                    size: 24,
+                  ),
+                  selectedLabelTextStyle: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? AppColors.primaryLight : AppColors.primary,
+                  ),
+                  unselectedLabelTextStyle: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: isDark
+                        ? AppColors.darkTextSecondary
+                        : AppColors.lightTextSecondary,
+                  ),
+                  leading: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        gradient: isDark
+                            ? AppColors.darkCardGradient
+                            : AppColors.primaryGradient,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: (isDark ? Colors.black : AppColors.primary)
+                                .withValues(alpha: 0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.point_of_sale_rounded,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                    ),
+                  ),
+                  destinations: railDestinations,
+                ),
+                VerticalDivider(
+                  width: 1,
+                  thickness: 1,
+                  color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+                ),
+                Expanded(
+                  child: IndexedStack(index: _currentIndex, children: tabs),
+                ),
+              ],
+            )
+          : IndexedStack(index: _currentIndex, children: tabs),
+      bottomNavigationBar: isWide
+          ? null
+          : NavigationBar(
+              selectedIndex: _currentIndex,
+              onDestinationSelected: (index) =>
+                  setState(() => _currentIndex = index),
+              destinations: destinations,
+            ),
     );
   }
 }

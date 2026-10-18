@@ -7,7 +7,6 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:pos/providers/auth_provider.dart';
-import 'package:pos/services/permission_service.dart';
 import 'package:pos/models/countries.dart';
 import 'package:pos/services/firebase_service.dart';
 
@@ -31,10 +30,10 @@ class _SignupScreenState extends State<SignupScreen> {
   bool _obscureConfirmPassword = true;
   String _selectedRole = 'owner';
   bool _isDetectingCountry = false;
-  bool _locationPermissionDenied = false;
 
   // Country code related - Default to Pakistan
   String _selectedCountryCode = '+92';
+  String _selectedCountryIso = 'PK';
   String _countryFlag = '🇵🇰';
   String _countryName = 'Pakistan';
 
@@ -69,6 +68,7 @@ class _SignupScreenState extends State<SignupScreen> {
     if (pakistan != null) {
       setState(() {
         _selectedCountryCode = pakistan.code;
+        _selectedCountryIso = pakistan.iso;
         _countryFlag = pakistan.flag;
         _countryName = pakistan.name;
       });
@@ -274,7 +274,6 @@ class _SignupScreenState extends State<SignupScreen> {
   Future<void> _detectCountry() async {
     setState(() {
       _isDetectingCountry = true;
-      _locationPermissionDenied = false;
     });
 
     try {
@@ -320,6 +319,7 @@ class _SignupScreenState extends State<SignupScreen> {
         if (matchingCountry != null) {
           setState(() {
             _selectedCountryCode = matchingCountry.code;
+            _selectedCountryIso = matchingCountry.iso;
             _countryFlag = matchingCountry.flag;
             _countryName = matchingCountry.name;
             _isDetectingCountry = false;
@@ -490,60 +490,6 @@ class _SignupScreenState extends State<SignupScreen> {
                         color: isDarkMode
                             ? Colors.blue.shade400
                             : Colors.blue.shade700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            // Show location permission status
-            if (_locationPermissionDenied)
-              Container(
-                padding: const EdgeInsets.all(8),
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(
-                  color: isDarkMode
-                      ? Colors.orange.shade900.withValues(alpha: 0.5)
-                      : Colors.orange.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: isDarkMode
-                        ? Colors.orange.shade700
-                        : Colors.orange.shade200,
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.location_off,
-                      size: 16,
-                      color: isDarkMode
-                          ? Colors.orange.shade400
-                          : Colors.orange.shade700,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Location permission denied. Using default country.',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: isDarkMode
-                              ? Colors.orange.shade400
-                              : Colors.orange.shade700,
-                        ),
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        PermissionService.openAppSettings();
-                      },
-                      child: Text(
-                        'Settings',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: isDarkMode
-                              ? Colors.blue.shade400
-                              : Colors.blue.shade700,
-                        ),
                       ),
                     ),
                   ],
@@ -1105,7 +1051,9 @@ class _SignupScreenState extends State<SignupScreen> {
                         ),
                         child: DropdownButtonHideUnderline(
                           child: DropdownButton<String>(
-                            value: _selectedCountryCode,
+                            value: _countries.any((c) => c.iso == _selectedCountryIso)
+                                ? _selectedCountryIso
+                                : 'PK',
                             isExpanded: true,
                             dropdownColor: isDarkMode
                                 ? Colors.grey.shade800
@@ -1116,8 +1064,8 @@ class _SignupScreenState extends State<SignupScreen> {
                             ),
                             padding: const EdgeInsets.symmetric(horizontal: 6),
                             items: _countries.map((country) {
-                              return DropdownMenuItem(
-                                value: country.code,
+                              return DropdownMenuItem<String>(
+                                value: country.iso,
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
@@ -1150,12 +1098,14 @@ class _SignupScreenState extends State<SignupScreen> {
                                 ),
                               );
                             }).toList(),
-                            onChanged: (value) {
-                              if (value != null) {
-                                final selected = CountryHelper.getCountryByCode(
-                                  value,
-                                )!;
+                            onChanged: (iso) {
+                              if (iso != null) {
+                                final selected = _countries.firstWhere(
+                                  (c) => c.iso == iso,
+                                  orElse: () => _countries.first,
+                                );
                                 setState(() {
+                                  _selectedCountryIso = selected.iso;
                                   _selectedCountryCode = selected.code;
                                   _countryFlag = selected.flag;
                                   _countryName = selected.name;
@@ -1346,6 +1296,17 @@ class _SignupScreenState extends State<SignupScreen> {
                                       builder: (context) => const LoginScreen(),
                                     ),
                                   );
+                                } else if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        authProvider.error ?? 'Failed to create account. Please try again.',
+                                        style: const TextStyle(color: Colors.white),
+                                      ),
+                                      backgroundColor: Colors.red.shade700,
+                                      behavior: SnackBarBehavior.floating,
+                                    ),
+                                  );
                                 }
                               }
                             },
@@ -1401,6 +1362,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 ),
                 TextButton(
                   onPressed: () {
+                    authProvider.clearError();
                     Navigator.pushReplacement(
                       context,
                       MaterialPageRoute(

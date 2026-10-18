@@ -10,11 +10,13 @@ class AuthProvider extends ChangeNotifier {
 
   AppUser? _currentUser;
   bool _isLoading = false;
+  bool _isInitializing = true;
   String? _error;
   bool _isUnlocked = false; // Biometric unlock state
 
   AppUser? get currentUser => _currentUser;
   bool get isLoading => _isLoading;
+  bool get isInitializing => _isInitializing;
   String? get error => _error;
   bool get isAuthenticated => _currentUser != null;
   bool get isUnlocked => _isUnlocked;
@@ -28,7 +30,7 @@ class AuthProvider extends ChangeNotifier {
 
   // Initialize auth state
   Future<void> init() async {
-    _isLoading = true;
+    _isInitializing = true;
     notifyListeners();
 
     try {
@@ -42,12 +44,12 @@ class AuthProvider extends ChangeNotifier {
       _error = e.toString();
       debugPrint('❌ Init error: $e');
     } finally {
-      _isLoading = false;
+      _isInitializing = false;
       notifyListeners();
     }
   }
 
-  // ✅ Sign up - Only completes Firestore setup (user already created during verification)
+  // ✅ Sign up - Creates Firebase Auth user and business/member records
   Future<bool> signUp({
     required String email,
     required String password,
@@ -61,41 +63,25 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Get the current Firebase user (created during email verification)
-      final firebaseUser = FirebaseAuth.instance.currentUser;
+      final user = await _authService.signUp(
+        email: email,
+        password: password,
+        name: name,
+        role: role,
+        phone: phone,
+        storeName: storeName,
+      );
 
-      if (firebaseUser == null) {
-        // If no user exists, sign in to get the user
-        await FirebaseAuth.instance.signInWithEmailAndPassword(
-          email: email,
-          password: password,
-        );
-      }
-
-      // Now create the business and user data in Firestore
-      final businessId = await _firebaseService.createBusiness(storeName);
-
-      if (businessId.isEmpty) {
-        throw Exception('Failed to create business');
-      }
-
-      // Get the updated user data
-      _currentUser = await _authService.getCurrentUserData();
-
-      if (_currentUser != null) {
-        debugPrint('✅ Signup successful!');
-        debugPrint('✅ User: ${_currentUser!.name}');
-        debugPrint('✅ Business ID: ${_currentUser!.businessId}');
-        debugPrint('✅ Role: ${_currentUser!.role}');
-
-        // Sign out immediately after signup (user will sign in manually)
+      if (user != null) {
+        debugPrint('✅ Signup successful for ${user.email} (Business: ${user.businessId})');
+        // Sign out immediately so user signs in cleanly through LoginScreen
         await _authService.signOut();
         _currentUser = null;
+        return true;
       }
-
-      return true;
+      throw Exception('Failed to create account');
     } catch (e) {
-      _error = e.toString();
+      _error = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
       debugPrint('❌ Signup error: $e');
       return false;
     } finally {
@@ -193,7 +179,7 @@ class AuthProvider extends ChangeNotifier {
 
       return _currentUser != null;
     } catch (e) {
-      _error = e.toString();
+      _error = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
       debugPrint('❌ Signin error: $e');
       return false;
     } finally {
@@ -243,4 +229,26 @@ class AuthProvider extends ChangeNotifier {
 
   // ✅ Get user's role display name
   String get roleDisplay => _currentUser?.roleDisplay ?? 'User';
+
+  /// Permanently delete account and clear local state (Apple App Store Guideline 5.1.1(v))
+  Future<bool> deleteAccount({String? password}) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      await _authService.deleteAccount(password: password);
+      _currentUser = null;
+      _isUnlocked = false;
+      debugPrint('✅ Account deleted successfully');
+      return true;
+    } catch (e) {
+      _error = e.toString().replaceFirst('Exception: ', '');
+      debugPrint('❌ Account deletion error: $e');
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
 }

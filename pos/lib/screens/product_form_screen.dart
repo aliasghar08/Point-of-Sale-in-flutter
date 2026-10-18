@@ -147,7 +147,22 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
 
     // Load subcategories for the selected category
     if (_selectedCategory != null) {
+      if (!_categories.contains(_selectedCategory)) {
+        _categories.insert(0, _selectedCategory!);
+      }
       _subCategories = ProductReference.getSubCategories(_selectedCategory!);
+      if (_selectedSubCategory != null && !_subCategories.contains(_selectedSubCategory)) {
+        _subCategories.insert(0, _selectedSubCategory!);
+      }
+    }
+    if (_selectedUnit != null && !_units.contains(_selectedUnit)) {
+      _units.insert(0, _selectedUnit!);
+    }
+    if (_selectedWeightUnit != null && !_weightUnits.contains(_selectedWeightUnit)) {
+      _weightUnits.insert(0, _selectedWeightUnit!);
+    }
+    if (_selectedTaxClass != null && !_taxClasses.contains(_selectedTaxClass)) {
+      _taxClasses.insert(0, _selectedTaxClass!);
     }
   }
 
@@ -1581,7 +1596,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: DropdownButtonFormField<String>(
-                  initialValue: _selectedUnit,
+                  initialValue: _units.contains(_selectedUnit) ? _selectedUnit : null,
                   decoration: const InputDecoration(
                     labelText: 'Unit *',
                     border: InputBorder.none,
@@ -1593,7 +1608,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                   style: TextStyle(
                     color: isDarkMode ? Colors.white : Colors.black,
                   ),
-                  items: _units.map((unit) {
+                  items: _units.toSet().map((unit) {
                     return DropdownMenuItem(value: unit, child: Text(unit));
                   }).toList(),
                   onChanged: (value) {
@@ -1673,7 +1688,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: DropdownButtonFormField<String>(
-                  initialValue: _selectedWeightUnit,
+                  initialValue: _weightUnits.contains(_selectedWeightUnit)
+                      ? _selectedWeightUnit
+                      : null,
                   decoration: const InputDecoration(
                     labelText: 'Weight Unit',
                     border: InputBorder.none,
@@ -1685,7 +1702,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                   style: TextStyle(
                     color: isDarkMode ? Colors.white : Colors.black,
                   ),
-                  items: _weightUnits.map((unit) {
+                  items: _weightUnits.toSet().map((unit) {
                     return DropdownMenuItem(value: unit, child: Text(unit));
                   }).toList(),
                   onChanged: (value) {
@@ -1999,11 +2016,21 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: DropdownButtonFormField<String>(
-                  initialValue: _selectedCategory,
+                  initialValue: _categories.contains(_selectedCategory)
+                      ? _selectedCategory
+                      : null,
                   decoration: const InputDecoration(
                     labelText: 'Category *',
                     border: InputBorder.none,
                     contentPadding: EdgeInsets.symmetric(horizontal: 12),
+                  ),
+                  hint: Text(
+                    'Select category...',
+                    style: TextStyle(
+                      color: isDarkMode
+                          ? Colors.grey.shade400
+                          : Colors.grey.shade600,
+                    ),
                   ),
                   dropdownColor: isDarkMode
                       ? Colors.grey.shade800
@@ -2011,18 +2038,12 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                   style: TextStyle(
                     color: isDarkMode ? Colors.white : Colors.black,
                   ),
-                  items: [
-                    const DropdownMenuItem(
-                      value: null,
-                      child: Text('Select category...'),
-                    ),
-                    ..._categories.map((category) {
-                      return DropdownMenuItem(
-                        value: category,
-                        child: Text(category),
-                      );
-                    }),
-                  ],
+                  items: _categories.toSet().map((category) {
+                    return DropdownMenuItem(
+                      value: category,
+                      child: Text(category),
+                    );
+                  }).toList(),
                   onChanged: (value) {
                     setState(() {
                       _selectedCategory = value;
@@ -2056,11 +2077,21 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: DropdownButtonFormField<String>(
-                  initialValue: _selectedSubCategory,
+                  initialValue: _subCategories.contains(_selectedSubCategory)
+                      ? _selectedSubCategory
+                      : null,
                   decoration: const InputDecoration(
                     labelText: 'Sub Category',
                     border: InputBorder.none,
                     contentPadding: EdgeInsets.symmetric(horizontal: 12),
+                  ),
+                  hint: Text(
+                    'Select sub category...',
+                    style: TextStyle(
+                      color: isDarkMode
+                          ? Colors.grey.shade400
+                          : Colors.grey.shade600,
+                    ),
                   ),
                   dropdownColor: isDarkMode
                       ? Colors.grey.shade800
@@ -2068,18 +2099,12 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                   style: TextStyle(
                     color: isDarkMode ? Colors.white : Colors.black,
                   ),
-                  items: [
-                    const DropdownMenuItem(
-                      value: null,
-                      child: Text('Select sub category...'),
-                    ),
-                    ..._subCategories.map((subCat) {
-                      return DropdownMenuItem(
-                        value: subCat,
-                        child: Text(subCat),
-                      );
-                    }),
-                  ],
+                  items: _subCategories.toSet().map((subCat) {
+                    return DropdownMenuItem(
+                      value: subCat,
+                      child: Text(subCat),
+                    );
+                  }).toList(),
                   onChanged: (value) {
                     setState(() {
                       _selectedSubCategory = value;
@@ -2106,11 +2131,21 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: DropdownButtonFormField<String>(
-                  initialValue: _selectedTaxClass,
+                  initialValue: _taxClasses.contains(_selectedTaxClass)
+                      ? _selectedTaxClass
+                      : null,
                   decoration: const InputDecoration(
                     labelText: 'Tax Class',
                     border: InputBorder.none,
                     contentPadding: EdgeInsets.symmetric(horizontal: 12),
+                  ),
+                  hint: Text(
+                    'Select tax class...',
+                    style: TextStyle(
+                      color: isDarkMode
+                          ? Colors.grey.shade400
+                          : Colors.grey.shade600,
+                    ),
                   ),
                   dropdownColor: isDarkMode
                       ? Colors.grey.shade800
@@ -2118,15 +2153,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                   style: TextStyle(
                     color: isDarkMode ? Colors.white : Colors.black,
                   ),
-                  items: [
-                    const DropdownMenuItem(
-                      value: null,
-                      child: Text('Select tax class...'),
-                    ),
-                    ..._taxClasses.map((tax) {
-                      return DropdownMenuItem(value: tax, child: Text(tax));
-                    }),
-                  ],
+                  items: _taxClasses.toSet().map((tax) {
+                    return DropdownMenuItem(value: tax, child: Text(tax));
+                  }).toList(),
                   onChanged: (value) {
                     setState(() {
                       _selectedTaxClass = value;

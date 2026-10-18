@@ -147,8 +147,9 @@ class Sale {
   // Get customer contact info
   String get customerContact {
     if (customerPhone.isNotEmpty) return customerPhone;
-    if (customerEmail != null && customerEmail!.isNotEmpty)
+    if (customerEmail != null && customerEmail!.isNotEmpty) {
       return customerEmail!;
+    }
     return 'No contact info';
   }
 
@@ -157,8 +158,9 @@ class Sale {
     if (isGuestCustomer) return 'Guest Customer';
     String info = customerName;
     if (customerPhone.isNotEmpty) info += ' | $customerPhone';
-    if (customerEmail != null && customerEmail!.isNotEmpty)
+    if (customerEmail != null && customerEmail!.isNotEmpty) {
       info += ' | ${customerEmail!}';
+    }
     return info;
   }
 }

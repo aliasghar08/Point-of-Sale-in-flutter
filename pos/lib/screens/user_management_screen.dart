@@ -8,6 +8,7 @@ import 'package:pos/services/auth_service.dart';
 import 'package:pos/widgets/role_guard.dart';
 import 'package:pos/models/user.dart';
 import 'package:pos/services/firebase_service.dart';
+import 'package:pos/widgets/staggered_animation.dart';
 
 class UserManagementScreen extends StatelessWidget {
   const UserManagementScreen({super.key});
@@ -340,11 +341,14 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                     itemCount: _businessUsers.length,
                     itemBuilder: (context, index) {
                       final user = _businessUsers[index];
-                      return InkWell(
-                        onTap: () =>
-                            _showUserDetailsDialog(context, user, isDarkMode),
-                        borderRadius: BorderRadius.circular(12),
-                        child: _buildUserCard(context, user, isDarkMode),
+                      return StaggeredSlideFade(
+                        index: index,
+                        child: InkWell(
+                          onTap: () =>
+                              _showUserDetailsDialog(context, user, isDarkMode),
+                          borderRadius: BorderRadius.circular(12),
+                          child: _buildUserCard(context, user, isDarkMode),
+                        ),
                       );
                     },
                   )
@@ -358,11 +362,14 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                     itemCount: _businessUsers.length,
                     itemBuilder: (context, index) {
                       final user = _businessUsers[index];
-                      return InkWell(
-                        onTap: () =>
-                            _showUserDetailsDialog(context, user, isDarkMode),
-                        borderRadius: BorderRadius.circular(12),
-                        child: _buildUserCard(context, user, isDarkMode),
+                      return StaggeredSlideFade(
+                        index: index,
+                        child: InkWell(
+                          onTap: () =>
+                              _showUserDetailsDialog(context, user, isDarkMode),
+                          borderRadius: BorderRadius.circular(12),
+                          child: _buildUserCard(context, user, isDarkMode),
+                        ),
                       );
                     },
                   ),
@@ -376,8 +383,9 @@ class _UserManagementContentState extends State<_UserManagementContent> {
   bool _canManageUser(AppUser targetUser, bool isCurrentUser) {
     if (isCurrentUser) return false; // Can't delete/edit yourself here
     if (_isOwner) return true; // Owner can manage anyone else
-    if (targetUser.role == 'worker')
+    if (targetUser.role == 'worker') {
       return true; // Managers can only manage workers
+    }
     return false;
   }
 
@@ -891,8 +899,9 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                   ),
                   keyboardType: TextInputType.emailAddress,
                   validator: (value) {
-                    if (value == null || value.isEmpty)
+                    if (value == null || value.isEmpty) {
                       return 'Please enter email';
+                    }
                     if (!value.contains('@')) return 'Please enter valid email';
                     return null;
                   },
@@ -914,10 +923,12 @@ class _UserManagementContentState extends State<_UserManagementContent> {
                   ),
                   obscureText: true,
                   validator: (value) {
-                    if (value == null || value.isEmpty)
+                    if (value == null || value.isEmpty) {
                       return 'Please enter password';
-                    if (value.length < 6)
+                    }
+                    if (value.length < 6) {
                       return 'Password must be at least 6 characters';
+                    }
                     return null;
                   },
                 ),
@@ -1033,7 +1044,10 @@ class _UserManagementContentState extends State<_UserManagementContent> {
 
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final roles = ['owner', 'manager', 'worker'];
-    String selectedRole = user.role;
+    String selectedRole = user.role.toLowerCase();
+    if (!roles.contains(selectedRole)) {
+      roles.add(selectedRole);
+    }
 
     showDialog(
       context: context,

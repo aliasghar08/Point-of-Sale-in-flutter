@@ -1,0 +1,145 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // =========================================================================
+    // HELPER FUNCTIONS
+    // =========================================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Checks if the user is the actual creator of the business document
+    function isBusinessCreator(businessId) {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/businesses/$(businessId)) &&
+        get(/databases/$(database)/documents/businesses/$(businessId)).data.ownerId == request.auth.uid;
+    }
+
+    // Checks if the user making the request is a member of the requested business
+    function isMember(businessId) {
+      return isAuthenticated() && (
+        isBusinessCreator(businessId) ||
+        exists(/databases/$(database)/documents/businesses/$(businessId)/members/$(request.auth.uid))
+      );
+    }
+
+    // Gets the role of the user making the request
+    function getRole(businessId) {
+      return get(/databases/$(database)/documents/businesses/$(businessId)/members/$(request.auth.uid)).data.role;
+    }
+
+    function isOwner(businessId) {
+      return isAuthenticated() && (
+        isBusinessCreator(businessId) ||
+        (exists(/databases/$(database)/documents/businesses/$(businessId)/members/$(request.auth.uid)) && 
+         getRole(businessId) == 'owner')
+      );
+    }
+
+    function isOwnerOrManager(businessId) {
+      return isAuthenticated() && (
+        isBusinessCreator(businessId) ||
+        (exists(/databases/$(database)/documents/businesses/$(businessId)/members/$(request.auth.uid)) && 
+         getRole(businessId) in ['owner', 'manager'])
+      );
+    }
+
+    // =========================================================================
+    // ROOT LEVEL COLLECTIONS
+    // =========================================================================
+
+    // 1. Root Users Collection
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      // Users can edit their own profile, OR their manager/owner can update their roles
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      allow update, delete: if isAuthenticated() && (
+        request.auth.uid == userId || 
+        ('businessId' in resource.data && isOwnerOrManager(resource.data.businessId))
+      );
+    }
+
+    // 2. Lookup Collection (For fast routing on login)
+    match /userBusinessLookup/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      allow update, delete: if isAuthenticated() && (
+        request.auth.uid == userId || 
+        ('businessId' in resource.data && isOwnerOrManager(resource.data.businessId))
+      );
+    }
+
+    // 3. Fallback Empty Collection (Used by streams to prevent crashes)
+    match /_empty/{document=**} {
+      allow read: if isAuthenticated();
+      allow write: if false;
+    }
+
+    // =========================================================================
+    // BUSINESS TENANT ARCHITECTURE
+    // =========================================================================
+
+    match /businesses/{businessId} {
+      // Allow reading base business docs so new staff can search for the store name to join
+      allow read: if isAuthenticated();
+      
+      // Anyone can create a business (they must be set as the ownerId)
+      allow create: if isAuthenticated() && request.resource.data.ownerId == request.auth.uid;
+      
+      // Only the owner can edit the main business details
+      allow update: if isAuthenticated() && isOwner(businessId);
+      allow delete: if isAuthenticated() && (
+        (resource.data.ownerId == request.auth.uid) || isOwner(businessId)
+      );
+
+      // --- SUBCOLLECTION: SETTINGS ---
+      match /settings/{document=**} {
+        allow read: if isAuthenticated() && isMember(businessId);
+        allow write: if isAuthenticated() && isOwnerOrManager(businessId);
+      }
+
+      // --- SUBCOLLECTION: MEMBERS ---
+      match /members/{userId} {
+        // Members can see who else is on the team, and users can read their own membership status
+        allow read: if isAuthenticated() && (request.auth.uid == userId || isMember(businessId));
+        
+        // Creation rules with security to prevent role-escalation hacking
+        allow create: if isAuthenticated() && (
+          // 1. If an existing owner/manager is adding them:
+          isOwnerOrManager(businessId) || 
+          // 2. If the user is adding themselves during signup:
+          (request.auth.uid == userId && (
+            // A) They can only join as 'owner' if they actually created the business document
+            (request.resource.data.role == 'owner' && isBusinessCreator(businessId)) ||
+            // B) Otherwise, they can join as manager or worker
+            (request.resource.data.role in ['manager', 'worker'])
+          ))
+        );
+        
+        allow update, delete: if isAuthenticated() && (request.auth.uid == userId || isOwnerOrManager(businessId));
+      }
+
+      // --- SUBCOLLECTION: PRODUCTS ---
+      match /products/{productId} {
+        // All staff need to read and update products (to reduce stock during checkout)
+        allow read, write: if isAuthenticated() && isMember(businessId);
+      }
+
+      // --- SUBCOLLECTION: SALES ---
+      match /sales/{saleId} {
+        // All staff can ring up sales and view history
+        allow read, create: if isAuthenticated() && isMember(businessId);
+        // Usually, only managers/owners should be able to alter or delete past receipts
+        allow update, delete: if isAuthenticated() && isOwnerOrManager(businessId);
+      }
+
+      // --- SUBCOLLECTION: CUSTOMERS (CRM) ---
+      match /customers/{customerId} {
+        // All staff need to read, create, and update customers during the checkout flow
+        allow read, write: if isAuthenticated() && isMember(businessId);
+      }
+    }
+  }
+}

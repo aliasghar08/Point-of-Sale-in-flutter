@@ -9,6 +9,7 @@ import 'package:pos/providers/settings_provider.dart';
 import 'package:pos/theme/app_colors.dart';
 import 'package:pos/widgets/pos_card.dart';
 import 'package:pos/widgets/empty_state_view.dart';
+import 'package:pos/widgets/staggered_animation.dart';
 
 /// Modern Executive BI, Analytics & Reports Screen.
 class ReportsScreen extends StatefulWidget {
@@ -178,31 +179,48 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   )
                 : RefreshIndicator(
                     onRefresh: _loadAnalytics,
-                    child: ListView(
-                      padding: const EdgeInsets.all(16),
-                      children: [
-                        // Executive Profit & Loss Cards
-                        _buildFinancialOverview(
-                          currencySymbol,
-                          profitMargin,
-                          isDark,
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 1000),
+                        child: ListView(
+                          padding: const EdgeInsets.all(16),
+                          children: [
+                            // Executive Profit & Loss Cards
+                            StaggeredSlideFade(
+                              index: 0,
+                              child: _buildFinancialOverview(
+                                currencySymbol,
+                                profitMargin,
+                                isDark,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Payment Methods Split
+                            StaggeredSlideFade(
+                              index: 1,
+                              child: _buildPaymentMethodChart(currencySymbol, isDark),
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Top Products Leaderboard
+                            StaggeredSlideFade(
+                              index: 2,
+                              child: _buildTopProductsCard(currencySymbol, isDark),
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Top Spenders CRM Card
+                            if (_topCustomers.isNotEmpty) ...[
+                              StaggeredSlideFade(
+                                index: 3,
+                                child: _buildTopCustomersCard(currencySymbol, isDark),
+                              ),
+                              const SizedBox(height: 16),
+                            ],
+                          ],
                         ),
-                        const SizedBox(height: 16),
-
-                        // Payment Methods Split
-                        _buildPaymentMethodChart(currencySymbol, isDark),
-                        const SizedBox(height: 16),
-
-                        // Top Products Leaderboard
-                        _buildTopProductsCard(currencySymbol, isDark),
-                        const SizedBox(height: 16),
-
-                        // Top Spenders CRM Card
-                        if (_topCustomers.isNotEmpty) ...[
-                          _buildTopCustomersCard(currencySymbol, isDark),
-                          const SizedBox(height: 16),
-                        ],
-                      ],
+                      ),
                     ),
                   ),
           ),

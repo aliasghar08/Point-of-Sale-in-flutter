@@ -4,12 +4,10 @@
 <dict>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
-	<key>NSFaceIDUsageDescription</key>
-	<string>This app requires Face ID to authenticate you securely.</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Pos</string>
+	<string>POS Hub</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -26,8 +24,20 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>POS Hub requires camera access to scan product barcodes, QR codes, and take product photos for inventory.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>POS Hub requires Face ID to securely authenticate you and protect your business transactions.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>POS Hub requires microphone access to enable hands-free voice search for products and inventory.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>POS Hub requires photo library access to select and upload product images.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>POS Hub uses speech recognition to convert voice commands into product searches.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

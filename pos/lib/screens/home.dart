@@ -22,6 +22,7 @@ import 'package:pos/widgets/qr_scanner.dart';
 import 'package:pos/widgets/barcode_scanner.dart';
 import 'package:pos/widgets/voice_input.dart';
 import 'package:pos/widgets/customer_selection_dialog.dart';
+import 'package:pos/widgets/staggered_animation.dart';
 
 /// Modern, High-Performance Point of Sale (POS) Cashier Register Screen.
 class HomeScreen extends StatefulWidget {
@@ -183,9 +184,10 @@ class _HomeScreenState extends State<HomeScreen> {
       _cart.fold(0.0, (sum, item) => sum + item.calculatedDiscount);
   double get _orderDiscountTotal {
     if (_orderDiscountAmount > 0) return _orderDiscountAmount;
-    if (_orderDiscountPercent > 0)
+    if (_orderDiscountPercent > 0) {
       return (_cartSubtotal - _itemsDiscountTotal) *
           (_orderDiscountPercent / 100);
+    }
     return 0.0;
   }
 
@@ -467,8 +469,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) return 'Enter price';
-                  if (double.tryParse(v.trim()) == null)
+                  if (double.tryParse(v.trim()) == null) {
                     return 'Enter valid number';
+                  }
                   return null;
                 },
               ),
@@ -1110,7 +1113,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final settingsProvider = Provider.of<SettingsProvider>(context);
     final currencySymbol = settingsProvider.currencySymbol;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isTablet = MediaQuery.of(context).size.width >= 900;
+    final isTablet = MediaQuery.of(context).size.width >= 700;
 
     return Scaffold(
       body: isTablet
@@ -1279,94 +1282,97 @@ class _HomeScreenState extends State<HomeScreen> {
         final product = _filteredProducts[i];
         final inStock = product.stock > 0;
 
-        return PosCard(
-          padding: const EdgeInsets.all(12),
-          onTap: inStock ? () => _addToCart(product) : null,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Category & Stock Badge
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Text(
-                      product.category,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: isDark
-                            ? AppColors.darkTextSecondary
-                            : AppColors.lightTextSecondary,
+        return StaggeredSlideFade(
+          index: i,
+          child: PosCard(
+            padding: const EdgeInsets.all(12),
+            onTap: inStock ? () => _addToCart(product) : null,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Category & Stock Badge
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        product.category,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: isDark
+                              ? AppColors.darkTextSecondary
+                              : AppColors.lightTextSecondary,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-                  StatBadge.stock(
-                    stock: product.stock,
-                    minStock: product.minStock,
-                  ),
-                ],
-              ),
-              const Spacer(),
-              // Icon Placeholder / Thumbnail
-              Center(
-                child: Container(
-                  width: 52,
-                  height: 52,
-                  decoration: BoxDecoration(
-                    color: isDark
-                        ? AppColors.primaryLight.withValues(alpha: 0.1)
-                        : AppColors.primary.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Icon(
-                    Icons.shopping_bag_outlined,
-                    color: isDark ? AppColors.primaryLight : AppColors.primary,
-                    size: 28,
-                  ),
+                    StatBadge.stock(
+                      stock: product.stock,
+                      minStock: product.minStock,
+                    ),
+                  ],
                 ),
-              ),
-              const Spacer(),
-              // Product Name & Price
-              Text(
-                product.name,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 4),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    FormatService.formatCurrency(
-                      product.salePrice ?? product.price,
-                      symbol: currencySymbol,
-                    ),
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      color: isDark ? AppColors.success : AppColors.primaryDark,
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.all(4),
+                const Spacer(),
+                // Icon Placeholder / Thumbnail
+                Center(
+                  child: Container(
+                    width: 52,
+                    height: 52,
                     decoration: BoxDecoration(
                       color: isDark
-                          ? AppColors.primaryLight
-                          : AppColors.primary,
-                      shape: BoxShape.circle,
+                          ? AppColors.primaryLight.withValues(alpha: 0.1)
+                          : AppColors.primary.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(14),
                     ),
-                    child: const Icon(Icons.add, size: 14, color: Colors.white),
+                    child: Icon(
+                      Icons.shopping_bag_outlined,
+                      color: isDark ? AppColors.primaryLight : AppColors.primary,
+                      size: 28,
+                    ),
                   ),
-                ],
-              ),
-            ],
+                ),
+                const Spacer(),
+                // Product Name & Price
+                Text(
+                  product.name,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      FormatService.formatCurrency(
+                        product.salePrice ?? product.price,
+                        symbol: currencySymbol,
+                      ),
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? AppColors.success : AppColors.primaryDark,
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? AppColors.primaryLight
+                            : AppColors.primary,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.add, size: 14, color: Colors.white),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -1397,8 +1403,15 @@ class _HomeScreenState extends State<HomeScreen> {
                     padding: const EdgeInsets.all(12),
                     itemCount: _cart.length,
                     separatorBuilder: (_, _) => const SizedBox(height: 8),
-                    itemBuilder: (ctx, i) =>
-                        _buildCartItemTile(_cart[i], i, currencySymbol, isDark),
+                    itemBuilder: (ctx, i) => StaggeredSlideFade(
+                      index: i,
+                      child: _buildCartItemTile(
+                        _cart[i],
+                        i,
+                        currencySymbol,
+                        isDark,
+                      ),
+                    ),
                   ),
           ),
 

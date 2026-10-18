@@ -13,6 +13,7 @@ import 'package:pos/theme/app_colors.dart';
 import 'package:pos/widgets/pos_card.dart';
 import 'package:pos/widgets/stat_badge.dart';
 import 'package:pos/widgets/empty_state_view.dart';
+import 'package:pos/widgets/staggered_animation.dart';
 
 /// Modern Sales History & Transaction Archive Screen.
 class SalesHistoryScreen extends StatefulWidget {
@@ -237,10 +238,13 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                     padding: const EdgeInsets.all(16),
                     itemCount: _filteredSales.length,
                     separatorBuilder: (_, _) => const SizedBox(height: 10),
-                    itemBuilder: (ctx, i) => _buildSaleCard(
-                      _filteredSales[i],
-                      currencySymbol,
-                      isDark,
+                    itemBuilder: (ctx, i) => StaggeredSlideFade(
+                      index: i,
+                      child: _buildSaleCard(
+                        _filteredSales[i],
+                        currencySymbol,
+                        isDark,
+                      ),
                     ),
                   ),
           ),

@@ -1,11 +1,12 @@
+import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:pos/models/user.dart';
 import 'package:pos/services/firebase_service.dart';
 
 class AuthService {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  FirebaseAuth get _auth => FirebaseAuth.instance;
+  FirebaseFirestore get _firestore => FirebaseFirestore.instance;
   final FirebaseService _firebaseService = FirebaseService();
 
   // Stream of auth state changes
@@ -149,29 +150,79 @@ class AuthService {
 
       final uid = user.uid;
 
-      // Get business ID from lookup collection
+      // Get business ID from lookup collection with self-healing fallbacks
+      String? businessId;
       final lookupDoc = await _firestore
           .collection('userBusinessLookup')
           .doc(uid)
           .get();
 
-      if (!lookupDoc.exists) {
-        throw Exception('User business not found');
+      if (lookupDoc.exists) {
+        final lookupData = lookupDoc.data() as Map<String, dynamic>;
+        businessId = lookupData['businessId'] as String?;
       }
 
-      final lookupData = lookupDoc.data() as Map<String, dynamic>;
-      final businessId = lookupData['businessId'] as String;
+      // Fallback 1: Check root users collection
+      if (businessId == null || businessId.isEmpty) {
+        final rootUserDoc = await _firestore.collection('users').doc(uid).get();
+        if (rootUserDoc.exists) {
+          businessId = rootUserDoc.data()?['businessId'] as String?;
+        }
+      }
+
+      // Fallback 2: Check if user owns a business
+      if (businessId == null || businessId.isEmpty) {
+        final ownedBizQuery = await _firestore
+            .collection('businesses')
+            .where('ownerId', isEqualTo: uid)
+            .limit(1)
+            .get();
+        if (ownedBizQuery.docs.isNotEmpty) {
+          businessId = ownedBizQuery.docs.first.id;
+        }
+      }
+
+      if (businessId == null || businessId.isEmpty) {
+        throw Exception('No store or business linked to this account.');
+      }
 
       // Get user data from business's MEMBERS sub-collection
-      final userDoc = await _firestore
+      final memberRef = _firestore
           .collection('businesses')
           .doc(businessId)
           .collection('members')
-          .doc(uid)
-          .get();
+          .doc(uid);
+      var userDoc = await memberRef.get();
 
+      // Self-heal member document if missing for owner
       if (!userDoc.exists) {
-        throw Exception('User data not found in business');
+        final bizDoc = await _firestore.collection('businesses').doc(businessId).get();
+        if (bizDoc.exists && bizDoc.data()?['ownerId'] == uid) {
+          await memberRef.set({
+            'id': uid,
+            'name': user.displayName ?? 'Store Owner',
+            'email': user.email ?? '',
+            'role': 'owner',
+            'phone': user.phoneNumber ?? '',
+            'isActive': true,
+            'createdAt': FieldValue.serverTimestamp(),
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+          userDoc = await memberRef.get();
+        } else {
+          throw Exception('User data not found in business.');
+        }
+      }
+
+      // Self-heal lookup document if missing
+      if (!lookupDoc.exists) {
+        await _firestore.collection('userBusinessLookup').doc(uid).set({
+          'businessId': businessId,
+          'role': userDoc.data()?['role'] ?? 'owner',
+          'email': user.email ?? '',
+          'name': user.displayName ?? '',
+          'createdAt': FieldValue.serverTimestamp(),
+        });
       }
 
       var data = userDoc.data() as Map<String, dynamic>;
@@ -195,7 +246,7 @@ class AuthService {
     await _auth.signOut();
   }
 
-  // ✅ UPDATED: Get current user data from MEMBERS sub-collection
+  // ✅ UPDATED: Get current user data from MEMBERS sub-collection with self-healing
   Future<AppUser?> getCurrentUserData() async {
     User? user = _auth.currentUser;
     if (user == null) return null;
@@ -203,15 +254,36 @@ class AuthService {
     try {
       final uid = user.uid;
 
+      String? businessId;
       final lookupDoc = await _firestore
           .collection('userBusinessLookup')
           .doc(uid)
           .get();
 
-      if (!lookupDoc.exists) return null;
+      if (lookupDoc.exists) {
+        final lookupData = lookupDoc.data() as Map<String, dynamic>;
+        businessId = lookupData['businessId'] as String?;
+      }
 
-      final lookupData = lookupDoc.data() as Map<String, dynamic>;
-      final businessId = lookupData['businessId'] as String;
+      if (businessId == null || businessId.isEmpty) {
+        final rootUserDoc = await _firestore.collection('users').doc(uid).get();
+        if (rootUserDoc.exists) {
+          businessId = rootUserDoc.data()?['businessId'] as String?;
+        }
+      }
+
+      if (businessId == null || businessId.isEmpty) {
+        final ownedBiz = await _firestore
+            .collection('businesses')
+            .where('ownerId', isEqualTo: uid)
+            .limit(1)
+            .get();
+        if (ownedBiz.docs.isNotEmpty) {
+          businessId = ownedBiz.docs.first.id;
+        }
+      }
+
+      if (businessId == null || businessId.isEmpty) return null;
 
       // Get from MEMBERS
       final userDoc = await _firestore
@@ -305,26 +377,114 @@ class AuthService {
     );
   }
 
+  /// Permanently deletes current user account and cleans up associated cloud records.
+  /// Complies with Apple App Store Guideline 5.1.1(v) for in-app account deletion.
+  Future<void> deleteAccount({String? password}) async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw Exception('No authenticated user found to delete.');
+    }
+
+    final uid = user.uid;
+
+    try {
+      // Step 1: Reauthenticate if password is provided
+      if (password != null && password.isNotEmpty && user.email != null) {
+        final credential = EmailAuthProvider.credential(
+          email: user.email!,
+          password: password,
+        );
+        await user.reauthenticateWithCredential(credential);
+      }
+
+      // Step 2: Retrieve business ID from lookup or user doc
+      String? businessId;
+      try {
+        final lookupDoc =
+            await _firestore.collection('userBusinessLookup').doc(uid).get();
+        if (lookupDoc.exists) {
+          businessId = lookupDoc.data()?['businessId'] as String?;
+        }
+      } catch (_) {}
+
+      if (businessId == null) {
+        try {
+          final userDoc = await _firestore.collection('users').doc(uid).get();
+          if (userDoc.exists) {
+            businessId = userDoc.data()?['businessId'] as String?;
+          }
+        } catch (_) {}
+      }
+
+      // Step 3: Remove user from business members if businessId exists
+      if (businessId != null && businessId.isNotEmpty) {
+        try {
+          await _firestore
+              .collection('businesses')
+              .doc(businessId)
+              .collection('members')
+              .doc(uid)
+              .delete();
+        } catch (e) {
+          debugPrint('⚠️ Warning deleting from business members: $e');
+        }
+      }
+
+      // Step 4: Remove user lookup and user root doc
+      try {
+        await _firestore.collection('userBusinessLookup').doc(uid).delete();
+      } catch (e) {
+        debugPrint('⚠️ Warning deleting userBusinessLookup: $e');
+      }
+
+      try {
+        await _firestore.collection('users').doc(uid).delete();
+      } catch (e) {
+        debugPrint('⚠️ Warning deleting user doc: $e');
+      }
+
+      // Step 5: Delete Firebase Auth user
+      await user.delete();
+      debugPrint('✅ Account successfully deleted for uid: $uid');
+    } catch (e) {
+      if (e is FirebaseAuthException && e.code == 'requires-recent-login') {
+        throw Exception(
+          'For security, please verify your credentials to confirm account deletion.',
+        );
+      }
+      throw _handleAuthError(e);
+    }
+  }
+
   // Error handler
   String _handleAuthError(dynamic error) {
     if (error is FirebaseAuthException) {
       switch (error.code) {
         case 'user-not-found':
-          return 'No user found with this email.';
+          return 'No account found with this email. Please check your email or sign up.';
         case 'wrong-password':
-          return 'Incorrect password.';
+          return 'Incorrect password. Please try again or reset your password.';
+        case 'invalid-credential':
+          return 'Invalid credentials. The email or password you entered is incorrect.';
+        case 'user-disabled':
+          return 'This user account has been disabled. Please contact support.';
         case 'email-already-in-use':
-          return 'Email is already registered. Try logging in.';
+          return 'This email address is already registered. Please sign in instead.';
         case 'invalid-email':
-          return 'Invalid email address format.';
+          return 'Invalid email address format. Please enter a valid email.';
         case 'weak-password':
-          return 'Password is too weak. Use at least 6 characters.';
+          return 'Password is too weak. Please use at least 6 characters.';
+        case 'operation-not-allowed':
+          return 'Email/password sign-in is not enabled in Firebase Authentication.';
         case 'too-many-requests':
-          return 'Too many failed attempts. Please try again later.';
+          return 'Too many failed login attempts. Access temporarily disabled for security. Please try again later.';
+        case 'network-request-failed':
+          return 'Network error. Please check your internet connection.';
         default:
-          return error.message ?? 'An authentication error occurred.';
+          return error.message ?? 'An authentication error occurred (${error.code}).';
       }
     }
-    return error.toString();
+    final msg = error.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
+    return msg;
   }
 }

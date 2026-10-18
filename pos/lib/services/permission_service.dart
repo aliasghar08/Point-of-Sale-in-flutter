@@ -9,9 +9,7 @@ class PermissionService {
 
   /// Open the app settings page so user can manually enable permissions
   static Future<void> openAppSettings() async {
-    await Permission.camera.request();
-    // ✅ FIX: Call the package's function using the 'ph' prefix
-    // This stops the infinite recursion crash!
+    // Call the package's function using the 'ph' prefix
     await ph.openAppSettings();
   }
 
@@ -168,22 +166,19 @@ class PermissionService {
 
   // ==================== COMBINED PERMISSIONS ====================
 
-  // Request all permissions (camera, microphone, location)
+  // Request core permissions (camera, microphone)
   static Future<Map<Permission, bool>> requestAllPermissions() async {
     Map<Permission, PermissionStatus> statuses = await [
       Permission.camera,
       Permission.microphone,
-      Permission.location, // Add location permission
     ].request();
 
     bool cameraGranted = statuses[Permission.camera]?.isGranted ?? false;
     bool micGranted = statuses[Permission.microphone]?.isGranted ?? false;
-    bool locationGranted = statuses[Permission.location]?.isGranted ?? false;
 
     return {
       Permission.camera: cameraGranted,
       Permission.microphone: micGranted,
-      Permission.location: locationGranted,
     };
   }
 

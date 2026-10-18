@@ -23,13 +23,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _isSeeding = false;
 
   final List<Map<String, String>> _currencyOptions = [
-    {'code': 'USD', 'symbol': '\$', 'name': 'US Dollar (\$)'},
-    {'code': 'EUR', 'symbol': '€', 'name': 'Euro (€)'},
-    {'code': 'GBP', 'symbol': '£', 'name': 'British Pound (£)'},
-    {'code': 'INR', 'symbol': '₹', 'name': 'Indian Rupee (₹)'},
-    {'code': 'CAD', 'symbol': 'C\$', 'name': 'Canadian Dollar (C\$)'},
-    {'code': 'AUD', 'symbol': 'A\$', 'name': 'Australian Dollar (A\$)'},
-    {'code': 'JPY', 'symbol': '¥', 'name': 'Japanese Yen (¥)'},
+    {'code': 'PKR', 'symbol': '₨', 'name': 'Pakistani Rupee (₨ - PKR)'},
+    {'code': 'USD', 'symbol': '\$', 'name': 'US Dollar (\$ - USD)'},
+    {'code': 'EUR', 'symbol': '€', 'name': 'Euro (€ - EUR)'},
+    {'code': 'GBP', 'symbol': '£', 'name': 'British Pound (£ - GBP)'},
+    {'code': 'AED', 'symbol': 'د.إ', 'name': 'UAE Dirham (د.إ - AED)'},
+    {'code': 'SAR', 'symbol': 'ر.س', 'name': 'Saudi Riyal (ر.س - SAR)'},
+    {'code': 'INR', 'symbol': '₹', 'name': 'Indian Rupee (₹ - INR)'},
+    {'code': 'CAD', 'symbol': 'C\$', 'name': 'Canadian Dollar (C\$ - CAD)'},
+    {'code': 'AUD', 'symbol': 'A\$', 'name': 'Australian Dollar (A\$ - AUD)'},
+    {'code': 'JPY', 'symbol': '¥', 'name': 'Japanese Yen (¥ - JPY)'},
   ];
 
   Future<void> _seedDemoData() async {
@@ -136,6 +139,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
                     // 9. Logout
                     _buildLogoutButton(authProvider, isDark),
+                    const SizedBox(height: 16),
+
+                    // 10. Account Deletion (Apple App Store Guideline 5.1.1(v))
+                    _buildAccountDeletionCard(authProvider, isDark),
                     const SizedBox(height: 32),
                   ],
                 ),
@@ -274,12 +281,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: 14),
           DropdownButtonFormField<String>(
-            initialValue: settings.currencyCode,
+            initialValue: _currencyOptions.any((c) => c['code'] == settings.currencyCode)
+                ? settings.currencyCode
+                : 'PKR',
             decoration: const InputDecoration(
               labelText: 'Primary Currency',
               border: OutlineInputBorder(),
             ),
-            items: _currencyOptions.map((c) {
+            items: {
+              ...{for (var c in _currencyOptions) c['code']!: c},
+              if (settings.currencyCode.isNotEmpty)
+                settings.currencyCode: {
+                  'code': settings.currencyCode,
+                  'symbol': settings.currencySymbol,
+                  'name': '${settings.currencyCode} (${settings.currencySymbol})'
+                }
+            }.values.map((c) {
               return DropdownMenuItem<String>(
                 value: c['code'],
                 child: Text(c['name']!),
@@ -289,6 +306,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
               if (val != null) {
                 final match = _currencyOptions.firstWhere(
                   (e) => e['code'] == val,
+                  orElse: () => {
+                    'code': val,
+                    'symbol': settings.currencySymbol,
+                    'name': val,
+                  },
                 );
                 provider.updateCurrency(match['symbol']!, match['code']!);
               }
@@ -585,6 +607,192 @@ class _SettingsScreenState extends State<SettingsScreen> {
           'Sign Out Terminal',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
+      ),
+    );
+  }
+
+  Widget _buildAccountDeletionCard(AuthProvider authProvider, bool isDark) {
+    return PosCard(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: const [
+              Icon(
+                Icons.warning_amber_rounded,
+                color: AppColors.error,
+              ),
+              SizedBox(width: 10),
+              Text(
+                'Account & Data Privacy',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: AppColors.error,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Permanently delete your POS Hub account and remove all personal profile records, business memberships, and credentials from cloud servers. Compliant with Apple App Store Guideline 5.1.1(v).',
+            style: TextStyle(
+              fontSize: 12,
+              color: isDark
+                  ? AppColors.darkTextSecondary
+                  : AppColors.lightTextSecondary,
+            ),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => _showAccountDeletionDialog(authProvider),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.error,
+                side: const BorderSide(color: AppColors.error),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              icon: const Icon(Icons.delete_forever, size: 20),
+              label: const Text(
+                'Delete Account & Data',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAccountDeletionDialog(AuthProvider authProvider) {
+    final passwordController = TextEditingController();
+    bool isDeleting = false;
+    String? localError;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          return AlertDialog(
+            title: Row(
+              children: const [
+                Icon(Icons.warning_amber_rounded, color: AppColors.error),
+                SizedBox(width: 8),
+                Text('Delete Account?'),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Are you sure you want to permanently delete your account?',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'In accordance with Apple App Store Guideline 5.1.1(v) and privacy standards, this will:\n'
+                    '• Permanently delete your user credentials\n'
+                    '• Remove your store member records\n'
+                    '• Revoke all cloud POS terminal access\n'
+                    '• Erase associated personal profile data',
+                    style: TextStyle(fontSize: 12, height: 1.4),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Enter your password to verify ownership:',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: passwordController,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                      hintText: 'Current Password',
+                      prefixIcon: Icon(Icons.lock_outline),
+                    ),
+                  ),
+                  if (localError != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      localError!,
+                      style: const TextStyle(color: AppColors.error, fontSize: 12),
+                    ),
+                  ],
+                  if (isDeleting) ...[
+                    const SizedBox(height: 16),
+                    const Center(child: CircularProgressIndicator()),
+                  ],
+                ],
+              ),
+            ),
+            actions: isDeleting
+                ? []
+                : [
+                    TextButton(
+                      onPressed: () => Navigator.pop(dialogContext),
+                      child: const Text('Cancel'),
+                    ),
+                    ElevatedButton(
+                      onPressed: () async {
+                        final password = passwordController.text.trim();
+                        if (password.isEmpty) {
+                          setDialogState(() {
+                            localError = 'Please enter your password to confirm.';
+                          });
+                          return;
+                        }
+
+                        setDialogState(() {
+                          isDeleting = true;
+                          localError = null;
+                        });
+
+                        final success = await authProvider.deleteAccount(
+                          password: password,
+                        );
+
+                        if (!mounted) return;
+
+                        if (success) {
+                          if (dialogContext.mounted) {
+                            Navigator.pop(dialogContext);
+                          }
+                          FeedbackService.success();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Your account has been permanently deleted.'),
+                              backgroundColor: AppColors.error,
+                            ),
+                          );
+                          Navigator.pushAndRemoveUntil(
+                            context,
+                            MaterialPageRoute(builder: (_) => const LoginScreen()),
+                            (route) => false,
+                          );
+                        } else {
+                          setDialogState(() {
+                            isDeleting = false;
+                            localError = authProvider.error ?? 'Failed to delete account.';
+                          });
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.error,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: const Text('Permanently Delete'),
+                    ),
+                  ],
+          );
+        },
       ),
     );
   }

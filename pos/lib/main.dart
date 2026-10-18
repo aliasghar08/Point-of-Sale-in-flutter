@@ -9,6 +9,8 @@ import 'package:pos/theme/app_colors.dart';
 import 'package:pos/screens/login_screen.dart';
 import 'package:pos/screens/dashboard_screen.dart';
 import 'package:pos/screens/biometric_lock_screen.dart';
+import 'package:pos/viewmodels/pos_view_model.dart';
+import 'package:pos/viewmodels/inventory_view_model.dart';
 import 'firebase_options.dart';
 
 void main() async {
@@ -93,52 +95,46 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => AuthProvider()..init()),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => SettingsProvider()),
+        ChangeNotifierProvider(create: (_) => PosViewModel()),
+        ChangeNotifierProvider(create: (_) => InventoryViewModel()),
       ],
       child: Consumer3<AuthProvider, ThemeProvider, SettingsProvider>(
         builder: (context, authProvider, themeProvider, settingsProvider, _) {
-          if (authProvider.isLoading) {
-            return MaterialApp(
-              debugShowCheckedModeBanner: false,
-              theme: AppTheme.lightTheme,
-              darkTheme: AppTheme.darkTheme,
-              themeMode: themeProvider.themeMode,
-              home: Scaffold(
-                body: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      CircularProgressIndicator(
-                        color: themeProvider.isDarkMode
-                            ? AppColors.primaryLight
-                            : AppColors.primary,
-                      ),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'Initializing POS System...',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          }
-
           return MaterialApp(
-            title: 'Enterprise POS',
+            title: 'POS Hub',
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
             themeMode: themeProvider.themeMode,
             debugShowCheckedModeBanner: false,
-            home: authProvider.isAuthenticated
-                ? (settingsProvider.settings.enableBiometrics &&
-                          !authProvider.isUnlocked
-                      ? const BiometricLockScreen()
-                      : const DashboardScreen())
-                : const LoginScreen(),
+            home: authProvider.isInitializing
+                ? Scaffold(
+                    body: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          CircularProgressIndicator(
+                            color: themeProvider.isDarkMode
+                                ? AppColors.primaryLight
+                                : AppColors.primary,
+                          ),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'Initializing POS System...',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                : (authProvider.isAuthenticated
+                    ? (settingsProvider.settings.enableBiometrics &&
+                              !authProvider.isUnlocked
+                          ? const BiometricLockScreen()
+                          : const DashboardScreen())
+                    : const LoginScreen()),
           );
         },
       ),

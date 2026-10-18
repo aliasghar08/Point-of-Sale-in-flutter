@@ -11,6 +11,7 @@ import 'package:pos/theme/app_colors.dart';
 import 'package:pos/widgets/pos_card.dart';
 import 'package:pos/widgets/stat_badge.dart';
 import 'package:pos/widgets/empty_state_view.dart';
+import 'package:pos/widgets/staggered_animation.dart';
 import 'package:pos/screens/customer_detail_screen.dart';
 
 /// Modern Customer Relationship Management (CRM) & Loyalty Directory.
@@ -269,10 +270,13 @@ class _CrmScreenState extends State<CrmScreen> {
                     padding: const EdgeInsets.all(16),
                     itemCount: _filteredCustomers.length,
                     separatorBuilder: (_, _) => const SizedBox(height: 10),
-                    itemBuilder: (ctx, i) => _buildCustomerCard(
-                      _filteredCustomers[i],
-                      currencySymbol,
-                      isDark,
+                    itemBuilder: (ctx, i) => StaggeredSlideFade(
+                      index: i,
+                      child: _buildCustomerCard(
+                        _filteredCustomers[i],
+                        currencySymbol,
+                        isDark,
+                      ),
                     ),
                   ),
           ),
@@ -340,95 +344,104 @@ class _CrmScreenState extends State<CrmScreen> {
       child: Row(
         children: [
           Expanded(
-            child: PosCard(
-              padding: const EdgeInsets.all(10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Directory',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: isDark
-                          ? AppColors.darkTextSecondary
-                          : AppColors.lightTextSecondary,
+            child: StaggeredSlideFade(
+              index: 0,
+              child: PosCard(
+                padding: const EdgeInsets.all(10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Directory',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: isDark
+                            ? AppColors.darkTextSecondary
+                            : AppColors.lightTextSecondary,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '$totalCustomers Clients',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
+                    const SizedBox(height: 2),
+                    Text(
+                      '$totalCustomers Clients',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
           const SizedBox(width: 8),
           Expanded(
-            child: PosCard(
-              padding: const EdgeInsets.all(10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'LTV Revenue',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: isDark
-                          ? AppColors.darkTextSecondary
-                          : AppColors.lightTextSecondary,
+            child: StaggeredSlideFade(
+              index: 1,
+              child: PosCard(
+                padding: const EdgeInsets.all(10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'LTV Revenue',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: isDark
+                            ? AppColors.darkTextSecondary
+                            : AppColors.lightTextSecondary,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    FormatService.formatCurrency(
-                      totalSpent,
-                      symbol: currencySymbol,
+                    const SizedBox(height: 2),
+                    Text(
+                      FormatService.formatCurrency(
+                        totalSpent,
+                        symbol: currencySymbol,
+                      ),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        color: AppColors.success,
+                      ),
                     ),
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                      color: AppColors.success,
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
           const SizedBox(width: 8),
           Expanded(
-            child: PosCard(
-              padding: const EdgeInsets.all(10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Avg Value',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: isDark
-                          ? AppColors.darkTextSecondary
-                          : AppColors.lightTextSecondary,
+            child: StaggeredSlideFade(
+              index: 2,
+              child: PosCard(
+                padding: const EdgeInsets.all(10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Avg Value',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: isDark
+                            ? AppColors.darkTextSecondary
+                            : AppColors.lightTextSecondary,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    FormatService.formatCurrency(
-                      avgSpend,
-                      symbol: currencySymbol,
+                    const SizedBox(height: 2),
+                    Text(
+                      FormatService.formatCurrency(
+                        avgSpend,
+                        symbol: currencySymbol,
+                      ),
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        color: isDark
+                            ? AppColors.primaryLight
+                            : AppColors.primary,
+                      ),
                     ),
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                      color: isDark
-                          ? AppColors.primaryLight
-                          : AppColors.primary,
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),

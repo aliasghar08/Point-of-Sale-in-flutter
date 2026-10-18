@@ -1,12 +1,12 @@
 {
-    "name": "pos",
-    "short_name": "pos",
+    "name": "POS Hub",
+    "short_name": "POS Hub",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#1976D2",
     "theme_color": "#1976D2",
-    "description": "A new Flutter project.",
-    "orientation": "portrait-primary",
+    "description": "Enterprise Point of Sale and Inventory Management System",
+    "orientation": "any",
     "prefer_related_applications": false,
     "icons": [
         {

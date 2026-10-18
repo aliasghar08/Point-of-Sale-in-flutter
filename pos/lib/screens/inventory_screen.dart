@@ -15,6 +15,7 @@ import 'package:pos/widgets/pos_card.dart';
 import 'package:pos/widgets/stat_badge.dart';
 import 'package:pos/widgets/category_pill.dart';
 import 'package:pos/widgets/empty_state_view.dart';
+import 'package:pos/widgets/staggered_animation.dart';
 import 'package:pos/screens/product_form_screen.dart';
 
 /// Modern Inventory & Stock Management Screen.
@@ -251,13 +252,15 @@ class _InventoryScreenState extends State<InventoryScreen> {
           // Filter Products
           final filtered = products.where((p) {
             // Stock state
-            if (_stockFilter == 'low' && (p.stock <= 0 || p.stock > p.minStock))
+            if (_stockFilter == 'low' && (p.stock <= 0 || p.stock > p.minStock)) {
               return false;
+            }
             if (_stockFilter == 'out' && p.stock > 0) return false;
 
             // Category
-            if (_selectedCategory != 'All' && p.category != _selectedCategory)
+            if (_selectedCategory != 'All' && p.category != _selectedCategory) {
               return false;
+            }
 
             // Search query
             if (_searchQuery.trim().isNotEmpty) {
@@ -391,57 +394,58 @@ class _InventoryScreenState extends State<InventoryScreen> {
     required String currencySymbol,
     required bool isDark,
   }) {
+    final tiles = [
+      _buildMetricTile(
+        label: 'Total SKUs',
+        value: '$totalSkus',
+        color: isDark ? AppColors.primaryLight : AppColors.primary,
+        isDark: isDark,
+      ),
+      _buildMetricTile(
+        label: 'Low Stock',
+        value: '$lowStock',
+        color: AppColors.warning,
+        isDark: isDark,
+        isSelected: _stockFilter == 'low',
+        onTap: () => setState(
+          () => _stockFilter = _stockFilter == 'low' ? 'all' : 'low',
+        ),
+      ),
+      _buildMetricTile(
+        label: 'Out of Stock',
+        value: '$outOfStock',
+        color: AppColors.error,
+        isDark: isDark,
+        isSelected: _stockFilter == 'out',
+        onTap: () => setState(
+          () => _stockFilter = _stockFilter == 'out' ? 'all' : 'out',
+        ),
+      ),
+      _buildMetricTile(
+        label: 'Stock Value',
+        value: FormatService.formatCurrency(
+          valuation,
+          symbol: currencySymbol,
+        ),
+        color: AppColors.success,
+        isDark: isDark,
+      ),
+    ];
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(
-        children: [
-          Expanded(
-            child: _buildMetricTile(
-              label: 'Total SKUs',
-              value: '$totalSkus',
-              color: isDark ? AppColors.primaryLight : AppColors.primary,
-              isDark: isDark,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: _buildMetricTile(
-              label: 'Low Stock',
-              value: '$lowStock',
-              color: AppColors.warning,
-              isDark: isDark,
-              isSelected: _stockFilter == 'low',
-              onTap: () => setState(
-                () => _stockFilter = _stockFilter == 'low' ? 'all' : 'low',
+        children: List.generate(tiles.length, (i) {
+          return Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(left: i == 0 ? 0 : 8),
+              child: StaggeredSlideFade(
+                index: i,
+                child: tiles[i],
               ),
             ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: _buildMetricTile(
-              label: 'Out of Stock',
-              value: '$outOfStock',
-              color: AppColors.error,
-              isDark: isDark,
-              isSelected: _stockFilter == 'out',
-              onTap: () => setState(
-                () => _stockFilter = _stockFilter == 'out' ? 'all' : 'out',
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: _buildMetricTile(
-              label: 'Stock Value',
-              value: FormatService.formatCurrency(
-                valuation,
-                symbol: currencySymbol,
-              ),
-              color: AppColors.success,
-              isDark: isDark,
-            ),
-          ),
-        ],
+          );
+        }),
       ),
     );
   }
@@ -528,134 +532,137 @@ class _InventoryScreenState extends State<InventoryScreen> {
       itemBuilder: (ctx, i) {
         final p = products[i];
 
-        return PosCard(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              // Product Avatar
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? AppColors.primaryLight.withValues(alpha: 0.12)
-                      : AppColors.primary.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(12),
+        return StaggeredSlideFade(
+          index: i,
+          child: PosCard(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                // Product Avatar
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? AppColors.primaryLight.withValues(alpha: 0.12)
+                        : AppColors.primary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    Icons.inventory_2_outlined,
+                    color: isDark ? AppColors.primaryLight : AppColors.primary,
+                    size: 24,
+                  ),
                 ),
-                child: Icon(
-                  Icons.inventory_2_outlined,
-                  color: isDark ? AppColors.primaryLight : AppColors.primary,
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: 12),
+                const SizedBox(width: 12),
 
-              // Details
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            p.name,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
+                // Details
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              p.name,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
                           ),
-                        ),
-                        StatBadge.stock(stock: p.stock, minStock: p.minStock),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${p.category} • SKU: ${p.sku.isNotEmpty ? p.sku : '-'} • Price: ${FormatService.formatCurrency(p.price, symbol: currencySymbol)}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: isDark
-                            ? AppColors.darkTextSecondary
-                            : AppColors.lightTextSecondary,
+                          StatBadge.stock(stock: p.stock, minStock: p.minStock),
+                        ],
                       ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Inline Stock Adjust Buttons
-              const SizedBox(width: 8),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.remove_circle_outline, size: 20),
-                    tooltip: 'Decrease Stock',
-                    onPressed: () => _adjustStock(p, -1),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isDark
-                          ? AppColors.darkBackground
-                          : AppColors.lightBackground,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      '${p.stock}',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.add_circle_outline, size: 20),
-                    tooltip: 'Increase Stock',
-                    onPressed: () => _adjustStock(p, 1),
-                  ),
-                  PopupMenuButton<String>(
-                    icon: const Icon(Icons.more_vert),
-                    onSelected: (val) {
-                      if (val == 'edit') {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => ProductFormScreen(product: p),
-                          ),
-                        );
-                      } else if (val == 'delete') {
-                        _deleteProduct(p);
-                      } else if (val == 'add5') {
-                        _adjustStock(p, 5);
-                      }
-                    },
-                    itemBuilder: (_) => [
-                      const PopupMenuItem(
-                        value: 'add5',
-                        child: Text('Add +5 Units'),
-                      ),
-                      const PopupMenuItem(
-                        value: 'edit',
-                        child: Text('Edit Product'),
-                      ),
-                      const PopupMenuItem(
-                        value: 'delete',
-                        child: Text(
-                          'Delete',
-                          style: TextStyle(color: AppColors.error),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${p.category} • SKU: ${p.sku.isNotEmpty ? p.sku : '-'} • Price: ${FormatService.formatCurrency(p.price, symbol: currencySymbol)}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isDark
+                              ? AppColors.darkTextSecondary
+                              : AppColors.lightTextSecondary,
                         ),
                       ),
                     ],
                   ),
-                ],
-              ),
-            ],
+                ),
+
+                // Inline Stock Adjust Buttons
+                const SizedBox(width: 8),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.remove_circle_outline, size: 20),
+                      tooltip: 'Decrease Stock',
+                      onPressed: () => _adjustStock(p, -1),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? AppColors.darkBackground
+                            : AppColors.lightBackground,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        '${p.stock}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.add_circle_outline, size: 20),
+                      tooltip: 'Increase Stock',
+                      onPressed: () => _adjustStock(p, 1),
+                    ),
+                    PopupMenuButton<String>(
+                      icon: const Icon(Icons.more_vert),
+                      onSelected: (val) {
+                        if (val == 'edit') {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => ProductFormScreen(product: p),
+                            ),
+                          );
+                        } else if (val == 'delete') {
+                          _deleteProduct(p);
+                        } else if (val == 'add5') {
+                          _adjustStock(p, 5);
+                        }
+                      },
+                      itemBuilder: (_) => [
+                        const PopupMenuItem(
+                          value: 'add5',
+                          child: Text('Add +5 Units'),
+                        ),
+                        const PopupMenuItem(
+                          value: 'edit',
+                          child: Text('Edit Product'),
+                        ),
+                        const PopupMenuItem(
+                          value: 'delete',
+                          child: Text(
+                            'Delete',
+                            style: TextStyle(color: AppColors.error),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -679,7 +686,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
       itemBuilder: (ctx, i) {
         final p = products[i];
 
-        return PosCard(
+        return StaggeredSlideFade(
+          index: i,
+          child: PosCard(
           padding: const EdgeInsets.all(12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -768,7 +777,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
               ),
             ],
           ),
-        );
+        ),
+      );
       },
     );
   }

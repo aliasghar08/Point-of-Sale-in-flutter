@@ -64,10 +64,12 @@ class CacheService {
 
   void upsertProduct(Product product) {
     _productById[product.id] = product;
-    if (product.barcode.isNotEmpty)
+    if (product.barcode.isNotEmpty) {
       _productByBarcode[product.barcode.trim()] = product;
-    if (product.sku.isNotEmpty)
+    }
+    if (product.sku.isNotEmpty) {
       _productBySku[product.sku.trim().toLowerCase()] = product;
+    }
 
     final index = _allProducts.indexWhere((p) => p.id == product.id);
     if (index >= 0) {
