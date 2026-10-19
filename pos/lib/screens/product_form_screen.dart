@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -135,21 +134,21 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
 
   void _openBarcodeScanner() {
     HapticFeedback.lightImpact();
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => BarcodeScanner(
-        title: 'Scan Item Barcode',
-        hintText: 'Align barcode or QR code in frame',
-        onScan: (code) {
-          Navigator.pop(ctx);
-          _viewModel.onBarcodeScanned(code);
-          _barcodeController.text = _viewModel.barcode;
-          if (_skuController.text.trim().isEmpty) {
-            _skuController.text = _viewModel.sku;
-          }
-        },
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BarcodeScanner(
+          title: 'Scan Item Barcode',
+          hintText: 'Align barcode or QR code in frame',
+          expectedType: ScannerExpectedType.any,
+          onScan: (code) {
+            _viewModel.onBarcodeScanned(code);
+            _barcodeController.text = _viewModel.barcode;
+            if (_skuController.text.trim().isEmpty) {
+              _skuController.text = _viewModel.sku;
+            }
+          },
+        ),
       ),
     );
   }
@@ -392,65 +391,40 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
         builder: (context, vm, _) {
           return Scaffold(
             backgroundColor: _bgObsidian,
-            resizeToAvoidBottomInset: false,
-            body: SafeArea(
-              child: Stack(
+            resizeToAvoidBottomInset: true,
+            appBar: PreferredSize(
+              preferredSize: const Size.fromHeight(56),
+              child: _buildStickyHeader(isEditing),
+            ),
+            body: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+              physics: const BouncingScrollPhysics(),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Scrollable Form Content
-                  Positioned.fill(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.only(
-                        left: 16,
-                        right: 16,
-                        top: 72, // Space for custom sticky header
-                        bottom: 120, // Space for sticky floating bottom bar
-                      ),
-                      physics: const BouncingScrollPhysics(),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          // 1. Hero Identity & Media Card
-                          _buildHeroIdentityCard(vm),
-                          const SizedBox(height: 16),
+                  // 1. Hero Identity & Media Card
+                  _buildHeroIdentityCard(vm),
+                  const SizedBox(height: 16),
 
-                          // 2. Dynamic Financial & Profit Margin Card
-                          _buildFinancialMarginCard(vm, currencySymbol),
-                          const SizedBox(height: 16),
+                  // 2. Dynamic Financial & Profit Margin Card
+                  _buildFinancialMarginCard(vm, currencySymbol),
+                  const SizedBox(height: 16),
 
-                          // 3. Inventory & Fast Unit Chips Card
-                          _buildInventoryUnitCard(vm),
-                          const SizedBox(height: 16),
+                  // 3. Inventory & Fast Unit Chips Card
+                  _buildInventoryUnitCard(vm),
+                  const SizedBox(height: 16),
 
-                          // 4. Categorization Pill Cloud Card
-                          _buildCategorizationCard(vm),
-                          const SizedBox(height: 16),
+                  // 4. Categorization Pill Cloud Card
+                  _buildCategorizationCard(vm),
+                  const SizedBox(height: 16),
 
-                          // 5. Collapsible Advanced Details Accordion
-                          _buildAdvancedDetailsCard(vm, currencySymbol),
-                          const SizedBox(height: 24),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  // Sticky Header / App Bar
-                  Positioned(
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    child: _buildStickyHeader(isEditing),
-                  ),
-
-                  // Sticky Floating Glass Bottom Action Bar
-                  Positioned(
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    child: _buildStickyBottomActionBar(vm),
-                  ),
+                  // 5. Collapsible Advanced Details Accordion
+                  _buildAdvancedDetailsCard(vm, currencySymbol),
+                  const SizedBox(height: 24),
                 ],
               ),
             ),
+            bottomNavigationBar: _buildStickyBottomActionBar(vm),
           );
         },
       ),
@@ -459,46 +433,39 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
 
   // ==================== STICKY HEADER ====================
 
-  Widget _buildStickyHeader(bool isEditing) {
-    return ClipRRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+  PreferredSizeWidget _buildStickyHeader(bool isEditing) {
+    return AppBar(
+      backgroundColor: _bgObsidian,
+      elevation: 0,
+      scrolledUnderElevation: 0,
+      centerTitle: false,
+      leading: IconButton(
+        icon: const Icon(Icons.close, color: Colors.white, size: 24),
+        onPressed: () => Navigator.pop(context),
+        tooltip: 'Cancel',
+      ),
+      title: Text(
+        isEditing ? 'Edit Product' : 'New Catalog Item',
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+          letterSpacing: -0.2,
+        ),
+      ),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.qr_code_scanner, color: _accentSky, size: 24),
+          onPressed: _openBarcodeScanner,
+          tooltip: 'Scan Barcode',
+        ),
+        const SizedBox(width: 8),
+      ],
+      bottom: PreferredSize(
+        preferredSize: const Size.fromHeight(1),
         child: Container(
-          height: 64,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          decoration: BoxDecoration(
-            color: _bgObsidian.withValues(alpha: 0.85),
-            border: const Border(
-              bottom: BorderSide(color: _borderSlate, width: 0.8),
-            ),
-          ),
-          child: Row(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.close, color: Colors.white, size: 24),
-                onPressed: () => Navigator.pop(context),
-                tooltip: 'Cancel',
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  isEditing ? 'Edit Product' : 'New Catalog Item',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: -0.2,
-                  ),
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.qr_code_scanner,
-                    color: _accentSky, size: 24),
-                onPressed: _openBarcodeScanner,
-                tooltip: 'Scan Barcode',
-              ),
-            ],
-          ),
+          color: _borderSlate,
+          height: 0.8,
         ),
       ),
     );
@@ -1636,23 +1603,19 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   // ==================== STICKY FLOATING GLASS BOTTOM BAR ====================
 
   Widget _buildStickyBottomActionBar(ProductFormViewModel vm) {
-    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     final isEnabled = vm.isValid && !vm.isSaving;
 
-    return Padding(
-      padding: EdgeInsets.only(bottom: bottomInset),
-      child: ClipRRect(
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: _bgObsidian.withValues(alpha: 0.88),
-              border: const Border(
-                top: BorderSide(color: _borderSlate, width: 0.8),
-              ),
-            ),
-            child: Row(
+    return SafeArea(
+      top: false,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: _bgObsidian.withValues(alpha: 0.95),
+          border: const Border(
+            top: BorderSide(color: _borderSlate, width: 0.8),
+          ),
+        ),
+        child: Row(
               children: [
                 // Left Summary Chip: Margin % or SKU
                 Container(
@@ -1755,8 +1718,6 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
               ],
             ),
           ),
-        ),
-      ),
-    );
+        );
   }
 }

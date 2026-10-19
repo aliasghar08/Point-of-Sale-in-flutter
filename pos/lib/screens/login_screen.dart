@@ -80,6 +80,18 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  Future<void> _handleDemoLogin() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final success = await authProvider.signInDemo();
+    if (success && mounted) {
+      FeedbackService.success();
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const DashboardScreen()),
+      );
+    }
+  }
+
   void _showForgotPasswordSheet() async {
     FeedbackService.lightTap();
     final sentEmail = await showModalBottomSheet<String>(
@@ -303,6 +315,19 @@ class _LoginScreenState extends State<LoginScreen> {
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
+                          ),
+                          const SizedBox(height: 10),
+                          OutlinedButton.icon(
+                            onPressed: authProvider.isLoading
+                                ? null
+                                : _handleDemoLogin,
+                            icon: const Icon(Icons.storefront_outlined,
+                                size: 18),
+                            label: const Text('Explore Demo Store (Quick Test)'),
+                            style: OutlinedButton.styleFrom(
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 12),
+                            ),
                           ),
                         ],
                       ), // Column

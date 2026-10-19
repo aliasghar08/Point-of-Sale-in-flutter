@@ -18,7 +18,7 @@ class BarcodeScanner extends StatefulWidget {
     this.title = 'Scan Barcode / QR Code',
     this.hintText = 'Align barcode or QR code inside the frame to scan',
     this.formats,
-    this.expectedType = ScannerExpectedType.barcode,
+    this.expectedType = ScannerExpectedType.any,
   });
 
   @override
@@ -148,8 +148,10 @@ class _BarcodeScannerState extends State<BarcodeScanner>
 
       Future.delayed(const Duration(milliseconds: 250), () {
         if (mounted) {
+          if (Navigator.canPop(context)) {
+            Navigator.pop(context);
+          }
           widget.onScan(rawValue);
-          Navigator.pop(context);
         }
       });
     }
@@ -232,8 +234,10 @@ class _BarcodeScannerState extends State<BarcodeScanner>
               if (text.isNotEmpty) {
                 Navigator.pop(dialogContext);
                 HapticFeedback.lightImpact();
+                if (Navigator.canPop(context)) {
+                  Navigator.pop(context);
+                }
                 widget.onScan(text);
-                Navigator.pop(context);
               }
             },
             child: const Text('Submit'),
@@ -508,6 +512,19 @@ class _BarcodeScannerState extends State<BarcodeScanner>
                           label: 'Manual',
                           onTap: _showManualInputDialog,
                         ),
+
+                        // Quick Test Barcode (Simulator / Debug)
+                        _buildControlButton(
+                          icon: Icons.science_outlined,
+                          label: 'Test Barcode',
+                          onTap: () {
+                            HapticFeedback.lightImpact();
+                            if (Navigator.canPop(context)) {
+                              Navigator.pop(context);
+                            }
+                            widget.onScan('1000000000018');
+                          },
+                        ),
                       ],
                     ),
                   ),
@@ -579,51 +596,119 @@ class _BarcodeScannerState extends State<BarcodeScanner>
   }
 
   Widget _buildPermissionDeniedState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(
-              Icons.camera_enhance_outlined,
-              size: 72,
-              color: Colors.white38,
+    return SafeArea(
+      child: Column(
+        children: [
+          // Header with Back Button
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                Material(
+                  color: Colors.white12,
+                  shape: const CircleBorder(),
+                  clipBehavior: Clip.antiAlias,
+                  child: IconButton(
+                    icon: const Icon(Icons.arrow_back, color: Colors.white),
+                    onPressed: () {
+                      if (Navigator.canPop(context)) Navigator.pop(context);
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  widget.title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            const Text(
-              'Camera Permission Required',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
+          ),
+          Expanded(
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.camera_enhance_outlined,
+                      size: 64,
+                      color: Colors.white38,
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Camera Scanner / Simulator',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Camera access is required for live scanning. On iOS simulator or without camera, enter codes manually or use quick test scan.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 14, color: Colors.white70),
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton.icon(
+                      onPressed: _checkPermission,
+                      icon: const Icon(Icons.settings),
+                      label: const Text('Grant Camera Permission'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue.shade700,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 14,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed: _showManualInputDialog,
+                      icon: const Icon(Icons.keyboard, color: Colors.cyanAccent),
+                      label: const Text(
+                        'Enter Code Manually',
+                        style: TextStyle(color: Colors.cyanAccent),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Colors.cyanAccent),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 14,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextButton.icon(
+                      onPressed: () {
+                        HapticFeedback.lightImpact();
+                        if (Navigator.canPop(context)) Navigator.pop(context);
+                        widget.onScan('1000000000018');
+                      },
+                      icon: const Icon(Icons.auto_awesome, color: Colors.amberAccent, size: 18),
+                      label: const Text(
+                        'Simulate Test Scan (Milk: 1000000000018)',
+                        style: TextStyle(color: Colors.amberAccent, fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-            const SizedBox(height: 8),
-            const Text(
-              'Camera access is needed to scan product barcodes and QR codes.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 14, color: Colors.white70),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: _checkPermission,
-              icon: const Icon(Icons.settings),
-              label: const Text('Grant Camera Permission'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue.shade700,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 14,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

@@ -1064,8 +1064,11 @@ class _HomeScreenState extends State<HomeScreen> {
       context,
       MaterialPageRoute(
         builder: (_) => BarcodeScanner(
+          expectedType: ScannerExpectedType.any,
           onScan: (code) {
-            final p = _cache.getProductByBarcode(code);
+            final trimmed = code.trim();
+            final p = _cache.getProductByBarcode(trimmed) ??
+                _cache.getProductBySku(trimmed);
             if (p != null) {
               _addToCart(p);
               ScaffoldMessenger.of(context).showSnackBar(
@@ -1075,8 +1078,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               );
             } else {
-              _searchController.text = code;
-              _onSearchChanged(code);
+              _searchController.text = trimmed;
+              _onSearchChanged(trimmed);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Scanned code "$trimmed" filtered into search.'),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
             }
           },
         ),

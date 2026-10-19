@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:pos/models/user.dart';
+import 'package:pos/models/product.dart';
 import 'package:pos/services/auth_service.dart';
 import 'package:pos/services/firebase_service.dart';
+import 'package:pos/services/cache_service.dart';
+import 'package:pos/services/sample_data_service.dart';
 
 class AuthProvider extends ChangeNotifier {
   final AuthService _authService = AuthService();
@@ -230,6 +233,42 @@ class AuthProvider extends ChangeNotifier {
   void clearError() {
     _error = null;
     notifyListeners();
+  }
+
+  /// Sign in as a demo store owner for testing and app evaluation
+  Future<bool> signInDemo() async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      _currentUser = AppUser(
+        id: 'demo-cashier-owner',
+        name: 'Demo Store Owner',
+        email: 'demo@poshub.app',
+        role: 'owner',
+        businessId: 'demo_business_store',
+        phone: '+1 555-0199',
+        createdAt: DateTime.now(),
+        isActive: true,
+      );
+
+      final cache = CacheService();
+      if (cache.allProducts.isEmpty) {
+        final demoItems = SampleDataService.sampleProducts
+            .map((m) => Product.fromMap(m, 'demo_${m['sku']}'))
+            .toList();
+        cache.setProducts(demoItems);
+      }
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      return false;
+    } finally {
+      _isLoading = false;
+      _isInitializing = false;
+      notifyListeners();
+    }
   }
 
   // Update current user
