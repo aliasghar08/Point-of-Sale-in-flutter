@@ -246,6 +246,17 @@ class AuthService {
     await _auth.signOut();
   }
 
+  // Send password reset email
+  Future<void> sendPasswordResetEmail(String email) async {
+    try {
+      await _auth.sendPasswordResetEmail(email: email.trim());
+      debugPrint('✅ Password reset email sent to $email');
+    } catch (e) {
+      debugPrint('❌ Password reset error: $e');
+      throw _handleAuthError(e);
+    }
+  }
+
   // ✅ UPDATED: Get current user data from MEMBERS sub-collection with self-healing
   Future<AppUser?> getCurrentUserData() async {
     User? user = _auth.currentUser;

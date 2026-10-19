@@ -6,6 +6,9 @@ import 'package:pos/models/customer.dart';
 import 'package:pos/viewmodels/pos_view_model.dart';
 import 'package:pos/viewmodels/inventory_view_model.dart';
 import 'package:pos/viewmodels/product_form_view_model.dart';
+import 'package:provider/provider.dart';
+import 'package:pos/providers/auth_provider.dart';
+import 'package:pos/screens/login_screen.dart';
 import 'package:pos/widgets/stat_badge.dart';
 import 'package:pos/widgets/pos_card.dart';
 import 'package:pos/widgets/staggered_animation.dart';
@@ -331,6 +334,25 @@ void main() {
 
       expect(find.text('Animated Card'), findsOneWidget);
       await tester.pumpAndSettle();
+    });
+
+    testWidgets('LoginScreen renders Forgot Password button and opens sheet', (tester) async {
+      final authProvider = AuthProvider();
+      await tester.pumpWidget(
+        ChangeNotifierProvider<AuthProvider>.value(
+          value: authProvider,
+          child: const MaterialApp(
+            home: LoginScreen(),
+          ),
+        ),
+      );
+
+      expect(find.text('Forgot Password?'), findsOneWidget);
+      await tester.tap(find.text('Forgot Password?'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Reset Password'), findsOneWidget);
+      expect(find.text('Send Reset Link'), findsOneWidget);
     });
   });
 

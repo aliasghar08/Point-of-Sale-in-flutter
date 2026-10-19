@@ -207,6 +207,25 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  // Send password reset email
+  Future<bool> sendPasswordResetEmail(String email) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      await _authService.sendPasswordResetEmail(email);
+      return true;
+    } catch (e) {
+      _error = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
+      debugPrint('❌ Send password reset error: $e');
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
   // Clear error
   void clearError() {
     _error = null;
