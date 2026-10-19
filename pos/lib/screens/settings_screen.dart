@@ -539,7 +539,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               const SizedBox(width: 10),
               const Text(
-                'About POS Enterprise',
+                'About PosHub',
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
             ],
