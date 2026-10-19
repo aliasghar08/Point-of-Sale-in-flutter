@@ -27,6 +27,7 @@ class AuthProvider extends ChangeNotifier {
 
   // ✅ Helper to get business ID
   String? get businessId => _currentUser?.businessId;
+  String? get currentBusinessId => businessId;
 
   // Initialize auth state
   Future<void> init() async {

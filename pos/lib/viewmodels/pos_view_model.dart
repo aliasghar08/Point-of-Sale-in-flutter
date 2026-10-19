@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:pos/models/product.dart';
 import 'package:pos/models/cart_item.dart';
 import 'package:pos/models/held_order.dart';
@@ -16,6 +17,9 @@ class PosViewModel extends ChangeNotifier {
   final FirebaseService _firebaseService = FirebaseService();
   final CacheService _cache = CacheService();
   final CustomerService _customerService = CustomerService();
+
+  StreamSubscription<QuerySnapshot>? _productsSubscription;
+  String? _currentBusinessId;
 
   // State
   List<Product> _filteredProducts = [];
@@ -49,12 +53,12 @@ class PosViewModel extends ChangeNotifier {
   double get orderDiscountAmount => _orderDiscountAmount;
   double get taxRate => _taxRate;
 
-  int get totalItemCount => _cart.fold(0, (sum, item) => sum + item.quantity);
+  int get totalItemCount => _cart.fold(0, (total, item) => total + item.quantity);
   bool get isCartEmpty => _cart.isEmpty;
 
   // Financial calculations
   double get subtotal =>
-      _cart.fold(0.0, (sum, item) => sum + (item.unitPrice * item.quantity));
+      _cart.fold(0.0, (total, item) => total + (item.unitPrice * item.quantity));
 
   double get totalDiscount {
     double total = 0.0;
@@ -91,7 +95,73 @@ class PosViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _debounceTimer?.cancel();
+    _productsSubscription?.cancel();
     super.dispose();
+  }
+
+  // ==================== REACTIVE MULTI-TENANT STORE SCOPING ====================
+
+  /// Binds PosViewModel to the authenticated business session.
+  /// Cancels prior subscriptions, attaches real-time Firestore stream,
+  /// updates cache and filters reactively on changes.
+  void initForStore(String? businessId) {
+    if (businessId == null || businessId.isEmpty) {
+      if (_currentBusinessId != null) {
+        _productsSubscription?.cancel();
+        _productsSubscription = null;
+        _currentBusinessId = null;
+        _filteredProducts = [];
+        notifyListeners();
+      }
+      return;
+    }
+
+    if (_currentBusinessId == businessId && _productsSubscription != null) {
+      return;
+    }
+
+    _productsSubscription?.cancel();
+    _currentBusinessId = businessId;
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      final collection = FirebaseFirestore.instance
+          .collection('businesses')
+          .doc(businessId)
+          .collection('products');
+
+      _productsSubscription = collection.snapshots().listen(
+        (snapshot) {
+          final items = snapshot.docs.map((doc) {
+            return Product.fromMap(
+              doc.data(),
+              doc.id,
+            );
+          }).toList();
+
+          _cache.setProducts(items);
+          _applyFilters();
+          _isLoading = false;
+          notifyListeners();
+        },
+        onError: (error) {
+          debugPrint('❌ PosViewModel Firestore stream error: $error');
+          _isLoading = false;
+          notifyListeners();
+        },
+      );
+    } catch (e) {
+      debugPrint('⚠️ Error setting up PosViewModel stream: $e');
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  void optimisticAddOrUpdate(Product product) {
+    _cache.upsertProduct(product);
+    _applyFilters();
+    notifyListeners();
   }
 
   // ==================== CATALOG METHODS ====================

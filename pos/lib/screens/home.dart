@@ -13,6 +13,7 @@ import 'package:pos/services/receipt_service.dart';
 import 'package:pos/services/customer_service.dart';
 import 'package:pos/providers/settings_provider.dart';
 import 'package:pos/providers/auth_provider.dart';
+import 'package:pos/viewmodels/pos_view_model.dart';
 import 'package:pos/theme/app_colors.dart';
 import 'package:pos/widgets/pos_card.dart';
 import 'package:pos/widgets/stat_badge.dart';
@@ -60,6 +61,16 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _loadCatalog();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Reactively refresh product grid when PosViewModel updates (e.g. products added or edited in catalog)
+    Provider.of<PosViewModel>(context);
+    if (!_isLoading) {
+      _applyFilters();
+    }
   }
 
   @override

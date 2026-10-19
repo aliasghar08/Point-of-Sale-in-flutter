@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:pos/models/product.dart';
 import 'package:pos/services/firebase_service.dart';
 import 'package:pos/services/cache_service.dart';
@@ -17,6 +16,7 @@ import 'package:pos/widgets/category_pill.dart';
 import 'package:pos/widgets/empty_state_view.dart';
 import 'package:pos/widgets/staggered_animation.dart';
 import 'package:pos/screens/product_form_screen.dart';
+import 'package:pos/viewmodels/inventory_view_model.dart';
 
 /// Modern Inventory & Stock Management Screen.
 class InventoryScreen extends StatefulWidget {
@@ -217,26 +217,16 @@ class _InventoryScreenState extends State<InventoryScreen> {
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
       ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: _firebaseService.productsStream(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting &&
+      body: Consumer<InventoryViewModel>(
+        builder: (context, invVm, _) {
+          if (invVm.isLoading &&
+              invVm.products.isEmpty &&
               !_cache.hasValidProductCache) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          List<Product> products = [];
-          if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
-            products = snapshot.data!.docs.map((doc) {
-              return Product.fromMap(
-                doc.data() as Map<String, dynamic>,
-                doc.id,
-              );
-            }).toList();
-            _cache.setProducts(products);
-          } else if (_cache.hasValidProductCache) {
-            products = _cache.allProducts;
-          }
+          final products =
+              invVm.products.isNotEmpty ? invVm.products : _cache.allProducts;
 
           // Calculate Inventory Metrics
           final totalSkus = products.length;

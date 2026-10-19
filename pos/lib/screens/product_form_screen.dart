@@ -1,16 +1,23 @@
+import 'dart:io';
+import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:intl/intl.dart';
-import 'dart:io';
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
+import 'package:image_picker/image_picker.dart';
+
 import 'package:pos/models/product.dart';
-import 'package:pos/services/firebase_service.dart';
+import 'package:pos/viewmodels/product_form_view_model.dart';
+import 'package:pos/viewmodels/inventory_view_model.dart';
+import 'package:pos/viewmodels/pos_view_model.dart';
+import 'package:pos/providers/auth_provider.dart';
 import 'package:pos/providers/settings_provider.dart';
-import 'package:pos/models/product_reference.dart';
-import 'package:pos/utils/field_info.dart';
+import 'package:pos/widgets/pos_card.dart';
 import 'package:pos/widgets/barcode_scanner.dart';
 
+/// Premium, Retail-Grade Product Catalog Creation & Editing Screen.
+/// Designed to Apple, Square, and Stripe retail standards with deep obsidian surfaces,
+/// live margin calculations, fluid pill selectors, and a glassmorphic sticky bottom bar.
 class ProductFormScreen extends StatefulWidget {
   final Product? product;
   final bool isEditing;
@@ -22,2533 +29,1186 @@ class ProductFormScreen extends StatefulWidget {
 }
 
 class _ProductFormScreenState extends State<ProductFormScreen> {
-  final _formKey = GlobalKey<FormState>();
+  late final ProductFormViewModel _viewModel;
 
-  // ===== CONTROLLERS =====
+  // Text Controllers
   final _nameController = TextEditingController();
-  final _descriptionController = TextEditingController();
-  final _brandController = TextEditingController();
   final _skuController = TextEditingController();
-  final _priceController = TextEditingController();
+  final _barcodeController = TextEditingController();
   final _costController = TextEditingController();
-  final _salePriceController = TextEditingController();
-  final _wholesalePriceController = TextEditingController();
+  final _sellingPriceController = TextEditingController();
   final _stockController = TextEditingController();
   final _minStockController = TextEditingController();
-  final _maxStockController = TextEditingController();
-  final _weightController = TextEditingController();
-  final _barcodeController = TextEditingController();
-  final _qrCodeController = TextEditingController();
-  final _supplierNameController = TextEditingController();
-  final _supplierSkuController = TextEditingController();
-  final _reorderPointController = TextEditingController();
-  final _reorderQuantityController = TextEditingController();
+  final _wholesaleController = TextEditingController();
+  final _salePriceController = TextEditingController();
+  final _descriptionController = TextEditingController();
 
-  // ===== DATE CONTROLLERS =====
-  DateTime? _manufactureDate;
-  DateTime? _expiryDate;
-  DateTime? _bestBeforeDate;
+  // Accordion State
+  bool _isAdvancedExpanded = false;
 
-  // ===== SELECTION STATE =====
-  File? _imageFile;
-  String? _imageUrl;
-  String? _selectedCategory;
-  String? _selectedSubCategory;
-  String? _selectedTaxClass;
-  String? _selectedUnit;
-  String? _selectedWeightUnit;
-  bool _isLoading = false;
-  bool _isActive = true;
-  bool _isFeatured = false;
-  bool _isDigital = false;
-  bool _hasVariants = false;
-
-  // ===== DROPDOWN OPTIONS (from ProductReference) =====
-  late List<String> _categories;
-  List<String> _subCategories = [];
-
-  // ===== TAX CLASSES =====
-  final List<String> _taxClasses = [
-    'Standard (18%)',
-    'Reduced (5%)',
-    'Zero (0%)',
-    'Exempt',
-  ];
-
-  // ===== UNITS =====
-  final List<String> _units = [
-    'pcs (Pieces)',
-    'kg (Kilograms)',
-    'g (Grams)',
-    'mg (Milligrams)',
-    'l (Liters)',
-    'ml (Milliliters)',
-    'm (Meters)',
-    'cm (Centimeters)',
-    'box (Box)',
-    'pack (Pack)',
-    'set (Set)',
-    'pair (Pair)',
-    'dozen (Dozen)',
-    'roll (Roll)',
-  ];
-
-  final List<String> _weightUnits = ['kg', 'g', 'lbs', 'oz'];
-
-  // ===== SEARCH STATE =====
-  List<String> _productSuggestions = [];
-  final TextEditingController _searchController = TextEditingController();
-  bool _showSuggestions = false;
+  // Color Palette Constants
+  static const Color _bgObsidian = Color(0xFF0B0F19);
+  static const Color _surfaceNavy = Color(0xFF1E293B);
+  static const Color _borderSlate = Color(0xFF334155);
+  static const Color _accentSky = Color(0xFF38BDF8);
+  static const Color _accentIndigo = Color(0xFF6366F1);
+  static const Color _emerald = Color(0xFF10B981);
+  static const Color _amber = Color(0xFFF59E0B);
+  static const Color _crimson = Color(0xFFEF4444);
 
   @override
   void initState() {
     super.initState();
-    // Get categories from ProductReference
-    _categories = ProductReference.getCategories();
+    _viewModel = ProductFormViewModel();
 
-    if (widget.isEditing && widget.product != null) {
-      _populateFields();
-    }
-  }
+    // Populate initial data from product or defaults
+    _viewModel.initFromProduct(widget.product);
 
-  void _populateFields() {
-    final p = widget.product!;
-    _nameController.text = p.name;
-    _descriptionController.text = p.description;
-    _brandController.text = p.brand;
-    _skuController.text = p.sku;
-    _priceController.text = p.price.toStringAsFixed(2);
-    _costController.text = p.costPrice.toStringAsFixed(2);
-    _salePriceController.text = p.salePrice?.toStringAsFixed(2) ?? '';
-    _wholesalePriceController.text = p.wholesalePrice?.toStringAsFixed(2) ?? '';
-    _stockController.text = p.stock.toString();
-    _minStockController.text = p.minStock.toString();
-    _maxStockController.text = p.maxStock > 0 ? p.maxStock.toString() : '';
-    _weightController.text = p.weight?.toString() ?? '';
-    _barcodeController.text = p.barcode;
-    _qrCodeController.text = p.qrCode;
-    _selectedCategory = p.category;
-    _selectedSubCategory = p.subCategory;
-    _selectedTaxClass = p.taxClass;
-    _selectedUnit = p.unit;
-    _selectedWeightUnit = p.weightUnit;
-    _supplierNameController.text = p.supplierName ?? '';
-    _supplierSkuController.text = p.supplierSku ?? '';
-    _reorderPointController.text = p.reorderPoint?.toString() ?? '';
-    _reorderQuantityController.text = p.reorderQuantity?.toString() ?? '';
-    _manufactureDate = p.manufactureDate;
-    _expiryDate = p.expiryDate;
-    _bestBeforeDate = p.bestBeforeDate;
-    _isActive = p.isActive;
-    _isFeatured = p.isFeatured;
-    _isDigital = p.isDigital;
-    _hasVariants = p.hasVariants;
-    _imageUrl = p.imageUrl;
+    // Initialize controller values
+    _nameController.text = _viewModel.name;
+    _skuController.text = _viewModel.sku;
+    _barcodeController.text = _viewModel.barcode;
+    _costController.text =
+        _viewModel.costPrice > 0 ? _viewModel.costPrice.toStringAsFixed(2) : '';
+    _sellingPriceController.text = _viewModel.sellingPrice > 0
+        ? _viewModel.sellingPrice.toStringAsFixed(2)
+        : '';
+    _stockController.text = _viewModel.stockQuantity.toString();
+    _minStockController.text = _viewModel.minStockAlert.toString();
+    _wholesaleController.text = _viewModel.wholesalePrice != null
+        ? _viewModel.wholesalePrice!.toStringAsFixed(2)
+        : '';
+    _salePriceController.text = _viewModel.salePrice != null
+        ? _viewModel.salePrice!.toStringAsFixed(2)
+        : '';
+    _descriptionController.text = _viewModel.description;
 
-    // Load subcategories for the selected category
-    if (_selectedCategory != null) {
-      if (!_categories.contains(_selectedCategory)) {
-        _categories.insert(0, _selectedCategory!);
-      }
-      _subCategories = ProductReference.getSubCategories(_selectedCategory!);
-      if (_selectedSubCategory != null && !_subCategories.contains(_selectedSubCategory)) {
-        _subCategories.insert(0, _selectedSubCategory!);
-      }
-    }
-    if (_selectedUnit != null && !_units.contains(_selectedUnit)) {
-      _units.insert(0, _selectedUnit!);
-    }
-    if (_selectedWeightUnit != null && !_weightUnits.contains(_selectedWeightUnit)) {
-      _weightUnits.insert(0, _selectedWeightUnit!);
-    }
-    if (_selectedTaxClass != null && !_taxClasses.contains(_selectedTaxClass)) {
-      _taxClasses.insert(0, _selectedTaxClass!);
-    }
+    // Attach listeners
+    _nameController.addListener(() => _viewModel.setName(_nameController.text));
+    _skuController.addListener(() => _viewModel.setSku(_skuController.text));
+    _barcodeController
+        .addListener(() => _viewModel.setBarcode(_barcodeController.text));
+    _costController.addListener(() {
+      final val = double.tryParse(_costController.text) ?? 0.0;
+      _viewModel.setCostPrice(val);
+    });
+    _sellingPriceController.addListener(() {
+      final val = double.tryParse(_sellingPriceController.text) ?? 0.0;
+      _viewModel.setSellingPrice(val);
+    });
+    _stockController.addListener(() {
+      final val = int.tryParse(_stockController.text) ?? 0;
+      _viewModel.setStockQuantity(val);
+    });
+    _minStockController.addListener(() {
+      final val = int.tryParse(_minStockController.text) ?? 0;
+      _viewModel.setMinStockAlert(val);
+    });
+    _wholesaleController.addListener(() {
+      final val = double.tryParse(_wholesaleController.text);
+      _viewModel.setWholesalePrice(val);
+    });
+    _salePriceController.addListener(() {
+      final val = double.tryParse(_salePriceController.text);
+      _viewModel.setSalePrice(val);
+    });
+    _descriptionController.addListener(
+      () => _viewModel.setDescription(_descriptionController.text),
+    );
   }
 
   @override
   void dispose() {
     _nameController.dispose();
-    _descriptionController.dispose();
-    _brandController.dispose();
     _skuController.dispose();
-    _priceController.dispose();
+    _barcodeController.dispose();
     _costController.dispose();
-    _salePriceController.dispose();
-    _wholesalePriceController.dispose();
+    _sellingPriceController.dispose();
     _stockController.dispose();
     _minStockController.dispose();
-    _maxStockController.dispose();
-    _weightController.dispose();
-    _barcodeController.dispose();
-    _qrCodeController.dispose();
-    _supplierNameController.dispose();
-    _supplierSkuController.dispose();
-    _reorderPointController.dispose();
-    _reorderQuantityController.dispose();
-    _searchController.dispose();
+    _wholesaleController.dispose();
+    _salePriceController.dispose();
+    _descriptionController.dispose();
+    _viewModel.dispose();
     super.dispose();
   }
 
-  void _updateSubCategories() {
-    setState(() {
-      if (_selectedCategory != null) {
-        _subCategories = ProductReference.getSubCategories(_selectedCategory!);
-      } else {
-        _subCategories = [];
-      }
-      _selectedSubCategory = null;
-    });
-  }
-
-  void _searchProducts(String query) {
-    if (query.isEmpty) {
-      setState(() {
-        _productSuggestions = [];
-        _showSuggestions = false;
-      });
-      return;
-    }
-
-    final suggestions = ProductReference.searchProducts(
-      query: query,
-      category: _selectedCategory,
-      limit: 15,
+  void _openBarcodeScanner() {
+    HapticFeedback.lightImpact();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => BarcodeScanner(
+        title: 'Scan Item Barcode',
+        hintText: 'Align barcode or QR code in frame',
+        onScan: (code) {
+          Navigator.pop(ctx);
+          _viewModel.onBarcodeScanned(code);
+          _barcodeController.text = _viewModel.barcode;
+          if (_skuController.text.trim().isEmpty) {
+            _skuController.text = _viewModel.sku;
+          }
+        },
+      ),
     );
-
-    setState(() {
-      _productSuggestions = suggestions;
-      _showSuggestions = true;
-    });
-  }
-
-  void _selectProductSuggestion(String productName) {
-    setState(() {
-      _nameController.text = productName;
-      _productSuggestions = [];
-      _showSuggestions = false;
-
-      // Try to auto-fill category from product reference
-      final category = ProductReference.findCategoryForProduct(productName);
-      if (category != null && category != _selectedCategory) {
-        _selectedCategory = category;
-        _updateSubCategories();
-      }
-    });
   }
 
   Future<void> _pickImage(ImageSource source) async {
     try {
-      final ImagePicker picker = ImagePicker();
-      final XFile? image = await picker.pickImage(
-        source: source,
-        maxWidth: 800,
-        maxHeight: 800,
-        imageQuality: 85,
-      );
-
-      if (image != null) {
-        setState(() {
-          _imageFile = File(image.path);
-        });
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(source: source, imageQuality: 85);
+      if (picked != null) {
+        _viewModel.setImageFile(File(picked.path));
       }
     } catch (e) {
-      _showSnackBar('Error picking image: $e', isError: true);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error selecting image: $e'),
+            backgroundColor: _crimson,
+          ),
+        );
+      }
     }
   }
 
-  void _showImagePickerOptions() {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-
+  void _showImagePickerSheet() {
+    HapticFeedback.lightImpact();
     showModalBottomSheet(
       context: context,
-      backgroundColor: isDarkMode ? Colors.grey.shade900 : Colors.white,
+      backgroundColor: _surfaceNavy,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 60,
-              height: 4,
-              decoration: BoxDecoration(
-                color: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Product Image',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Add a product image to make it stand out',
-              style: TextStyle(
-                fontSize: 14,
-                color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Material(
-              color: Colors.transparent,
-              borderRadius: BorderRadius.circular(12),
-              child: ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: isDarkMode
-                        ? Colors.blue.shade900
-                        : Colors.blue.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(
-                    Icons.photo_library,
-                    color: isDarkMode ? Colors.blue.shade400 : Colors.blue,
-                  ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: _borderSlate,
+                  borderRadius: BorderRadius.circular(2),
                 ),
-                title: const Text('Choose from Gallery'),
-                subtitle: Text(
-                  'Select from your device',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: isDarkMode
-                        ? Colors.grey.shade400
-                        : Colors.grey.shade600,
-                  ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Product Photo',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
                 ),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: const Icon(Icons.camera_alt, color: _accentSky),
+                title: const Text('Take Photo',
+                    style: TextStyle(color: Colors.white)),
                 onTap: () {
-                  Navigator.pop(context);
-                  _pickImage(ImageSource.gallery);
-                },
-              ),
-            ),
-            Material(
-              color: Colors.transparent,
-              borderRadius: BorderRadius.circular(12),
-              child: ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: isDarkMode
-                        ? Colors.green.shade900
-                        : Colors.green.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(
-                    Icons.camera_alt,
-                    color: isDarkMode ? Colors.green.shade400 : Colors.green,
-                  ),
-                ),
-                title: const Text('Take Photo'),
-                subtitle: Text(
-                  'Capture with camera',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: isDarkMode
-                        ? Colors.grey.shade400
-                        : Colors.grey.shade600,
-                  ),
-                ),
-                onTap: () {
-                  Navigator.pop(context);
+                  Navigator.pop(ctx);
                   _pickImage(ImageSource.camera);
                 },
               ),
-            ),
-            if (_imageFile != null)
-              Material(
-                color: Colors.transparent,
-                borderRadius: BorderRadius.circular(12),
-                child: ListTile(
-                  leading: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: isDarkMode
-                          ? Colors.red.shade900
-                          : Colors.red.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(
-                      Icons.delete,
-                      color: isDarkMode ? Colors.red.shade400 : Colors.red,
-                    ),
-                  ),
-                  title: const Text(
-                    'Remove Image',
-                    style: TextStyle(color: Colors.red),
-                  ),
+              ListTile(
+                leading: const Icon(Icons.photo_library, color: _accentSky),
+                title: const Text('Choose from Gallery',
+                    style: TextStyle(color: Colors.white)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickImage(ImageSource.gallery);
+                },
+              ),
+              if (_viewModel.imageFile != null || _viewModel.imageUrl != null)
+                ListTile(
+                  leading: const Icon(Icons.delete_outline, color: _crimson),
+                  title: const Text('Remove Photo',
+                      style: TextStyle(color: _crimson)),
                   onTap: () {
-                    Navigator.pop(context);
-                    setState(() {
-                      _imageFile = null;
-                    });
+                    Navigator.pop(ctx);
+                    _viewModel.clearImage();
                   },
                 ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showAddCategorySheet() {
+    final catController = TextEditingController();
+    HapticFeedback.lightImpact();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: _surfaceNavy,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+          left: 20,
+          right: 20,
+          top: 20,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Add New Category',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white70),
+                  onPressed: () => Navigator.pop(ctx),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: catController,
+              autofocus: true,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: 'e.g., Dairy, Spices, Cosmetics',
+                hintStyle: const TextStyle(color: Colors.white38),
+                filled: true,
+                fillColor: _bgObsidian,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: _borderSlate),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: _borderSlate),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: _accentSky, width: 1.5),
+                ),
               ),
-            const SizedBox(height: 8),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                onPressed: () {
+                  final text = catController.text.trim();
+                  if (text.isNotEmpty) {
+                    _viewModel.addCategory(text);
+                    Navigator.pop(ctx);
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _accentSky,
+                  foregroundColor: _bgObsidian,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 0,
+                ),
+                child: const Text(
+                  'Add Category',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  DateTime _normalizeDate(DateTime date) {
-    return DateTime(date.year, date.month, date.day);
-  }
-
-  void _openScanner(String target) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => BarcodeScanner(
-          title: target == 'qr' ? 'Scan QR Code' : 'Scan Barcode',
-          hintText: target == 'qr'
-              ? 'Align QR code inside frame to scan'
-              : 'Align barcode inside frame to scan',
-          expectedType: target == 'qr'
-              ? ScannerExpectedType.qrCode
-              : ScannerExpectedType.barcode,
-          onScan: (code) {
-            setState(() {
-              if (target == 'qr') {
-                _qrCodeController.text = code;
-              } else {
-                _barcodeController.text = code;
-              }
-            });
-            _showSnackBar(
-              '✅ ${target == 'qr' ? 'QR Code' : 'Barcode'} scanned: $code',
-            );
-          },
+  Future<void> _submitProduct() async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final businessId = auth.currentBusinessId;
+    if (businessId == null || businessId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No active store selected. Please login again.'),
+          backgroundColor: _crimson,
         ),
-      ),
-    );
-  }
-
-  void _clearDate(String type) {
-    setState(() {
-      switch (type) {
-        case 'manufacture':
-          _manufactureDate = null;
-          break;
-        case 'expiry':
-          _expiryDate = null;
-          break;
-        case 'bestBefore':
-          _bestBeforeDate = null;
-          break;
-      }
-    });
-  }
-
-  Future<void> _selectDate(BuildContext context, String type) async {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-
-    DateTime firstDate = DateTime(2000, 1, 1);
-    DateTime lastDate = DateTime(2100, 12, 31);
-    DateTime? currentSelected;
-
-    if (type == 'manufacture') {
-      currentSelected = _manufactureDate;
-      // Manufacture date cannot be after Best Before or Expiry date
-      if (_bestBeforeDate != null && _expiryDate != null) {
-        lastDate = _bestBeforeDate!.isBefore(_expiryDate!)
-            ? _normalizeDate(_bestBeforeDate!)
-            : _normalizeDate(_expiryDate!);
-      } else if (_bestBeforeDate != null) {
-        lastDate = _normalizeDate(_bestBeforeDate!);
-      } else if (_expiryDate != null) {
-        lastDate = _normalizeDate(_expiryDate!);
-      }
-    } else if (type == 'bestBefore') {
-      currentSelected = _bestBeforeDate;
-      // Best Before cannot be before Manufacture Date
-      if (_manufactureDate != null) {
-        firstDate = _normalizeDate(_manufactureDate!);
-      }
-      // Best Before cannot be after Expiry Date
-      if (_expiryDate != null) {
-        lastDate = _normalizeDate(_expiryDate!);
-      }
-    } else if (type == 'expiry') {
-      currentSelected = _expiryDate;
-      // Expiry cannot be before Best Before Date or Manufacture Date
-      if (_bestBeforeDate != null) {
-        firstDate = _normalizeDate(_bestBeforeDate!);
-      } else if (_manufactureDate != null) {
-        firstDate = _normalizeDate(_manufactureDate!);
-      }
-    }
-
-    if (firstDate.isAfter(lastDate)) {
-      firstDate = lastDate;
-    }
-
-    DateTime initialDate = currentSelected != null
-        ? _normalizeDate(currentSelected)
-        : _normalizeDate(DateTime.now());
-
-    if (initialDate.isBefore(firstDate)) {
-      initialDate = firstDate;
-    } else if (initialDate.isAfter(lastDate)) {
-      initialDate = lastDate;
-    }
-
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: initialDate,
-      firstDate: firstDate,
-      lastDate: lastDate,
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.fromSeed(
-              seedColor: Colors.blue,
-              brightness: isDarkMode ? Brightness.dark : Brightness.light,
-            ),
-          ),
-          child: child!,
-        );
-      },
-    );
-
-    if (picked != null) {
-      final normalizedPicked = _normalizeDate(picked);
-      setState(() {
-        switch (type) {
-          case 'manufacture':
-            _manufactureDate = normalizedPicked;
-            break;
-          case 'expiry':
-            _expiryDate = normalizedPicked;
-            break;
-          case 'bestBefore':
-            _bestBeforeDate = normalizedPicked;
-            break;
-        }
-      });
-    }
-  }
-
-  Future<void> _saveProduct() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    if (_manufactureDate != null && _bestBeforeDate != null) {
-      if (_normalizeDate(
-        _manufactureDate!,
-      ).isAfter(_normalizeDate(_bestBeforeDate!))) {
-        _showSnackBar(
-          '❌ Manufacture date cannot be after Best Before date',
-          isError: true,
-        );
-        return;
-      }
-    }
-
-    if (_bestBeforeDate != null && _expiryDate != null) {
-      if (_normalizeDate(
-        _bestBeforeDate!,
-      ).isAfter(_normalizeDate(_expiryDate!))) {
-        _showSnackBar(
-          '❌ Best Before date cannot be after Expiry date',
-          isError: true,
-        );
-        return;
-      }
-    }
-
-    if (_manufactureDate != null && _expiryDate != null) {
-      if (_normalizeDate(
-        _manufactureDate!,
-      ).isAfter(_normalizeDate(_expiryDate!))) {
-        _showSnackBar(
-          '❌ Manufacture date cannot be after Expiry date',
-          isError: true,
-        );
-        return;
-      }
-    }
-
-    setState(() => _isLoading = true);
-
-    try {
-      final product = Product(
-        id: widget.isEditing ? widget.product!.id : '',
-        name: _nameController.text.trim(),
-        description: _descriptionController.text.trim(),
-        brand: _brandController.text.trim(),
-        sku: _skuController.text.trim(),
-        price: double.parse(_priceController.text),
-        costPrice: double.parse(_costController.text),
-        salePrice: _salePriceController.text.isNotEmpty
-            ? double.parse(_salePriceController.text)
-            : null,
-        wholesalePrice: _wholesalePriceController.text.isNotEmpty
-            ? double.parse(_wholesalePriceController.text)
-            : null,
-        stock: int.parse(_stockController.text),
-        minStock: int.parse(_minStockController.text),
-        maxStock: _maxStockController.text.isNotEmpty
-            ? int.parse(_maxStockController.text)
-            : 0,
-        unit: _selectedUnit ?? 'pcs',
-        weight: _weightController.text.isNotEmpty
-            ? double.parse(_weightController.text)
-            : null,
-        weightUnit: _selectedWeightUnit,
-        reorderPoint: _reorderPointController.text.isNotEmpty
-            ? int.parse(_reorderPointController.text)
-            : null,
-        reorderQuantity: _reorderQuantityController.text.isNotEmpty
-            ? int.parse(_reorderQuantityController.text)
-            : null,
-        manufactureDate: _manufactureDate,
-        expiryDate: _expiryDate,
-        bestBeforeDate: _bestBeforeDate,
-        barcode: _barcodeController.text.trim(),
-        qrCode: _qrCodeController.text.trim(),
-        category: _selectedCategory ?? 'Uncategorized',
-        subCategory: _selectedSubCategory,
-        taxClass: _selectedTaxClass,
-        supplierName: _supplierNameController.text.trim(),
-        supplierSku: _supplierSkuController.text.trim(),
-        imageUrl: _imageUrl ?? '',
-        isActive: _isActive,
-        isFeatured: _isFeatured,
-        isDigital: _isDigital,
-        hasVariants: _hasVariants,
-        createdAt: widget.isEditing
-            ? widget.product!.createdAt
-            : DateTime.now(),
-        updatedAt: DateTime.now(),
       );
-
-      final firebaseService = FirebaseService();
-
-      if (widget.isEditing) {
-        await firebaseService.updateProduct(
-          widget.product!.id,
-          product.toMap(),
-        );
-        _showSnackBar('✅ Product updated successfully!');
-      } else {
-        await firebaseService.addProduct(product.toMap());
-        _showSnackBar('✅ Product added successfully!');
-      }
-
-      if (!mounted) return;
-      Navigator.pop(context, true);
-    } catch (e) {
-      _showSnackBar('❌ Error: $e', isError: true);
-    } finally {
-      setState(() => _isLoading = false);
+      return;
     }
-  }
 
-  void _showSnackBar(String message, {bool isError = false}) {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final inventoryVm = Provider.of<InventoryViewModel>(context, listen: false);
+    final posVm = Provider.of<PosViewModel>(context, listen: false);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          message,
-          style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
-        ),
-        backgroundColor: isError
-            ? (isDarkMode ? Colors.red.shade400 : Colors.red.shade700)
-            : (isDarkMode ? Colors.green.shade400 : Colors.green.shade700),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      ),
+    HapticFeedback.mediumImpact();
+    final success = await _viewModel.saveProduct(
+      existingProduct: widget.product,
+      businessId: businessId,
+      inventoryViewModel: inventoryVm,
+      posViewModel: posVm,
     );
+
+    if (success && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(widget.isEditing
+              ? 'Product updated successfully!'
+              : 'Product saved to catalog!'),
+          backgroundColor: _emerald,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      Navigator.pop(context);
+    } else if (mounted && _viewModel.errorMessage != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_viewModel.errorMessage!),
+          backgroundColor: _crimson,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final settingsProvider = Provider.of<SettingsProvider>(context);
-    final currencySymbol = settingsProvider.currencySymbol;
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final settings = Provider.of<SettingsProvider>(context);
+    final currencySymbol = settings.currencySymbol;
+    final isEditing = widget.isEditing || widget.product != null;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          widget.isEditing ? 'Edit Product' : 'Add New Product',
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        backgroundColor: isDarkMode
-            ? Colors.blue.shade800
-            : Colors.blue.shade700,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.qr_code_scanner, color: Colors.white),
-            onPressed: () => _openScanner('barcode'),
-            tooltip: 'Scan Barcode / QR Code',
-          ),
-          IconButton(
-            icon: const Icon(Icons.help_outline, color: Colors.white),
-            onPressed: _showHelpDialog,
-            tooltip: 'Help',
-          ),
-        ],
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildFormHeader(isDarkMode),
-                    const SizedBox(height: 20),
-                    _buildImageSection(isDarkMode),
-                    const SizedBox(height: 20),
-                    _buildSectionCard(
-                      title: 'Basic Information',
-                      icon: Icons.info,
-                      child: _buildBasicInfoFields(isDarkMode),
-                      isDarkMode: isDarkMode,
-                    ),
-                    const SizedBox(height: 20),
-                    _buildSectionCard(
-                      title: 'Pricing & Stock',
-                      icon: Icons.attach_money,
-                      child: _buildPricingStockFields(
-                        currencySymbol,
-                        isDarkMode,
+    return ChangeNotifierProvider<ProductFormViewModel>.value(
+      value: _viewModel,
+      child: Consumer<ProductFormViewModel>(
+        builder: (context, vm, _) {
+          return Scaffold(
+            backgroundColor: _bgObsidian,
+            resizeToAvoidBottomInset: false,
+            body: SafeArea(
+              child: Stack(
+                children: [
+                  // Scrollable Form Content
+                  Positioned.fill(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.only(
+                        left: 16,
+                        right: 16,
+                        top: 72, // Space for custom sticky header
+                        bottom: 120, // Space for sticky floating bottom bar
                       ),
-                      isDarkMode: isDarkMode,
+                      physics: const BouncingScrollPhysics(),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // 1. Hero Identity & Media Card
+                          _buildHeroIdentityCard(vm),
+                          const SizedBox(height: 16),
+
+                          // 2. Dynamic Financial & Profit Margin Card
+                          _buildFinancialMarginCard(vm, currencySymbol),
+                          const SizedBox(height: 16),
+
+                          // 3. Inventory & Fast Unit Chips Card
+                          _buildInventoryUnitCard(vm),
+                          const SizedBox(height: 16),
+
+                          // 4. Categorization Pill Cloud Card
+                          _buildCategorizationCard(vm),
+                          const SizedBox(height: 16),
+
+                          // 5. Collapsible Advanced Details Accordion
+                          _buildAdvancedDetailsCard(vm, currencySymbol),
+                          const SizedBox(height: 24),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 20),
-                    _buildSectionCard(
-                      title: 'Expiry & Dates',
-                      icon: Icons.calendar_today,
-                      child: _buildDateFields(isDarkMode),
-                      isDarkMode: isDarkMode,
-                    ),
-                    const SizedBox(height: 20),
-                    _buildSectionCard(
-                      title: 'Additional Details',
-                      icon: Icons.more_horiz,
-                      child: _buildAdditionalFields(isDarkMode),
-                      isDarkMode: isDarkMode,
-                    ),
-                    const SizedBox(height: 20),
-                    _buildSectionCard(
-                      title: 'Supplier Info',
-                      icon: Icons.business,
-                      child: _buildSupplierFields(isDarkMode),
-                      isDarkMode: isDarkMode,
-                    ),
-                    const SizedBox(height: 20),
-                    _buildSectionCard(
-                      title: 'Status',
-                      icon: Icons.toggle_on,
-                      child: _buildStatusSection(isDarkMode),
-                      isDarkMode: isDarkMode,
-                    ),
-                    const SizedBox(height: 24),
-                    _buildSaveButton(isDarkMode),
-                    const SizedBox(height: 16),
-                  ],
-                ),
+                  ),
+
+                  // Sticky Header / App Bar
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    child: _buildStickyHeader(isEditing),
+                  ),
+
+                  // Sticky Floating Glass Bottom Action Bar
+                  Positioned(
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    child: _buildStickyBottomActionBar(vm),
+                  ),
+                ],
               ),
             ),
+          );
+        },
+      ),
     );
   }
 
-  // ===== BUILD METHODS =====
+  // ==================== STICKY HEADER ====================
 
-  Widget _buildFormHeader(bool isDarkMode) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            isDarkMode ? Colors.blue.shade800 : Colors.blue.shade700,
-            isDarkMode ? Colors.blue.shade900 : Colors.blue.shade800,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              widget.isEditing ? Icons.edit : Icons.add_circle,
-              color: Colors.white,
-              size: 28,
+  Widget _buildStickyHeader(bool isEditing) {
+    return ClipRRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        child: Container(
+          height: 64,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            color: _bgObsidian.withValues(alpha: 0.85),
+            border: const Border(
+              bottom: BorderSide(color: _borderSlate, width: 0.8),
             ),
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  widget.isEditing ? 'Edit Product' : 'Create New Product',
+          child: Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.close, color: Colors.white, size: 24),
+                onPressed: () => Navigator.pop(context),
+                tooltip: 'Cancel',
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  isEditing ? 'Edit Product' : 'New Catalog Item',
                   style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
                     color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: -0.2,
                   ),
                 ),
-                Text(
-                  widget.isEditing
-                      ? 'Update product details and information'
-                      : 'Fill in the details to add a new product',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.white.withValues(alpha: 0.8),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildImageSection(bool isDarkMode) {
-    return Container(
-      decoration: BoxDecoration(
-        color: isDarkMode ? Colors.grey.shade800 : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: isDarkMode
-                ? Colors.black.withValues(alpha: 0.3)
-                : Colors.grey.withValues(alpha: 0.1),
-            spreadRadius: 1,
-            blurRadius: 8,
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.image,
-                  color: isDarkMode
-                      ? Colors.blue.shade400
-                      : Colors.blue.shade700,
-                  size: 20,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  'Product Image',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: isDarkMode ? Colors.white : Colors.black,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isDarkMode
-                        ? Colors.grey.shade700
-                        : Colors.grey.shade200,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    'Optional',
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: isDarkMode
-                          ? Colors.grey.shade400
-                          : Colors.grey.shade600,
-                    ),
-                  ),
-                ),
-                const Spacer(),
-                const InfoIconWidget(info: FieldInfo.productImage),
-              ],
-            ),
-            const SizedBox(height: 12),
-            GestureDetector(
-              onTap: _showImagePickerOptions,
-              child: Container(
-                height: 180,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: isDarkMode
-                      ? Colors.grey.shade700
-                      : Colors.grey.shade50,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: isDarkMode
-                        ? Colors.grey.shade600
-                        : Colors.grey.shade300,
-                    width: 2,
-                    style: BorderStyle.solid,
-                  ),
-                ),
-                child: _imageFile != null
-                    ? Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: Image.file(_imageFile!, fit: BoxFit.cover),
-                          ),
-                          Positioned(
-                            top: 8,
-                            right: 8,
-                            child: Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: Colors.black.withValues(alpha: 0.7),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: const Row(
-                                children: [
-                                  Icon(
-                                    Icons.edit,
-                                    color: Colors.white,
-                                    size: 16,
-                                  ),
-                                  SizedBox(width: 4),
-                                  Text(
-                                    'Edit',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      )
-                    : Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.cloud_upload,
-                            size: 48,
-                            color: isDarkMode
-                                ? Colors.grey.shade400
-                                : Colors.grey.shade600,
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Tap to upload product image',
-                            style: TextStyle(
-                              color: isDarkMode
-                                  ? Colors.grey.shade400
-                                  : Colors.grey.shade600,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'PNG, JPG, WEBP (Max 5MB)',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: isDarkMode
-                                  ? Colors.grey.shade500
-                                  : Colors.grey.shade400,
-                            ),
-                          ),
-                        ],
-                      ),
               ),
-            ),
-          ],
+              IconButton(
+                icon: const Icon(Icons.qr_code_scanner,
+                    color: _accentSky, size: 24),
+                onPressed: _openBarcodeScanner,
+                tooltip: 'Scan Barcode',
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildSectionCard({
-    required String title,
-    required IconData icon,
-    required Widget child,
-    required bool isDarkMode,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: isDarkMode ? Colors.grey.shade800 : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: isDarkMode
-                ? Colors.black.withValues(alpha: 0.3)
-                : Colors.grey.withValues(alpha: 0.1),
-            spreadRadius: 1,
-            blurRadius: 8,
-          ),
-        ],
-      ),
+  // ==================== CARD 1: HERO IDENTITY & MEDIA ====================
+
+  Widget _buildHeroIdentityCard(ProductFormViewModel vm) {
+    return PosCard(
+      backgroundColor: _surfaceNavy,
+      borderRadius: 16,
+      border: Border.all(color: _borderSlate, width: 1),
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 88x88 px Interactive Image Square
+              GestureDetector(
+                onTap: _showImagePickerSheet,
+                child: Container(
+                  width: 88,
+                  height: 88,
                   decoration: BoxDecoration(
-                    color: isDarkMode
-                        ? Colors.blue.shade900
-                        : Colors.blue.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(
-                    icon,
-                    size: 18,
-                    color: isDarkMode
-                        ? Colors.blue.shade400
-                        : Colors.blue.shade700,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: isDarkMode ? Colors.white : Colors.black,
-                  ),
-                ),
-                const Spacer(),
-                Container(
-                  height: 2,
-                  width: 30,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        isDarkMode
-                            ? Colors.blue.shade400
-                            : Colors.blue.shade700,
-                        isDarkMode ? Colors.blue.shade900 : Colors.blue.shade50,
-                      ],
+                    color: _bgObsidian,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: vm.imageFile != null || vm.imageUrl != null
+                          ? _accentSky
+                          : _borderSlate,
+                      width: 1.5,
                     ),
                   ),
+                  child: Stack(
+                    children: [
+                      Center(
+                        child: vm.imageFile != null
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(14),
+                                child: Image.file(
+                                  vm.imageFile!,
+                                  width: 88,
+                                  height: 88,
+                                  fit: BoxFit.cover,
+                                ),
+                              )
+                            : (vm.imageUrl != null && vm.imageUrl!.isNotEmpty)
+                                ? ClipRRect(
+                                    borderRadius: BorderRadius.circular(14),
+                                    child: Image.network(
+                                      vm.imageUrl!,
+                                      width: 88,
+                                      height: 88,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (context, error, stackTrace) =>
+                                          const Icon(
+                                        Icons.image_not_supported,
+                                        color: Colors.white38,
+                                      ),
+                                    ),
+                                  )
+                                : Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: const [
+                                      Icon(Icons.add_a_photo_outlined,
+                                          color: _accentSky, size: 28),
+                                      SizedBox(height: 4),
+                                      Text(
+                                        'Photo',
+                                        style: TextStyle(
+                                          color: Colors.white70,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                      ),
+                      if (vm.imageFile != null ||
+                          (vm.imageUrl != null && vm.imageUrl!.isNotEmpty))
+                        Positioned(
+                          top: 4,
+                          right: 4,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: const BoxDecoration(
+                              color: _bgObsidian,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.edit,
+                                size: 12, color: _accentSky),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Divider(
-              color: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade200,
-              height: 1,
-            ),
-          ),
-          Padding(padding: const EdgeInsets.all(16), child: child),
-        ],
-      ),
-    );
-  }
+              ),
+              const SizedBox(width: 16),
 
-  Widget _buildBasicInfoFields(bool isDarkMode) {
-    return Column(
-      children: [
-        // Product Name with Autocomplete
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: _nameController,
-                    onChanged: _searchProducts,
-                    onTap: () {
-                      if (_nameController.text.isNotEmpty) {
-                        _searchProducts(_nameController.text);
-                      }
-                    },
-                    decoration: InputDecoration(
-                      labelText: 'Product Name *',
-                      hintText: 'Enter the product name',
-                      prefixIcon: Icon(
-                        Icons.production_quantity_limits,
-                        color: isDarkMode
-                            ? Colors.grey.shade400
-                            : Colors.grey.shade600,
+              // Product Name Large Field
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'PRODUCT NAME *',
+                      style: TextStyle(
+                        color: _accentSky,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.5,
                       ),
-                      suffixIcon: _nameController.text.isNotEmpty
-                          ? IconButton(
-                              icon: Icon(
-                                Icons.clear,
-                                color: isDarkMode
-                                    ? Colors.grey.shade400
-                                    : Colors.grey.shade600,
-                              ),
-                              onPressed: () {
-                                setState(() {
-                                  _nameController.clear();
-                                  _productSuggestions = [];
-                                  _showSuggestions = false;
-                                });
-                              },
-                            )
-                          : null,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: _nameController,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
                       ),
-                      filled: true,
-                      fillColor: isDarkMode
-                          ? Colors.grey.shade700
-                          : Colors.grey.shade50,
+                      decoration: InputDecoration(
+                        hintText: 'e.g., Organic Whole Milk 1L',
+                        hintStyle: const TextStyle(
+                          color: Colors.white24,
+                          fontSize: 16,
+                          fontWeight: FontWeight.normal,
+                        ),
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 10),
+                        filled: true,
+                        fillColor: _bgObsidian,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(color: _borderSlate),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(color: _borderSlate),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide:
+                              const BorderSide(color: _accentSky, width: 1.5),
+                        ),
+                      ),
                     ),
-                    style: TextStyle(
-                      color: isDarkMode ? Colors.white : Colors.black,
-                    ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter product name';
-                      }
-                      if (value.length < 3) {
-                        return 'Name must be at least 3 characters';
-                      }
-                      return null;
-                    },
-                  ),
-                ),
-                const InfoIconWidget(info: FieldInfo.productName),
-              ],
-            ),
-            // Suggestions Dropdown
-            if (_showSuggestions && _productSuggestions.isNotEmpty)
-              Container(
-                margin: const EdgeInsets.only(top: 4),
-                decoration: BoxDecoration(
-                  color: isDarkMode ? Colors.grey.shade800 : Colors.white,
-                  borderRadius: BorderRadius.circular(8),
-                  boxShadow: [
-                    BoxShadow(
-                      color: isDarkMode
-                          ? Colors.black.withValues(alpha: 0.3)
-                          : Colors.grey.withValues(alpha: 0.2),
-                      spreadRadius: 1,
-                      blurRadius: 8,
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Displayed on register grid & print receipts',
+                      style: TextStyle(color: Colors.white38, fontSize: 11),
                     ),
                   ],
                 ),
-                constraints: const BoxConstraints(maxHeight: 200),
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: _productSuggestions.length,
-                  itemBuilder: (context, index) {
-                    final suggestion = _productSuggestions[index];
-                    return Material(
-                      color: Colors.transparent,
-                      child: ListTile(
-                        leading: Icon(
-                          Icons.search,
-                          color: isDarkMode
-                              ? Colors.grey.shade400
-                              : Colors.grey.shade600,
-                          size: 16,
-                        ),
-                        title: Text(
-                          suggestion,
-                          style: TextStyle(
-                            color: isDarkMode ? Colors.white : Colors.black,
-                            fontSize: 14,
-                          ),
-                        ),
-                        onTap: () => _selectProductSuggestion(suggestion),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Divider(color: _borderSlate, height: 1),
+          const SizedBox(height: 16),
+
+          // Barcode & SKU Row
+          Row(
+            children: [
+              // SKU
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'SKU (STOCK KEEPING UNIT)',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
                       ),
-                    );
-                  },
-                ),
-              ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: TextFormField(
-                controller: _descriptionController,
-                maxLines: 3,
-                decoration: InputDecoration(
-                  labelText: 'Description',
-                  hintText: 'Enter product description',
-                  prefixIcon: Icon(
-                    Icons.description,
-                    color: isDarkMode
-                        ? Colors.grey.shade400
-                        : Colors.grey.shade600,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                  filled: true,
-                  fillColor: isDarkMode
-                      ? Colors.grey.shade700
-                      : Colors.grey.shade50,
-                ),
-                style: TextStyle(
-                  color: isDarkMode ? Colors.white : Colors.black,
-                ),
-              ),
-            ),
-            const InfoIconWidget(info: FieldInfo.descriptionField),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: TextFormField(
-                controller: _brandController,
-                decoration: InputDecoration(
-                  labelText: 'Brand',
-                  hintText: 'Enter brand name',
-                  prefixIcon: Icon(
-                    Icons.branding_watermark,
-                    color: isDarkMode
-                        ? Colors.grey.shade400
-                        : Colors.grey.shade600,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                  filled: true,
-                  fillColor: isDarkMode
-                      ? Colors.grey.shade700
-                      : Colors.grey.shade50,
-                ),
-                style: TextStyle(
-                  color: isDarkMode ? Colors.white : Colors.black,
-                ),
-              ),
-            ),
-            const InfoIconWidget(info: FieldInfo.brand),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: TextFormField(
-                controller: _skuController,
-                decoration: InputDecoration(
-                  labelText: 'SKU',
-                  hintText: 'Enter SKU code',
-                  prefixIcon: Icon(
-                    Icons.code,
-                    color: isDarkMode
-                        ? Colors.grey.shade400
-                        : Colors.grey.shade600,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                  filled: true,
-                  fillColor: isDarkMode
-                      ? Colors.grey.shade700
-                      : Colors.grey.shade50,
-                ),
-                style: TextStyle(
-                  color: isDarkMode ? Colors.white : Colors.black,
-                ),
-              ),
-            ),
-            const InfoIconWidget(info: FieldInfo.sku),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildPricingStockFields(String currencySymbol, bool isDarkMode) {
-    return Column(
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: TextFormField(
-                controller: _priceController,
-                decoration: InputDecoration(
-                  labelText: 'Selling Price *',
-                  hintText: '0.00',
-                  prefixIcon: Icon(
-                    Icons.attach_money,
-                    color: isDarkMode
-                        ? Colors.green.shade400
-                        : Colors.green.shade700,
-                  ),
-                  prefixText: '$currencySymbol ',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                  filled: true,
-                  fillColor: isDarkMode
-                      ? Colors.grey.shade700
-                      : Colors.grey.shade50,
-                ),
-                keyboardType: TextInputType.number,
-                style: TextStyle(
-                  color: isDarkMode ? Colors.white : Colors.black,
-                ),
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
-                ],
-                validator: (value) {
-                  if (value == null || value.isEmpty) return 'Required';
-                  if (double.tryParse(value) == null) return 'Invalid number';
-                  if (double.parse(value) < 0) return 'Price must be positive';
-                  return null;
-                },
-              ),
-            ),
-            const InfoIconWidget(info: FieldInfo.sellingPrice),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: TextFormField(
-                controller: _costController,
-                decoration: InputDecoration(
-                  labelText: 'Cost Price *',
-                  hintText: '0.00',
-                  prefixIcon: Icon(
-                    Icons.currency_exchange,
-                    color: isDarkMode
-                        ? Colors.orange.shade400
-                        : Colors.orange.shade700,
-                  ),
-                  prefixText: '$currencySymbol ',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                  filled: true,
-                  fillColor: isDarkMode
-                      ? Colors.grey.shade700
-                      : Colors.grey.shade50,
-                ),
-                keyboardType: TextInputType.number,
-                style: TextStyle(
-                  color: isDarkMode ? Colors.white : Colors.black,
-                ),
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
-                ],
-                validator: (value) {
-                  if (value == null || value.isEmpty) return 'Required';
-                  if (double.tryParse(value) == null) return 'Invalid number';
-                  if (double.parse(value) < 0) return 'Cost must be positive';
-                  return null;
-                },
-              ),
-            ),
-            const InfoIconWidget(info: FieldInfo.costPrice),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: TextFormField(
-                controller: _salePriceController,
-                decoration: InputDecoration(
-                  labelText: 'Sale Price',
-                  hintText: '0.00 (Optional)',
-                  prefixIcon: Icon(
-                    Icons.local_offer,
-                    color: isDarkMode
-                        ? Colors.purple.shade400
-                        : Colors.purple.shade700,
-                  ),
-                  prefixText: '$currencySymbol ',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                  filled: true,
-                  fillColor: isDarkMode
-                      ? Colors.grey.shade700
-                      : Colors.grey.shade50,
-                ),
-                keyboardType: TextInputType.number,
-                style: TextStyle(
-                  color: isDarkMode ? Colors.white : Colors.black,
-                ),
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
-                ],
-              ),
-            ),
-            const InfoIconWidget(info: FieldInfo.salePrice),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: TextFormField(
-                controller: _wholesalePriceController,
-                decoration: InputDecoration(
-                  labelText: 'Wholesale Price',
-                  hintText: '0.00 (Optional)',
-                  prefixIcon: Icon(
-                    Icons.shopping_bag,
-                    color: isDarkMode
-                        ? Colors.teal.shade400
-                        : Colors.teal.shade700,
-                  ),
-                  prefixText: '$currencySymbol ',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                  filled: true,
-                  fillColor: isDarkMode
-                      ? Colors.grey.shade700
-                      : Colors.grey.shade50,
-                ),
-                keyboardType: TextInputType.number,
-                style: TextStyle(
-                  color: isDarkMode ? Colors.white : Colors.black,
-                ),
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
-                ],
-              ),
-            ),
-            const InfoIconWidget(info: FieldInfo.wholesalePrice),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: TextFormField(
-                controller: _stockController,
-                decoration: InputDecoration(
-                  labelText: 'Stock Quantity *',
-                  hintText: '0',
-                  prefixIcon: Icon(
-                    Icons.inventory,
-                    color: isDarkMode
-                        ? Colors.blue.shade400
-                        : Colors.blue.shade700,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                  filled: true,
-                  fillColor: isDarkMode
-                      ? Colors.grey.shade700
-                      : Colors.grey.shade50,
-                ),
-                keyboardType: TextInputType.number,
-                style: TextStyle(
-                  color: isDarkMode ? Colors.white : Colors.black,
-                ),
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                validator: (value) {
-                  if (value == null || value.isEmpty) return 'Required';
-                  if (int.tryParse(value) == null) return 'Invalid number';
-                  if (int.parse(value) < 0) return 'Stock cannot be negative';
-                  return null;
-                },
-              ),
-            ),
-            const InfoIconWidget(info: FieldInfo.stockQuantity),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: TextFormField(
-                controller: _minStockController,
-                decoration: InputDecoration(
-                  labelText: 'Min Stock Alert *',
-                  hintText: '10',
-                  prefixIcon: Icon(
-                    Icons.warning,
-                    color: isDarkMode
-                        ? Colors.red.shade400
-                        : Colors.red.shade700,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                  filled: true,
-                  fillColor: isDarkMode
-                      ? Colors.grey.shade700
-                      : Colors.grey.shade50,
-                ),
-                keyboardType: TextInputType.number,
-                style: TextStyle(
-                  color: isDarkMode ? Colors.white : Colors.black,
-                ),
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                validator: (value) {
-                  if (value == null || value.isEmpty) return 'Required';
-                  if (int.tryParse(value) == null) return 'Invalid number';
-                  if (int.parse(value) < 0) return 'Min stock must be positive';
-                  return null;
-                },
-              ),
-            ),
-            const InfoIconWidget(info: FieldInfo.minStockAlert),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: TextFormField(
-                controller: _maxStockController,
-                decoration: InputDecoration(
-                  labelText: 'Max Stock',
-                  hintText: '0 (Optional)',
-                  prefixIcon: Icon(
-                    Icons.inventory_2,
-                    color: isDarkMode
-                        ? Colors.grey.shade400
-                        : Colors.grey.shade600,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                  filled: true,
-                  fillColor: isDarkMode
-                      ? Colors.grey.shade700
-                      : Colors.grey.shade50,
-                ),
-                keyboardType: TextInputType.number,
-                style: TextStyle(
-                  color: isDarkMode ? Colors.white : Colors.black,
-                ),
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              ),
-            ),
-            const InfoIconWidget(info: FieldInfo.maxStock),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  border: Border.all(
-                    color: isDarkMode
-                        ? Colors.grey.shade600
-                        : Colors.grey.shade300,
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: DropdownButtonFormField<String>(
-                  initialValue: _units.contains(_selectedUnit) ? _selectedUnit : null,
-                  decoration: const InputDecoration(
-                    labelText: 'Unit *',
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(horizontal: 12),
-                  ),
-                  dropdownColor: isDarkMode
-                      ? Colors.grey.shade800
-                      : Colors.white,
-                  style: TextStyle(
-                    color: isDarkMode ? Colors.white : Colors.black,
-                  ),
-                  items: _units.toSet().map((unit) {
-                    return DropdownMenuItem(value: unit, child: Text(unit));
-                  }).toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedUnit = value;
-                    });
-                  },
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please select a unit';
-                    }
-                    return null;
-                  },
-                  hint: Text(
-                    'Select unit',
-                    style: TextStyle(
-                      color: isDarkMode
-                          ? Colors.grey.shade400
-                          : Colors.grey.shade600,
                     ),
-                  ),
-                ),
-              ),
-            ),
-            const InfoIconWidget(info: FieldInfo.unit),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: TextFormField(
-                controller: _weightController,
-                decoration: InputDecoration(
-                  labelText: 'Weight',
-                  hintText: '0.00 (Optional)',
-                  prefixIcon: Icon(
-                    Icons.fitness_center,
-                    color: isDarkMode
-                        ? Colors.grey.shade400
-                        : Colors.grey.shade600,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                  filled: true,
-                  fillColor: isDarkMode
-                      ? Colors.grey.shade700
-                      : Colors.grey.shade50,
-                ),
-                keyboardType: TextInputType.number,
-                style: TextStyle(
-                  color: isDarkMode ? Colors.white : Colors.black,
-                ),
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
-                ],
-              ),
-            ),
-            const InfoIconWidget(info: FieldInfo.weight),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  border: Border.all(
-                    color: isDarkMode
-                        ? Colors.grey.shade600
-                        : Colors.grey.shade300,
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: DropdownButtonFormField<String>(
-                  initialValue: _weightUnits.contains(_selectedWeightUnit)
-                      ? _selectedWeightUnit
-                      : null,
-                  decoration: const InputDecoration(
-                    labelText: 'Weight Unit',
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(horizontal: 12),
-                  ),
-                  dropdownColor: isDarkMode
-                      ? Colors.grey.shade800
-                      : Colors.white,
-                  style: TextStyle(
-                    color: isDarkMode ? Colors.white : Colors.black,
-                  ),
-                  items: _weightUnits.toSet().map((unit) {
-                    return DropdownMenuItem(value: unit, child: Text(unit));
-                  }).toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedWeightUnit = value;
-                    });
-                  },
-                  hint: Text(
-                    'Select unit',
-                    style: TextStyle(
-                      color: isDarkMode
-                          ? Colors.grey.shade400
-                          : Colors.grey.shade600,
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: _skuController,
+                      style: const TextStyle(color: Colors.white, fontSize: 14),
+                      decoration: InputDecoration(
+                        hintText: 'e.g., MILK-01',
+                        hintStyle: const TextStyle(color: Colors.white24),
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 12),
+                        filled: true,
+                        fillColor: _bgObsidian,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(color: _borderSlate),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(color: _borderSlate),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide:
+                              const BorderSide(color: _accentSky, width: 1.5),
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ),
-            ),
-            const InfoIconWidget(info: FieldInfo.weightUnit),
-          ],
-        ),
-      ],
+              const SizedBox(width: 12),
+
+              // Barcode with attached scan button
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'BARCODE / UPC',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: _barcodeController,
+                      style: const TextStyle(color: Colors.white, fontSize: 14),
+                      decoration: InputDecoration(
+                        hintText: 'e.g., 0123456789',
+                        hintStyle: const TextStyle(color: Colors.white24),
+                        isDense: true,
+                        contentPadding: const EdgeInsets.only(
+                            left: 12, top: 12, bottom: 12, right: 4),
+                        filled: true,
+                        fillColor: _bgObsidian,
+                        suffixIcon: IconButton(
+                          icon: const Icon(Icons.qr_code_scanner,
+                              color: _accentSky, size: 20),
+                          onPressed: _openBarcodeScanner,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(
+                              minWidth: 36, minHeight: 36),
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(color: _borderSlate),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(color: _borderSlate),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide:
+                              const BorderSide(color: _accentSky, width: 1.5),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildDateFields(bool isDarkMode) {
-    String? manufactureHelper;
-    if (_bestBeforeDate != null) {
-      manufactureHelper =
-          'Must be on or before Best Before (${DateFormat('dd/MM/yyyy').format(_bestBeforeDate!)})';
-    } else if (_expiryDate != null) {
-      manufactureHelper =
-          'Must be on or before Expiry (${DateFormat('dd/MM/yyyy').format(_expiryDate!)})';
+  // ==================== CARD 2: DYNAMIC FINANCIAL & MARGIN ====================
+
+  Widget _buildFinancialMarginCard(
+      ProductFormViewModel vm, String currencySymbol) {
+    Color marginColor = _emerald;
+    String marginLabel = 'Healthy Retail Margin';
+    IconData marginIcon = Icons.trending_up;
+
+    if (vm.marginHealth == MarginHealth.loss) {
+      marginColor = _crimson;
+      marginLabel = vm.profit < 0
+          ? 'Warning: Selling at Loss!'
+          : 'Warning: Zero Margin';
+      marginIcon = Icons.warning_amber_rounded;
+    } else if (vm.marginHealth == MarginHealth.low) {
+      marginColor = _amber;
+      marginLabel = 'Thin Margin (<25%)';
+      marginIcon = Icons.trending_flat;
     }
 
-    String? bestBeforeHelper;
-    if (_manufactureDate != null && _expiryDate != null) {
-      bestBeforeHelper =
-          'Must be between ${DateFormat('dd/MM/yyyy').format(_manufactureDate!)} & ${DateFormat('dd/MM/yyyy').format(_expiryDate!)}';
-    } else if (_manufactureDate != null) {
-      bestBeforeHelper =
-          'Must be on or after Manufacture (${DateFormat('dd/MM/yyyy').format(_manufactureDate!)})';
-    } else if (_expiryDate != null) {
-      bestBeforeHelper =
-          'Must be on or before Expiry (${DateFormat('dd/MM/yyyy').format(_expiryDate!)})';
-    }
-
-    String? expiryHelper;
-    if (_bestBeforeDate != null) {
-      expiryHelper =
-          'Must be on or after Best Before (${DateFormat('dd/MM/yyyy').format(_bestBeforeDate!)})';
-    } else if (_manufactureDate != null) {
-      expiryHelper =
-          'Must be on or after Manufacture (${DateFormat('dd/MM/yyyy').format(_manufactureDate!)})';
-    }
-
-    return Column(
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: _buildDatePicker(
-                label: 'Manufacture Date',
-                date: _manufactureDate,
-                icon: Icons.factory,
-                onTap: () => _selectDate(context, 'manufacture'),
-                onClear: () => _clearDate('manufacture'),
-                helperText: manufactureHelper,
-                isDarkMode: isDarkMode,
+    return PosCard(
+      backgroundColor: _surfaceNavy,
+      borderRadius: 16,
+      border: Border.all(color: _borderSlate, width: 1),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'FINANCIALS & PROFITABILITY',
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.5,
+                ),
               ),
-            ),
-            const InfoIconWidget(info: FieldInfo.manufactureDate),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: _buildDatePicker(
-                label: 'Best Before Date',
-                date: _bestBeforeDate,
-                icon: Icons.calendar_today,
-                onTap: () => _selectDate(context, 'bestBefore'),
-                onClear: () => _clearDate('bestBefore'),
-                helperText: bestBeforeHelper,
-                isDarkMode: isDarkMode,
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: _bgObsidian,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: _borderSlate),
+                ),
+                child: Text(
+                  'Currency: $currencySymbol',
+                  style: const TextStyle(color: Colors.white70, fontSize: 11),
+                ),
               ),
-            ),
-            const InfoIconWidget(info: FieldInfo.bestBeforeDate),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: _buildDatePicker(
-                label: 'Expiry Date',
-                date: _expiryDate,
-                icon: Icons.warning_amber,
-                onTap: () => _selectDate(context, 'expiry'),
-                onClear: () => _clearDate('expiry'),
-                helperText: expiryHelper,
-                isDarkMode: isDarkMode,
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // Cost & Selling Inputs
+          Row(
+            children: [
+              // Cost Price
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Cost Price',
+                      style: TextStyle(color: Colors.white70, fontSize: 12),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: _costController,
+                      keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      decoration: InputDecoration(
+                        prefixText: '$currencySymbol ',
+                        prefixStyle: const TextStyle(
+                            color: Colors.white70, fontSize: 15),
+                        hintText: '0.00',
+                        hintStyle: const TextStyle(color: Colors.white24),
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 12),
+                        filled: true,
+                        fillColor: _bgObsidian,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(color: _borderSlate),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(color: _borderSlate),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide:
+                              const BorderSide(color: _accentSky, width: 1.5),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const InfoIconWidget(info: FieldInfo.expiryDate),
-          ],
-        ),
-      ],
-    );
-  }
+              const SizedBox(width: 12),
 
-  Widget _buildDatePicker({
-    required String label,
-    required DateTime? date,
-    required IconData icon,
-    required VoidCallback onTap,
-    VoidCallback? onClear,
-    String? helperText,
-    required bool isDarkMode,
-  }) {
-    final hasValue = date != null;
+              // Selling Price
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Selling Price *',
+                      style: TextStyle(
+                        color: _accentSky,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: _sellingPriceController,
+                      keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      decoration: InputDecoration(
+                        prefixText: '$currencySymbol ',
+                        prefixStyle: const TextStyle(
+                            color: _accentSky,
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold),
+                        hintText: '0.00',
+                        hintStyle: const TextStyle(color: Colors.white24),
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 12),
+                        filled: true,
+                        fillColor: _bgObsidian,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(color: _borderSlate),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(color: _borderSlate),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide:
+                              const BorderSide(color: _accentSky, width: 1.5),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        GestureDetector(
-          onTap: onTap,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          // Interactive Live Margin Indicator Box
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 250),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              border: Border.all(
-                color: isDarkMode ? Colors.grey.shade600 : Colors.grey.shade300,
-              ),
+              color: marginColor.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(12),
-              color: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50,
+              border:
+                  Border.all(color: marginColor.withValues(alpha: 0.6), width: 1),
             ),
             child: Row(
               children: [
-                Icon(
-                  icon,
-                  color: isDarkMode
-                      ? Colors.blue.shade400
-                      : Colors.blue.shade700,
-                  size: 20,
-                ),
-                const SizedBox(width: 12),
+                Icon(marginIcon, color: marginColor, size: 24),
+                const SizedBox(width: 10),
                 Expanded(
-                  child: Text(
-                    hasValue ? DateFormat('dd/MM/yyyy').format(date) : label,
-                    style: TextStyle(
-                      color: hasValue
-                          ? (isDarkMode ? Colors.white : Colors.black)
-                          : (isDarkMode
-                                ? Colors.grey.shade400
-                                : Colors.grey.shade600),
-                      fontWeight: hasValue
-                          ? FontWeight.w500
-                          : FontWeight.normal,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Gross Profit: $currencySymbol ${vm.profit.toStringAsFixed(2)}',
+                            style: TextStyle(
+                              color: marginColor,
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: marginColor,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              '${vm.marginPercentage.toStringAsFixed(1)}% Margin',
+                              style: const TextStyle(
+                                color: _bgObsidian,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        marginLabel,
+                        style: TextStyle(
+                          color: marginColor.withValues(alpha: 0.9),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                if (hasValue && onClear != null)
-                  InkWell(
-                    onTap: onClear,
-                    borderRadius: BorderRadius.circular(12),
-                    child: Padding(
-                      padding: const EdgeInsets.all(4.0),
-                      child: Icon(
-                        Icons.cancel,
-                        size: 18,
-                        color: isDarkMode
-                            ? Colors.grey.shade400
-                            : Colors.grey.shade600,
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==================== CARD 3: INVENTORY & FAST UNIT CHIPS ====================
+
+  Widget _buildInventoryUnitCard(ProductFormViewModel vm) {
+    return PosCard(
+      backgroundColor: _surfaceNavy,
+      borderRadius: 16,
+      border: Border.all(color: _borderSlate, width: 1),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'INVENTORY & UNIT OF MEASURE',
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.5,
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // Stock Stepper Row
+          Row(
+            children: [
+              // Initial Stock with Stepper
+              Expanded(
+                flex: 3,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Initial Stock',
+                        style: TextStyle(color: Colors.white70, fontSize: 12)),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        // Decrement Button
+                        InkWell(
+                          onTap: () {
+                            vm.decrementStock();
+                            _stockController.text =
+                                vm.stockQuantity.toString();
+                          },
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            width: 38,
+                            height: 42,
+                            decoration: BoxDecoration(
+                              color: _bgObsidian,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: _borderSlate),
+                            ),
+                            child: const Icon(Icons.remove,
+                                color: Colors.white, size: 18),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+
+                        // Numeric Field
+                        Expanded(
+                          child: TextField(
+                            controller: _stockController,
+                            keyboardType: TextInputType.number,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            decoration: InputDecoration(
+                              isDense: true,
+                              contentPadding: const EdgeInsets.symmetric(
+                                  vertical: 12, horizontal: 8),
+                              filled: true,
+                              fillColor: _bgObsidian,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide:
+                                    const BorderSide(color: _borderSlate),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide:
+                                    const BorderSide(color: _borderSlate),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: const BorderSide(
+                                    color: _accentSky, width: 1.5),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+
+                        // Increment Button
+                        InkWell(
+                          onTap: () {
+                            vm.incrementStock();
+                            _stockController.text =
+                                vm.stockQuantity.toString();
+                          },
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            width: 38,
+                            height: 42,
+                            decoration: BoxDecoration(
+                              color: _bgObsidian,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: _borderSlate),
+                            ),
+                            child: const Icon(Icons.add,
+                                color: Colors.white, size: 18),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 14),
+
+              // Low Stock Warning Threshold
+              Expanded(
+                flex: 2,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Low Stock Alert',
+                        style: TextStyle(color: Colors.white70, fontSize: 12)),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: _minStockController,
+                      keyboardType: TextInputType.number,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      decoration: InputDecoration(
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(
+                            vertical: 12, horizontal: 8),
+                        filled: true,
+                        fillColor: _bgObsidian,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: _borderSlate),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: _borderSlate),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide:
+                              const BorderSide(color: _accentSky, width: 1.5),
+                        ),
                       ),
                     ),
-                  )
-                else
-                  Icon(
-                    Icons.calendar_today,
-                    size: 18,
-                    color: isDarkMode
-                        ? Colors.grey.shade400
-                        : Colors.grey.shade600,
-                  ),
-              ],
-            ),
-          ),
-        ),
-        if (helperText != null && helperText.isNotEmpty) ...[
-          const SizedBox(height: 4),
-          Padding(
-            padding: const EdgeInsets.only(left: 4),
-            child: Text(
-              helperText,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-                color: isDarkMode ? Colors.blue.shade300 : Colors.blue.shade700,
+                  ],
+                ),
               ),
-            ),
+            ],
           ),
-        ],
-      ],
-    );
-  }
+          const SizedBox(height: 16),
 
-  Widget _buildAdditionalFields(bool isDarkMode) {
-    return Column(
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: TextFormField(
-                controller: _barcodeController,
-                decoration: InputDecoration(
-                  labelText: 'Barcode',
-                  hintText: 'Enter or scan barcode',
-                  prefixIcon: Icon(
-                    Icons.barcode_reader,
-                    color: isDarkMode
-                        ? Colors.grey.shade400
-                        : Colors.grey.shade600,
-                  ),
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      Icons.qr_code_scanner,
-                      color: isDarkMode
-                          ? Colors.blue.shade400
-                          : Colors.blue.shade700,
+          // Unit Selector Chips
+          const Text(
+            'Unit of Measurement',
+            style: TextStyle(color: Colors.white70, fontSize: 12),
+          ),
+          const SizedBox(height: 8),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: ProductFormViewModel.unitPresets.map((preset) {
+                final isSelected = vm.unit == preset['value'];
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: FilterChip(
+                    label: Text(preset['label']!),
+                    selected: isSelected,
+                    onSelected: (_) => vm.setUnit(preset['value']!),
+                    backgroundColor: _bgObsidian,
+                    selectedColor: _accentIndigo,
+                    labelStyle: TextStyle(
+                      color: isSelected ? Colors.white : Colors.white70,
+                      fontWeight:
+                          isSelected ? FontWeight.bold : FontWeight.normal,
+                      fontSize: 12,
                     ),
-                    onPressed: () => _openScanner('barcode'),
-                    tooltip: 'Scan Barcode',
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                  filled: true,
-                  fillColor: isDarkMode
-                      ? Colors.grey.shade700
-                      : Colors.grey.shade50,
-                ),
-                style: TextStyle(
-                  color: isDarkMode ? Colors.white : Colors.black,
-                ),
-              ),
-            ),
-            const InfoIconWidget(info: FieldInfo.barcode),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: TextFormField(
-                controller: _qrCodeController,
-                decoration: InputDecoration(
-                  labelText: 'QR Code',
-                  hintText: 'Enter or scan QR code',
-                  prefixIcon: Icon(
-                    Icons.qr_code,
-                    color: isDarkMode
-                        ? Colors.grey.shade400
-                        : Colors.grey.shade600,
-                  ),
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      Icons.qr_code_scanner,
-                      color: isDarkMode
-                          ? Colors.blue.shade400
-                          : Colors.blue.shade700,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      side: BorderSide(
+                        color: isSelected ? _accentSky : _borderSlate,
+                        width: isSelected ? 1.5 : 1,
+                      ),
                     ),
-                    onPressed: () => _openScanner('qr'),
-                    tooltip: 'Scan QR Code',
+                    showCheckmark: false,
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                   ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                  filled: true,
-                  fillColor: isDarkMode
-                      ? Colors.grey.shade700
-                      : Colors.grey.shade50,
-                ),
-                style: TextStyle(
-                  color: isDarkMode ? Colors.white : Colors.black,
-                ),
-              ),
-            ),
-            const InfoIconWidget(info: FieldInfo.qrCode),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  border: Border.all(
-                    color: isDarkMode
-                        ? Colors.grey.shade600
-                        : Colors.grey.shade300,
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: DropdownButtonFormField<String>(
-                  initialValue: _categories.contains(_selectedCategory)
-                      ? _selectedCategory
-                      : null,
-                  decoration: const InputDecoration(
-                    labelText: 'Category *',
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(horizontal: 12),
-                  ),
-                  hint: Text(
-                    'Select category...',
-                    style: TextStyle(
-                      color: isDarkMode
-                          ? Colors.grey.shade400
-                          : Colors.grey.shade600,
-                    ),
-                  ),
-                  dropdownColor: isDarkMode
-                      ? Colors.grey.shade800
-                      : Colors.white,
-                  style: TextStyle(
-                    color: isDarkMode ? Colors.white : Colors.black,
-                  ),
-                  items: _categories.toSet().map((category) {
-                    return DropdownMenuItem(
-                      value: category,
-                      child: Text(category),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedCategory = value;
-                      _updateSubCategories();
-                    });
-                  },
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please select a category';
-                    }
-                    return null;
-                  },
-                ),
-              ),
-            ),
-            const InfoIconWidget(info: FieldInfo.category),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  border: Border.all(
-                    color: isDarkMode
-                        ? Colors.grey.shade600
-                        : Colors.grey.shade300,
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: DropdownButtonFormField<String>(
-                  initialValue: _subCategories.contains(_selectedSubCategory)
-                      ? _selectedSubCategory
-                      : null,
-                  decoration: const InputDecoration(
-                    labelText: 'Sub Category',
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(horizontal: 12),
-                  ),
-                  hint: Text(
-                    'Select sub category...',
-                    style: TextStyle(
-                      color: isDarkMode
-                          ? Colors.grey.shade400
-                          : Colors.grey.shade600,
-                    ),
-                  ),
-                  dropdownColor: isDarkMode
-                      ? Colors.grey.shade800
-                      : Colors.white,
-                  style: TextStyle(
-                    color: isDarkMode ? Colors.white : Colors.black,
-                  ),
-                  items: _subCategories.toSet().map((subCat) {
-                    return DropdownMenuItem(
-                      value: subCat,
-                      child: Text(subCat),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedSubCategory = value;
-                    });
-                  },
-                ),
-              ),
-            ),
-            const InfoIconWidget(info: FieldInfo.subCategory),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  border: Border.all(
-                    color: isDarkMode
-                        ? Colors.grey.shade600
-                        : Colors.grey.shade300,
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: DropdownButtonFormField<String>(
-                  initialValue: _taxClasses.contains(_selectedTaxClass)
-                      ? _selectedTaxClass
-                      : null,
-                  decoration: const InputDecoration(
-                    labelText: 'Tax Class',
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(horizontal: 12),
-                  ),
-                  hint: Text(
-                    'Select tax class...',
-                    style: TextStyle(
-                      color: isDarkMode
-                          ? Colors.grey.shade400
-                          : Colors.grey.shade600,
-                    ),
-                  ),
-                  dropdownColor: isDarkMode
-                      ? Colors.grey.shade800
-                      : Colors.white,
-                  style: TextStyle(
-                    color: isDarkMode ? Colors.white : Colors.black,
-                  ),
-                  items: _taxClasses.toSet().map((tax) {
-                    return DropdownMenuItem(value: tax, child: Text(tax));
-                  }).toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedTaxClass = value;
-                    });
-                  },
-                ),
-              ),
-            ),
-            const InfoIconWidget(info: FieldInfo.taxClass),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: TextFormField(
-                controller: _reorderPointController,
-                decoration: InputDecoration(
-                  labelText: 'Reorder Point',
-                  hintText: '0 (Optional)',
-                  prefixIcon: Icon(
-                    Icons.notifications_active,
-                    color: isDarkMode
-                        ? Colors.grey.shade400
-                        : Colors.grey.shade600,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                  filled: true,
-                  fillColor: isDarkMode
-                      ? Colors.grey.shade700
-                      : Colors.grey.shade50,
-                ),
-                keyboardType: TextInputType.number,
-                style: TextStyle(
-                  color: isDarkMode ? Colors.white : Colors.black,
-                ),
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              ),
-            ),
-            const InfoIconWidget(info: FieldInfo.reorderPoint),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: TextFormField(
-                controller: _reorderQuantityController,
-                decoration: InputDecoration(
-                  labelText: 'Reorder Quantity',
-                  hintText: '0 (Optional)',
-                  prefixIcon: Icon(
-                    Icons.shopping_cart,
-                    color: isDarkMode
-                        ? Colors.grey.shade400
-                        : Colors.grey.shade600,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                  filled: true,
-                  fillColor: isDarkMode
-                      ? Colors.grey.shade700
-                      : Colors.grey.shade50,
-                ),
-                keyboardType: TextInputType.number,
-                style: TextStyle(
-                  color: isDarkMode ? Colors.white : Colors.black,
-                ),
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              ),
-            ),
-            const InfoIconWidget(info: FieldInfo.reorderQuantity),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSupplierFields(bool isDarkMode) {
-    return Column(
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: TextFormField(
-                controller: _supplierNameController,
-                decoration: InputDecoration(
-                  labelText: 'Supplier Name',
-                  hintText: 'Enter supplier name',
-                  prefixIcon: Icon(
-                    Icons.business,
-                    color: isDarkMode
-                        ? Colors.grey.shade400
-                        : Colors.grey.shade600,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                  filled: true,
-                  fillColor: isDarkMode
-                      ? Colors.grey.shade700
-                      : Colors.grey.shade50,
-                ),
-                style: TextStyle(
-                  color: isDarkMode ? Colors.white : Colors.black,
-                ),
-              ),
-            ),
-            const InfoIconWidget(info: FieldInfo.supplierName),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: TextFormField(
-                controller: _supplierSkuController,
-                decoration: InputDecoration(
-                  labelText: 'Supplier SKU',
-                  hintText: 'Enter supplier SKU',
-                  prefixIcon: Icon(
-                    Icons.code,
-                    color: isDarkMode
-                        ? Colors.grey.shade400
-                        : Colors.grey.shade600,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                  filled: true,
-                  fillColor: isDarkMode
-                      ? Colors.grey.shade700
-                      : Colors.grey.shade50,
-                ),
-                style: TextStyle(
-                  color: isDarkMode ? Colors.white : Colors.black,
-                ),
-              ),
-            ),
-            const InfoIconWidget(info: FieldInfo.supplierSku),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStatusSection(bool isDarkMode) {
-    return Column(
-      children: [
-        Material(
-          color: Colors.transparent,
-          child: SwitchListTile(
-            title: Text(
-              'Product Active',
-              style: TextStyle(
-                fontWeight: FontWeight.w500,
-                color: isDarkMode ? Colors.white : Colors.black,
-              ),
-            ),
-            subtitle: Text(
-              _isActive
-                  ? 'Product is visible and available for sale'
-                  : 'Product is hidden and not available for sale',
-              style: TextStyle(
-                fontSize: 12,
-                color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-              ),
-            ),
-            value: _isActive,
-            onChanged: (value) {
-              setState(() {
-                _isActive = value;
-              });
-            },
-            activeThumbColor: isDarkMode ? Colors.green.shade400 : Colors.green,
-            inactiveThumbColor: isDarkMode ? Colors.grey.shade400 : Colors.grey,
-            contentPadding: EdgeInsets.zero,
-          ),
-        ),
-        const Divider(height: 1),
-        Material(
-          color: Colors.transparent,
-          child: SwitchListTile(
-            title: Text(
-              'Featured Product',
-              style: TextStyle(
-                fontWeight: FontWeight.w500,
-                color: isDarkMode ? Colors.white : Colors.black,
-              ),
-            ),
-            subtitle: Text(
-              _isFeatured
-                  ? 'Product appears in featured section'
-                  : 'Product not featured',
-              style: TextStyle(
-                fontSize: 12,
-                color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-              ),
-            ),
-            value: _isFeatured,
-            onChanged: (value) {
-              setState(() {
-                _isFeatured = value;
-              });
-            },
-            activeThumbColor: isDarkMode
-                ? Colors.orange.shade400
-                : Colors.orange,
-            inactiveThumbColor: isDarkMode ? Colors.grey.shade400 : Colors.grey,
-            contentPadding: EdgeInsets.zero,
-          ),
-        ),
-        const Divider(height: 1),
-        Material(
-          color: Colors.transparent,
-          child: SwitchListTile(
-            title: Text(
-              'Digital Product',
-              style: TextStyle(
-                fontWeight: FontWeight.w500,
-                color: isDarkMode ? Colors.white : Colors.black,
-              ),
-            ),
-            subtitle: Text(
-              _isDigital
-                  ? 'Product is digital (no shipping required)'
-                  : 'Product is physical (requires shipping)',
-              style: TextStyle(
-                fontSize: 12,
-                color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-              ),
-            ),
-            value: _isDigital,
-            onChanged: (value) {
-              setState(() {
-                _isDigital = value;
-              });
-            },
-            activeThumbColor: isDarkMode
-                ? Colors.purple.shade400
-                : Colors.purple,
-            inactiveThumbColor: isDarkMode ? Colors.grey.shade400 : Colors.grey,
-            contentPadding: EdgeInsets.zero,
-          ),
-        ),
-        const Divider(height: 1),
-        Material(
-          color: Colors.transparent,
-          child: SwitchListTile(
-            title: Text(
-              'Has Variants',
-              style: TextStyle(
-                fontWeight: FontWeight.w500,
-                color: isDarkMode ? Colors.white : Colors.black,
-              ),
-            ),
-            subtitle: Text(
-              _hasVariants
-                  ? 'Product has multiple variants (size, color, etc.)'
-                  : 'Product is a single item without variants',
-              style: TextStyle(
-                fontSize: 12,
-                color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
-              ),
-            ),
-            value: _hasVariants,
-            onChanged: (value) {
-              setState(() {
-                _hasVariants = value;
-              });
-            },
-            activeThumbColor: isDarkMode ? Colors.blue.shade400 : Colors.blue,
-            inactiveThumbColor: isDarkMode ? Colors.grey.shade400 : Colors.grey,
-            contentPadding: EdgeInsets.zero,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSaveButton(bool isDarkMode) {
-    return SizedBox(
-      width: double.infinity,
-      height: 55,
-      child: ElevatedButton(
-        onPressed: _saveProduct,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: isDarkMode
-              ? Colors.blue.shade400
-              : Colors.blue.shade700,
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          elevation: 4,
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(widget.isEditing ? Icons.update : Icons.save, size: 20),
-            const SizedBox(width: 12),
-            Text(
-              widget.isEditing ? 'Update Product' : 'Add Product',
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showHelpDialog() {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(
-          'Help - Add Product',
-          style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
-        ),
-        backgroundColor: isDarkMode ? Colors.grey.shade800 : Colors.white,
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildHelpItem(
-              '📝',
-              'Basic Info',
-              'Name, description, brand, and SKU',
-              isDarkMode,
-            ),
-            _buildHelpItem(
-              '💰',
-              'Pricing',
-              'Selling price, cost, sale, and wholesale',
-              isDarkMode,
-            ),
-            _buildHelpItem(
-              '📦',
-              'Stock',
-              'Quantity, min stock, max stock, and unit',
-              isDarkMode,
-            ),
-            _buildHelpItem(
-              '📅',
-              'Dates',
-              'Manufacture, expiry, and best before dates',
-              isDarkMode,
-            ),
-            _buildHelpItem(
-              '🔢',
-              'Codes',
-              'Barcode and QR code for scanning',
-              isDarkMode,
-            ),
-            _buildHelpItem(
-              '📂',
-              'Categories',
-              'Category, sub-category, and tax class',
-              isDarkMode,
-            ),
-            _buildHelpItem(
-              '🏢',
-              'Supplier',
-              'Supplier name and SKU',
-              isDarkMode,
-            ),
-            _buildHelpItem(
-              '✅',
-              'Status',
-              'Active, featured, digital, and variants',
-              isDarkMode,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Got it',
-              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                );
+              }).toList(),
             ),
           ),
         ],
@@ -2556,43 +1216,546 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     );
   }
 
-  Widget _buildHelpItem(
-    String icon,
-    String title,
-    String description,
-    bool isDarkMode,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Row(
+  // ==================== CARD 4: CATEGORIZATION PILL CLOUD ====================
+
+  Widget _buildCategorizationCard(ProductFormViewModel vm) {
+    return PosCard(
+      backgroundColor: _surfaceNavy,
+      borderRadius: 16,
+      border: Border.all(color: _borderSlate, width: 1),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(icon, style: const TextStyle(fontSize: 16)),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'CATEGORY CLASSIFICATION',
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              Text(
+                'Active: ${vm.category}',
+                style: const TextStyle(
+                  color: _accentSky,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Wrapping Category Pills
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              // + Add Category Action Chip
+              ActionChip(
+                avatar: const Icon(Icons.add, color: _accentSky, size: 16),
+                label: const Text('Add Category'),
+                labelStyle: const TextStyle(
+                  color: _accentSky,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+                backgroundColor: _bgObsidian,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                  side: const BorderSide(color: _accentSky, width: 1.2),
+                ),
+                onPressed: _showAddCategorySheet,
+              ),
+
+              // Dynamic Categories
+              ...vm.availableCategories.map((cat) {
+                final isSelected = vm.category == cat;
+                return ChoiceChip(
+                  label: Text(cat),
+                  selected: isSelected,
+                  onSelected: (selected) {
+                    if (selected) vm.setCategory(cat);
+                  },
+                  backgroundColor: _bgObsidian,
+                  selectedColor: _accentIndigo,
+                  labelStyle: TextStyle(
+                    color: isSelected ? Colors.white : Colors.white70,
+                    fontWeight:
+                        isSelected ? FontWeight.bold : FontWeight.w500,
                     fontSize: 12,
-                    color: isDarkMode ? Colors.white : Colors.black,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    side: BorderSide(
+                      color: isSelected ? _accentSky : _borderSlate,
+                      width: isSelected ? 1.5 : 1,
+                    ),
+                  ),
+                  showCheckmark: false,
+                );
+              }),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==================== CARD 5: ADVANCED DETAILS ACCORDION ====================
+
+  Widget _buildAdvancedDetailsCard(
+      ProductFormViewModel vm, String currencySymbol) {
+    final dateFormat = DateFormat('dd MMM yyyy');
+
+    return PosCard(
+      backgroundColor: _surfaceNavy,
+      borderRadius: 16,
+      border: Border.all(color: _borderSlate, width: 1),
+      padding: EdgeInsets.zero,
+      child: Column(
+        children: [
+          // Accordion Header
+          InkWell(
+            onTap: () {
+              HapticFeedback.lightImpact();
+              setState(() => _isAdvancedExpanded = !_isAdvancedExpanded);
+            },
+            borderRadius: BorderRadius.circular(16),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: const [
+                      Icon(Icons.tune, color: _accentSky, size: 20),
+                      SizedBox(width: 10),
+                      Text(
+                        'Advanced Details (Optional)',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                  Icon(
+                    _isAdvancedExpanded
+                        ? Icons.keyboard_arrow_up
+                        : Icons.keyboard_arrow_down,
+                    color: Colors.white70,
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // Collapsible Content
+          if (_isAdvancedExpanded) ...[
+            const Divider(color: _borderSlate, height: 1),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Wholesale & Promotional Sale Price Row
+                  Row(
+                    children: [
+                      // Wholesale Price
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Wholesale Price',
+                                style: TextStyle(
+                                    color: Colors.white70, fontSize: 12)),
+                            const SizedBox(height: 6),
+                            TextField(
+                              controller: _wholesaleController,
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                      decimal: true),
+                              style: const TextStyle(
+                                  color: Colors.white, fontSize: 14),
+                              decoration: InputDecoration(
+                                prefixText: '$currencySymbol ',
+                                prefixStyle: const TextStyle(
+                                    color: Colors.white70, fontSize: 13),
+                                hintText: '0.00',
+                                hintStyle:
+                                    const TextStyle(color: Colors.white24),
+                                isDense: true,
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 12),
+                                filled: true,
+                                fillColor: _bgObsidian,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide:
+                                      const BorderSide(color: _borderSlate),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide:
+                                      const BorderSide(color: _borderSlate),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: const BorderSide(
+                                      color: _accentSky, width: 1.5),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+
+                      // Sale / Promotional Price
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Special Sale Price',
+                                style: TextStyle(
+                                    color: Colors.white70, fontSize: 12)),
+                            const SizedBox(height: 6),
+                            TextField(
+                              controller: _salePriceController,
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                      decimal: true),
+                              style: const TextStyle(
+                                  color: Colors.white, fontSize: 14),
+                              decoration: InputDecoration(
+                                prefixText: '$currencySymbol ',
+                                prefixStyle: const TextStyle(
+                                    color: Colors.white70, fontSize: 13),
+                                hintText: '0.00',
+                                hintStyle:
+                                    const TextStyle(color: Colors.white24),
+                                isDense: true,
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 12),
+                                filled: true,
+                                fillColor: _bgObsidian,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide:
+                                      const BorderSide(color: _borderSlate),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide:
+                                      const BorderSide(color: _borderSlate),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: const BorderSide(
+                                      color: _accentSky, width: 1.5),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Dates Row
+                  Row(
+                    children: [
+                      // Manufacture Date Pill
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Mfg Date',
+                                style: TextStyle(
+                                    color: Colors.white70, fontSize: 12)),
+                            const SizedBox(height: 6),
+                            InkWell(
+                              onTap: () async {
+                                final dt = await showDatePicker(
+                                  context: context,
+                                  initialDate:
+                                      vm.manufactureDate ?? DateTime.now(),
+                                  firstDate: DateTime(2020),
+                                  lastDate: DateTime(2035),
+                                );
+                                if (dt != null) vm.setManufactureDate(dt);
+                              },
+                              borderRadius: BorderRadius.circular(10),
+                              child: Container(
+                                height: 44,
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 10),
+                                decoration: BoxDecoration(
+                                  color: _bgObsidian,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: _borderSlate),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.calendar_today,
+                                        size: 16, color: _accentSky),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        vm.manufactureDate != null
+                                            ? dateFormat
+                                                .format(vm.manufactureDate!)
+                                            : 'Select date',
+                                        style: TextStyle(
+                                          color: vm.manufactureDate != null
+                                              ? Colors.white
+                                              : Colors.white38,
+                                          fontSize: 12,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+
+                      // Expiry Date Pill
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Expiry Date',
+                                style: TextStyle(
+                                    color: Colors.white70, fontSize: 12)),
+                            const SizedBox(height: 6),
+                            InkWell(
+                              onTap: () async {
+                                final dt = await showDatePicker(
+                                  context: context,
+                                  initialDate: vm.expiryDate ??
+                                      DateTime.now()
+                                          .add(const Duration(days: 365)),
+                                  firstDate: DateTime.now()
+                                      .subtract(const Duration(days: 30)),
+                                  lastDate: DateTime(2040),
+                                );
+                                if (dt != null) vm.setExpiryDate(dt);
+                              },
+                              borderRadius: BorderRadius.circular(10),
+                              child: Container(
+                                height: 44,
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 10),
+                                decoration: BoxDecoration(
+                                  color: _bgObsidian,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: _borderSlate),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.event_busy,
+                                        size: 16, color: _crimson),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        vm.expiryDate != null
+                                            ? dateFormat.format(vm.expiryDate!)
+                                            : 'Select date',
+                                        style: TextStyle(
+                                          color: vm.expiryDate != null
+                                              ? Colors.white
+                                              : Colors.white38,
+                                          fontSize: 12,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Description / Notes Field
+                  const Text('Internal Product Description / Notes',
+                      style: TextStyle(color: Colors.white70, fontSize: 12)),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: _descriptionController,
+                    maxLines: 3,
+                    style: const TextStyle(color: Colors.white, fontSize: 13),
+                    decoration: InputDecoration(
+                      hintText:
+                          'Add private supplier notes, batch specifics, or specifications...',
+                      hintStyle: const TextStyle(color: Colors.white24),
+                      filled: true,
+                      fillColor: _bgObsidian,
+                      contentPadding: const EdgeInsets.all(12),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: _borderSlate),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: _borderSlate),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide:
+                            const BorderSide(color: _accentSky, width: 1.5),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // ==================== STICKY FLOATING GLASS BOTTOM BAR ====================
+
+  Widget _buildStickyBottomActionBar(ProductFormViewModel vm) {
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final isEnabled = vm.isValid && !vm.isSaving;
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: bottomInset),
+      child: ClipRRect(
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: _bgObsidian.withValues(alpha: 0.88),
+              border: const Border(
+                top: BorderSide(color: _borderSlate, width: 0.8),
+              ),
+            ),
+            child: Row(
+              children: [
+                // Left Summary Chip: Margin % or SKU
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: _surfaceNavy,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: _borderSlate),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        vm.marginHealth == MarginHealth.loss
+                            ? Icons.trending_down
+                            : Icons.trending_up,
+                        size: 16,
+                        color: vm.marginHealth == MarginHealth.loss
+                            ? _crimson
+                            : _emerald,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        '${vm.marginPercentage.toStringAsFixed(1)}%',
+                        style: TextStyle(
+                          color: vm.marginHealth == MarginHealth.loss
+                              ? _crimson
+                              : _emerald,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                Text(
-                  description,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: isDarkMode
-                        ? Colors.grey.shade400
-                        : Colors.grey.shade600,
+                const SizedBox(width: 12),
+
+                // Right: Gradient Save Button
+                Expanded(
+                  child: SizedBox(
+                    height: 48,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        gradient: isEnabled
+                            ? const LinearGradient(
+                                colors: [Color(0xFF0284C7), _accentIndigo],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              )
+                            : null,
+                        color: isEnabled ? null : _borderSlate,
+                        boxShadow: isEnabled
+                            ? [
+                                BoxShadow(
+                                  color: _accentIndigo.withValues(alpha: 0.4),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ]
+                            : null,
+                      ),
+                      child: ElevatedButton(
+                        onPressed: isEnabled ? _submitProduct : null,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          foregroundColor: Colors.white,
+                          disabledBackgroundColor: Colors.transparent,
+                          disabledForegroundColor: Colors.white38,
+                          shadowColor: Colors.transparent,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: vm.isSaving
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white),
+                                ),
+                              )
+                            : Text(
+                                widget.isEditing
+                                    ? 'Update Product'
+                                    : 'Save Item to Catalog',
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.2,
+                                ),
+                              ),
+                      ),
+                    ),
                   ),
                 ),
               ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }

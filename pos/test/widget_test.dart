@@ -5,6 +5,7 @@ import 'package:pos/models/product.dart';
 import 'package:pos/models/customer.dart';
 import 'package:pos/viewmodels/pos_view_model.dart';
 import 'package:pos/viewmodels/inventory_view_model.dart';
+import 'package:pos/viewmodels/product_form_view_model.dart';
 import 'package:pos/widgets/stat_badge.dart';
 import 'package:pos/widgets/pos_card.dart';
 import 'package:pos/widgets/staggered_animation.dart';
@@ -353,4 +354,165 @@ void main() {
       expect(customer.displayName, 'Sarah Connor');
     });
   });
+
+  group('ProductFormViewModel Tests', () {
+    late ProductFormViewModel formVm;
+
+    setUp(() {
+      formVm = ProductFormViewModel();
+      formVm.initFromProduct(null);
+    });
+
+    test('calculates profit and margin percentage correctly', () {
+      formVm.setName('Fresh Milk');
+      formVm.setCostPrice(60.0);
+      formVm.setSellingPrice(100.0);
+
+      // Profit = 100 - 60 = 40
+      expect(formVm.profit, 40.0);
+      // Margin = ((100 - 60) / 100) * 100 = 40%
+      expect(formVm.marginPercentage, 40.0);
+      // Margin > 25% -> healthy
+      expect(formVm.marginHealth, MarginHealth.healthy);
+    });
+
+    test('evaluates thin margin (1% - 25%) as MarginHealth.low', () {
+      formVm.setName('Cheap Candy');
+      formVm.setCostPrice(85.0);
+      formVm.setSellingPrice(100.0);
+
+      // Profit = 15, Margin = 15%
+      expect(formVm.profit, 15.0);
+      expect(formVm.marginPercentage, 15.0);
+      expect(formVm.marginHealth, MarginHealth.low);
+    });
+
+    test('evaluates loss or zero profit as MarginHealth.loss', () {
+      formVm.setName('Loss Leader Item');
+      formVm.setCostPrice(120.0);
+      formVm.setSellingPrice(100.0);
+
+      // Selling below cost
+      expect(formVm.profit, -20.0);
+      expect(formVm.marginPercentage, -20.0);
+      expect(formVm.marginHealth, MarginHealth.loss);
+
+      // Selling at cost
+      formVm.setCostPrice(100.0);
+      expect(formVm.profit, 0.0);
+      expect(formVm.marginPercentage, 0.0);
+      expect(formVm.marginHealth, MarginHealth.loss);
+    });
+
+    test('handles division by zero and zero cost price gracefully without crash', () {
+      formVm.setCostPrice(0.0);
+      formVm.setSellingPrice(0.0);
+
+      expect(formVm.profit, 0.0);
+      expect(formVm.marginPercentage, 0.0);
+      expect(formVm.marginHealth, MarginHealth.loss);
+
+      // Selling price positive, zero cost price (100% markup)
+      formVm.setSellingPrice(50.0);
+      expect(formVm.profit, 50.0);
+      expect(formVm.marginPercentage, 100.0);
+      expect(formVm.marginHealth, MarginHealth.healthy);
+    });
+
+    test('validates form fields correctly', () {
+      // Initially empty -> invalid
+      expect(formVm.isValid, false);
+
+      formVm.setName('Basmati Rice 5kg');
+      expect(formVm.isValid, false); // selling price still 0
+
+      formVm.setSellingPrice(25.0);
+      formVm.setStockQuantity(10);
+      expect(formVm.isValid, true);
+
+      // Negative stock quantity is guarded
+      formVm.setStockQuantity(-5);
+      expect(formVm.stockQuantity, 0); // clamped to 0
+      expect(formVm.isValid, true);
+    });
+
+    test('barcode bridge auto-fills barcode and SKU when SKU is empty', () {
+      expect(formVm.barcode, '');
+      expect(formVm.sku, '');
+
+      formVm.onBarcodeScanned('8901234567890');
+      expect(formVm.barcode, '8901234567890');
+      expect(formVm.sku, '8901234567890');
+
+      // If SKU is already populated, scanning a new barcode updates barcode but preserves SKU
+      formVm.setSku('CUSTOM-SKU-99');
+      formVm.onBarcodeScanned('777888999');
+      expect(formVm.barcode, '777888999');
+      expect(formVm.sku, 'CUSTOM-SKU-99');
+    });
+
+    test('stepper increments and decrements stock correctly', () {
+      formVm.setStockQuantity(5);
+      formVm.incrementStock();
+      expect(formVm.stockQuantity, 6);
+
+      formVm.decrementStock();
+      expect(formVm.stockQuantity, 5);
+
+      // Does not decrement below zero
+      formVm.setStockQuantity(0);
+      formVm.decrementStock();
+      expect(formVm.stockQuantity, 0);
+    });
+
+    test('category management adds and selects categories', () {
+      formVm.addCategory('Organic Spices');
+      expect(formVm.availableCategories.contains('Organic Spices'), true);
+      expect(formVm.category, 'Organic Spices');
+
+      formVm.setCategory('Bakery');
+      expect(formVm.category, 'Bakery');
+    });
+
+    test('initializes correctly from existing Product', () {
+      final existing = Product(
+        id: 'prod_99',
+        name: 'Whole Grain Bread',
+        description: 'Nutritious brown bread',
+        brand: 'HealthyBake',
+        sku: 'BRD-01',
+        price: 4.50,
+        costPrice: 2.50,
+        stock: 18,
+        minStock: 4,
+        maxStock: 50,
+        unit: 'box',
+        barcode: '99887766',
+        qrCode: '',
+        category: 'Bakery',
+        imageUrl: 'https://example.com/bread.jpg',
+        isActive: true,
+        isFeatured: false,
+        isDigital: false,
+        hasVariants: false,
+        createdAt: testDate,
+        updatedAt: testDate,
+      );
+
+      formVm.initFromProduct(existing);
+      expect(formVm.name, 'Whole Grain Bread');
+      expect(formVm.sku, 'BRD-01');
+      expect(formVm.barcode, '99887766');
+      expect(formVm.costPrice, 2.50);
+      expect(formVm.sellingPrice, 4.50);
+      expect(formVm.profit, 2.00);
+      expect(formVm.unit, 'box');
+      expect(formVm.stockQuantity, 18);
+      expect(formVm.minStockAlert, 4);
+      expect(formVm.category, 'Bakery');
+      expect(formVm.imageUrl, 'https://example.com/bread.jpg');
+      expect(formVm.isValid, true);
+    });
+  });
 }
+

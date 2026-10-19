@@ -95,8 +95,16 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => AuthProvider()..init()),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => SettingsProvider()),
-        ChangeNotifierProvider(create: (_) => PosViewModel()),
-        ChangeNotifierProvider(create: (_) => InventoryViewModel()),
+        ChangeNotifierProxyProvider<AuthProvider, PosViewModel>(
+          create: (_) => PosViewModel(),
+          update: (_, auth, posVm) =>
+              (posVm ?? PosViewModel())..initForStore(auth.currentBusinessId),
+        ),
+        ChangeNotifierProxyProvider<AuthProvider, InventoryViewModel>(
+          create: (_) => InventoryViewModel(),
+          update: (_, auth, invVm) =>
+              (invVm ?? InventoryViewModel())..initForStore(auth.currentBusinessId),
+        ),
       ],
       child: Consumer3<AuthProvider, ThemeProvider, SettingsProvider>(
         builder: (context, authProvider, themeProvider, settingsProvider, _) {
