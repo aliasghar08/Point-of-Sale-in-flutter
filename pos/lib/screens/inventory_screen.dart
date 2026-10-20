@@ -17,6 +17,7 @@ import 'package:pos/widgets/empty_state_view.dart';
 import 'package:pos/widgets/staggered_animation.dart';
 import 'package:pos/screens/product_form_screen.dart';
 import 'package:pos/viewmodels/inventory_view_model.dart';
+import 'package:pos/widgets/product_image_widget.dart';
 
 /// Modern Inventory & Stock Management Screen.
 class InventoryScreen extends StatefulWidget {
@@ -528,21 +529,14 @@ class _InventoryScreenState extends State<InventoryScreen> {
             padding: const EdgeInsets.all(12),
             child: Row(
               children: [
-                // Product Avatar
-                Container(
+                // Product Avatar / Thumbnail
+                ProductImageWidget(
+                  imageUrl: p.imageUrl,
                   width: 48,
                   height: 48,
-                  decoration: BoxDecoration(
-                    color: isDark
-                        ? AppColors.primaryLight.withValues(alpha: 0.12)
-                        : AppColors.primary.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    Icons.inventory_2_outlined,
-                    color: isDark ? AppColors.primaryLight : AppColors.primary,
-                    size: 24,
-                  ),
+                  borderRadius: 12,
+                  fallbackIcon: Icons.inventory_2_outlined,
+                  iconSize: 24,
                 ),
                 const SizedBox(width: 12),
 
@@ -702,6 +696,17 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   ),
                   StatBadge.stock(stock: p.stock, minStock: p.minStock),
                 ],
+              ),
+              const Spacer(),
+              Center(
+                child: ProductImageWidget(
+                  imageUrl: p.imageUrl,
+                  width: 52,
+                  height: 52,
+                  borderRadius: 12,
+                  fallbackIcon: Icons.inventory_2_outlined,
+                  iconSize: 26,
+                ),
               ),
               const Spacer(),
               Text(

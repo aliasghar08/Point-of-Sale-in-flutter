@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:pos/models/product.dart';
 import 'package:pos/services/firebase_service.dart';
 import 'package:pos/services/cache_service.dart';
+import 'package:pos/services/storage_service.dart';
 import 'package:pos/services/feedback_service.dart';
 import 'package:pos/viewmodels/inventory_view_model.dart';
 import 'package:pos/viewmodels/pos_view_model.dart';
@@ -22,6 +23,7 @@ enum MarginHealth {
 class ProductFormViewModel extends ChangeNotifier {
   final FirebaseService _firebaseService = FirebaseService();
   final CacheService _cache = CacheService();
+  final StorageService _storageService = StorageService();
 
   // Basic Details
   String _name = '';
@@ -359,10 +361,24 @@ class ProductFormViewModel extends ChangeNotifier {
               .doc()
               .id;
 
-      // Handle image: store local path or url
+      // Handle image: upload to Firebase Cloud Storage under Blaze plan if new local image was selected
       String finalImageUrl = _imageUrl ?? '';
       if (_imageFile != null) {
-        finalImageUrl = _imageFile!.path;
+        try {
+          final uploadedUrl = await _storageService.uploadProductImage(
+            businessId: businessId,
+            productId: productId,
+            file: _imageFile!,
+          );
+          if (uploadedUrl != null && uploadedUrl.isNotEmpty) {
+            finalImageUrl = uploadedUrl;
+          } else {
+            finalImageUrl = _imageFile!.path;
+          }
+        } catch (e) {
+          debugPrint('⚠️ Storage upload failed, falling back to local path: $e');
+          finalImageUrl = _imageFile!.path;
+        }
       }
 
       final product = Product(

@@ -24,6 +24,7 @@ import 'package:pos/widgets/barcode_scanner.dart';
 import 'package:pos/widgets/voice_input.dart';
 import 'package:pos/widgets/customer_selection_dialog.dart';
 import 'package:pos/widgets/staggered_animation.dart';
+import 'package:pos/widgets/product_image_widget.dart';
 
 /// Modern, High-Performance Point of Sale (POS) Cashier Register Screen.
 class HomeScreen extends StatefulWidget {
@@ -1335,22 +1336,15 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
                 const Spacer(),
-                // Icon Placeholder / Thumbnail
+                // Product Image / Thumbnail
                 Center(
-                  child: Container(
-                    width: 52,
-                    height: 52,
-                    decoration: BoxDecoration(
-                      color: isDark
-                          ? AppColors.primaryLight.withValues(alpha: 0.1)
-                          : AppColors.primary.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Icon(
-                      Icons.shopping_bag_outlined,
-                      color: isDark ? AppColors.primaryLight : AppColors.primary,
-                      size: 28,
-                    ),
+                  child: ProductImageWidget(
+                    imageUrl: product.imageUrl,
+                    width: 56,
+                    height: 56,
+                    borderRadius: 14,
+                    fallbackIcon: Icons.shopping_bag_outlined,
+                    iconSize: 28,
                   ),
                 ),
                 const Spacer(),

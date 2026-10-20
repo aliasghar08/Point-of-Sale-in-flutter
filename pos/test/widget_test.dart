@@ -12,6 +12,7 @@ import 'package:pos/screens/login_screen.dart';
 import 'package:pos/widgets/stat_badge.dart';
 import 'package:pos/widgets/pos_card.dart';
 import 'package:pos/widgets/staggered_animation.dart';
+import 'package:pos/widgets/product_image_widget.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -534,6 +535,40 @@ void main() {
       expect(formVm.category, 'Bakery');
       expect(formVm.imageUrl, 'https://example.com/bread.jpg');
       expect(formVm.isValid, true);
+    });
+  });
+
+  group('ProductImageWidget Tests', () {
+    testWidgets('renders fallback icon when imageUrl is empty', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: ProductImageWidget(
+              imageUrl: '',
+              fallbackIcon: Icons.shopping_bag_outlined,
+            ),
+          ),
+        ),
+      );
+
+      expect(find.byIcon(Icons.shopping_bag_outlined), findsOneWidget);
+    });
+
+    testWidgets('renders custom fallback icon and dimensions', (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: ProductImageWidget(
+              imageUrl: null,
+              width: 64,
+              height: 64,
+              fallbackIcon: Icons.inventory_2_outlined,
+            ),
+          ),
+        ),
+      );
+
+      expect(find.byIcon(Icons.inventory_2_outlined), findsOneWidget);
     });
   });
 }

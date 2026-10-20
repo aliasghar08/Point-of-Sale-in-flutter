@@ -13,6 +13,7 @@ import 'package:pos/providers/auth_provider.dart';
 import 'package:pos/providers/settings_provider.dart';
 import 'package:pos/widgets/pos_card.dart';
 import 'package:pos/widgets/barcode_scanner.dart';
+import 'package:pos/widgets/product_image_widget.dart';
 
 /// Premium, Retail-Grade Product Catalog Creation & Editing Screen.
 /// Designed to Apple, Square, and Stripe retail standards with deep obsidian surfaces,
@@ -504,32 +505,18 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                   child: Stack(
                     children: [
                       Center(
-                        child: vm.imageFile != null
-                            ? ClipRRect(
-                                borderRadius: BorderRadius.circular(14),
-                                child: Image.file(
-                                  vm.imageFile!,
-                                  width: 88,
-                                  height: 88,
-                                  fit: BoxFit.cover,
-                                ),
+                        child: (vm.imageFile != null ||
+                                (vm.imageUrl != null && vm.imageUrl!.isNotEmpty))
+                            ? ProductImageWidget(
+                                localFile: vm.imageFile,
+                                imageUrl: vm.imageUrl,
+                                width: 88,
+                                height: 88,
+                                borderRadius: 14,
+                                fallbackIcon: Icons.shopping_bag_outlined,
+                                iconSize: 32,
                               )
-                            : (vm.imageUrl != null && vm.imageUrl!.isNotEmpty)
-                                ? ClipRRect(
-                                    borderRadius: BorderRadius.circular(14),
-                                    child: Image.network(
-                                      vm.imageUrl!,
-                                      width: 88,
-                                      height: 88,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (context, error, stackTrace) =>
-                                          const Icon(
-                                        Icons.image_not_supported,
-                                        color: Colors.white38,
-                                      ),
-                                    ),
-                                  )
-                                : Column(
+                            : Column(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: const [
                                       Icon(Icons.add_a_photo_outlined,

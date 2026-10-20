@@ -61,6 +61,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   speech_to_text: ^7.4.0
   local_auth: ^3.0.2
+  firebase_storage: ^13.6.0
 
 dev_dependencies:
   flutter_test:

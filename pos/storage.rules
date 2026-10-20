@@ -1,0 +1,49 @@
+rules_version = '2';
+
+// Craft rules based on data in your Firestore database
+// users/{userId}/avatar/{fileName}
+// businesses/{businessId}/products/{productId}/{fileName}
+// businesses/{businessId}/branding/{fileName}
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isImage() {
+      return request.resource.contentType.matches('image/.*')
+             && request.resource.size <= 10 * 1024 * 1024; // Max 10MB image
+    }
+
+    // Product Catalog Images
+    match /businesses/{businessId}/products/{productId}/{fileName} {
+      // Anyone can read catalog images (for customer receipts, public invoices, POS display)
+      allow read: if true;
+      // Authenticated users can upload and manage images for their store's products
+      allow write: if isAuthenticated() && isImage();
+      allow delete: if isAuthenticated();
+    }
+
+    // Store Branding, Banners, and Receipt Logos
+    match /businesses/{businessId}/branding/{fileName} {
+      allow read: if true;
+      allow write: if isAuthenticated() && isImage();
+      allow delete: if isAuthenticated();
+    }
+
+    // User Profile Images
+    match /users/{userId}/avatar/{fileName} {
+      allow read: if true;
+      allow write: if isAuthenticated() && (request.auth.uid == userId) && isImage();
+      allow delete: if isAuthenticated() && (request.auth.uid == userId);
+    }
+
+    // General fallback
+    match /{allPaths=**} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && isImage();
+    }
+  }
+}
